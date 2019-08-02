@@ -4,7 +4,9 @@
 import json
 import logging
 import traceback
+import time
 
+from inspect import getargspec, signature
 from datetime import datetime as dt
 
 from odoo import api, fields, models, _
@@ -16,6 +18,65 @@ _logger = logging.getLogger(__name__)
 
 SYNCHRONIZATION_STATES = ['new', 'fail', 'done', 'cancel']
 
+def get_integration(integration_obj, provider_name):
+    integration = integration_obj.search([('provider_name', '=', provider_name), '|', ('active', '=', False), ('active', '=', True)], limit=1)
+    if not integration: 
+            _logger.info("No integration found, create a default one")
+            api_connection = integration_obj.env.ref('edi_base.api_connection')
+            integration = integration_obj.create({
+                'integration_flow' : 'in',
+                'connection_id': api_connection.id,
+                'type': 'api',
+                'provider_name': provider_name,
+                'name' : provider_name,
+                'synchronization_content_type': 'json',
+                'active': False,
+            })
+    return integration
+
+def create_synchronization(integration, pool, args, kwargs, fct):
+    data = {
+        'name' : '%s @%s' % (integration.provider_name, time.time()),
+        'integration_id' : integration.id,
+        'synchronization_date': fields.Datetime.now(),
+        'content': """
+Function
+\t%s.%s
+Args
+\t%s
+Kwarg
+\t%s
+Context
+\t%s""" % (pool._name, fct.__name__, args, kwargs, pool._context),
+        'user_id': pool.env.user.id,
+    }
+    return integration.env['edi.synchronization'].create(data)
+
+def integration(name):
+    def decorator(fct):
+        def wrapper(*args, **kwargs):
+            self = args[0]
+            with api.Environment.manage():
+                new_cr = self.pool.cursor()
+                integration_obj = self.env['edi.integration'].sudo().with_env(self.env(cr=new_cr))
+                integration = get_integration(integration_obj, name)
+                sync = create_synchronization(integration, self, args, kwargs, fct)
+                try:
+                    res = fct(*args, **kwargs)
+                except Exception as e:
+                    sync._report_error(name, e)
+                    raise
+                else:
+                    sync._done()
+                finally:
+                    new_cr.commit()
+                    new_cr.close()
+            return res
+
+        sig = signature(fct)
+        wrapper.__signature__ = sig
+        return wrapper
+    return decorator
 
 class Integration(models.Model):
 
@@ -25,7 +86,7 @@ class Integration(models.Model):
 
     integration_flow = fields.Selection([('in', 'From provider to Odoo'), ('out', 'From Odoo to provider')], required=True, string='Flow of data')
     connection_id = fields.Many2one('edi.connection', required=True, on_delete='restrict', string='Connection')
-    type = fields.Selection(selection=[], required=True, string='Type') #Add selection for your integration
+    type = fields.Selection(selection=[('api', 'RPC Api')], required=True, string='Type') #Add selection for your integration
     parameter = fields.Text(string="Parameter")
 
     synchronization_content_type = fields.Selection(selection=[
@@ -52,6 +113,45 @@ class Integration(models.Model):
     cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron job')
     integration_name = fields.Char(related='cron_id.name', store=True, string='Name')
 
+    #Status
+    last_success_date = fields.Datetime(compute="_get_status")
+    last_failure_date = fields.Datetime(compute="_get_status")
+    last_sync_status = fields.Char(compute="_get_status")
+    color = fields.Integer(compute="_get_status")
+    error_ids = fields.One2many('edi.synchronization.error', 'integration_id')
+
+    def _get_status(self):
+        query = """
+            SELECT DISTINCT ON (integration_id, state) 
+                integration_id, 
+                synchronization_date, 
+                state 
+            FROM edi_Synchronization 
+            WHERE integration_id in (%s) 
+            ORDER BY integration_id, state, synchronization_date desc;
+        """
+        self.env.cr.execute(query, self.ids)
+        fail_sync = {}
+        done_sync = {}
+        for sync in self.env.cr.fetchall():
+            if sync[2] == 'fail':
+                fail_sync[sync[0]] = fields.Datetime.to_string(sync[1])
+            if sync[2] == 'done':
+                done_sync[sync[0]] = fields.Datetime.to_string(sync[1])
+            
+        for rec in self:
+            rec.last_success_date = done_sync.get(rec.id, False)
+            rec.last_failure_date = fail_sync.get(rec.id, False)
+            rec.last_sync_status = 'No Sync Yet'
+            rec.color = 4
+            if rec.last_success_date > rec.last_failure_date:
+                rec.last_sync_status = "Success"
+                rec.color = 10
+            if rec.last_success_date < rec.last_failure_date:
+                rec.last_sync_status = "Fail"
+                rec.color = 1
+
+
     # @api.depends('res_model_id')
     # def _compute_post_message_available(self):
     #     """
@@ -74,12 +174,12 @@ class Integration(models.Model):
         """
         """
 
-        for integration in self:
-            if integration.flow_type == in:
-                integration.proccess_in()
-            else:
-                integration.processs_out()
-            integration._process_integration()
+        # for integration in self:
+        #     if integration.flow_type == in:
+        #         integration.proccess_in()
+        #     else:
+        #         integration.processs_out()
+        #     integration._process_integration()
 
         return True #TODO make difference between in and out
 

@@ -9,7 +9,7 @@
             <field name="synchronization_id"/>
             <field name="create_date"/>
             <field name="activity"/>
-            <field name="description"/>
+            <field name="description_short"/>
         </tree>
     </field>
 </record>
@@ -50,7 +50,7 @@
     <field name="name">edi.synchronization.form</field>
     <field name="model">edi.synchronization</field>
     <field name="arch" type="xml">
-        <form string="Synchronization" edit="0" create="0" delete="0">
+        <form string="Synchronization" edit="1" create="1" delete="0">
             <field name="integration_id" invisible="1"/>
             <field name="res_id" invisible="1"/>
             <header>
@@ -111,7 +111,7 @@
     <field name="name">edi.synchronization.tree</field>
     <field name="model">edi.synchronization</field>
     <field name="arch" type="xml">
-        <tree string="Synchronizations" edit="0" create="0" delete="0"
+        <tree string="Synchronizations" edit="1" create="1" delete="0"
             decoration-success="[('state', '=', 'done')]"
             decoration-bf="[('state', '=', 'new')]"
             decoration-muted="[('state', '=', 'cancel')]"
@@ -127,7 +127,7 @@
     </field>
 </record>
 
-<record id="synchronization_kanban_view" model="ir.ui.view">
+<!-- <record id="synchronization_kanban_view" model="ir.ui.view">
     <field name="name">edi.syncrhonization.kanban.view</field>
     <field name="model">edi.synchronization</field>
     <field name="arch" type="xml">
@@ -218,7 +218,7 @@
             </templates>
         </kanban>
     </field>
-</record>
+</record> -->
 
 <record id="synchronization_search_view" model="ir.ui.view">
     <field name="name">edi.syncrhonization.search.view</field>
@@ -253,7 +253,7 @@
 <record id="synchronizations_act_window" model="ir.actions.act_window">
     <field name="name">Synchronizations</field>
     <field name="res_model">edi.synchronization</field>
-    <field name="view_mode">kanban,tree,form</field>
+    <field name="view_mode">tree,form</field>
     <field name="search_view_id" ref="edi_base.synchronization_search_view"/>
     <field name="help" type="html">
         <p class="oe_view_nocontent">Here you will find the files created to be synchronized with the remote servers configured on your integrations.</p>
@@ -263,6 +263,6 @@
     }"/>
 </record>
 
-<menuitem id="synchronizations_menu" parent="root_menu" name="Synchronizations" sequence="20" action="synchronizations_act_window"/>
+<menuitem id="synchronizations_menu" parent="root_menu" name="Synchronizations" sequence="10" action="synchronizations_act_window"/>
 
 </odoo>

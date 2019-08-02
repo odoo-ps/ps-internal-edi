@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+import traceback
 
 from odoo import api, fields, models, SUPERUSER_ID
+
 
 
 class Synchronization(models.Model):
@@ -36,6 +38,7 @@ class Synchronization(models.Model):
     content = fields.Text(readonly=True)
     error_ids = fields.One2many('edi.synchronization.error', 'synchronization_id', string='synchronization_id')
     errors_count = fields.Integer(_compute='_compute_errors_count', string='# errors')
+    user_id = fields.Many2one('res.users', string='Trigger User', help="User that trigger the synchronization or call the API")
 
     def _process_in(self, data):
         """
@@ -58,6 +61,19 @@ class Synchronization(models.Model):
         """
         raise NotImplementedError("No _get_content method implemented for this type of connection")
 
+    def _report_error(self, activity, exception):
+        tb = traceback.format_exc()
+        self.write({
+            'state': 'fail', 
+            'error_ids' : [(0, 0, {
+                'activity': activity,
+                'description': str(tb),
+            })]
+        })
+
+    def _done(self):
+        self.write({'state': 'done'})
+
     ###################################
     #    End of abstract interface    #
     #  don't override these methods   #
@@ -70,6 +86,9 @@ class Synchronization(models.Model):
             'The name must be unique per integration!'
         )
     ]
+
+
+    
 
     @api.depends('error_ids')
     def _compute_errors_count(self):
@@ -109,6 +128,7 @@ class SynchronizationError(models.Model):
     _name = 'edi.synchronization.error'
     _description = 'Synchronization Error'
 
+    integration_id = fields.Many2one(related='synchronization_id.integration_id', store=True)
     synchronization_id = fields.Many2one(
         comodel_name='edi.synchronization',
         on_delete='cascade',
@@ -116,3 +136,11 @@ class SynchronizationError(models.Model):
     )
     activity = fields.Char()
     description = fields.Text()
+    description_short = fields.Text(compute='_get_short_desc')
+
+    def _get_short_desc(self):
+        for rec in self:
+            if not rec.description or len(rec.description) < 700:
+                rec.description_short = rec.description
+            else:
+                rec.description_short = "%s\n....\n%s" % (rec.description[:200], rec.description[-500:])

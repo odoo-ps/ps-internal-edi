@@ -63,6 +63,13 @@ class Connection(models.Model):
 
 import os
 
+class ConnectionApi(models.Model):
+
+    _inherit = 'edi.connection'
+    _description = 'EDI Connection'
+
+    type = fields.Selection(selection_add=[('api', 'Rpc Api')])
+
 class ConnectionFolder(models.Model):
 
     _inherit = 'edi.connection'

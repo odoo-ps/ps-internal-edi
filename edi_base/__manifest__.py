@@ -14,7 +14,8 @@ Odoo PS EDI Framework
         'security/ir.model.access.csv',
         'views/edi_connection.xml',
         'views/edi_integration.xml',
-        'views/edi_synchronization.xml'
+        'views/edi_synchronization.xml',
+        'data/connection.xml',
     ],
     'hidden': True,
     'auto_install': False

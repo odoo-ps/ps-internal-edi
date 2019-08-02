@@ -1,0 +1,6 @@
+<odoo>
+    <record model="edi.connection" id="api_connection">
+        <field name="name">Call to Odoo Rpc Api</field>
+        <field name="type">api</field>
+    </record>
+</odoo>
