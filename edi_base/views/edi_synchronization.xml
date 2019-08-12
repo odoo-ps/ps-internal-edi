@@ -27,10 +27,9 @@
                     <group>
                         <field name="activity"/>
                     </group>
-                    <group>
-                        <field name="description"/>
-                    </group>
                 </group>
+                <separator string="Description" />
+                <field name="description" />
             </sheet>
         </form>
     </field>

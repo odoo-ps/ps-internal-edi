@@ -23,18 +23,25 @@ class Connection(models.Model):
         """
         raise NotImplementedError("No test method implemented for this type of connection")
 
-    def send_synchronization(self, synchronization, *args, **kwargs):
+    def _send_synchronization(self, filename, content, *args, **kwargs):
         """
         """
         raise NotImplementedError("No send_synchronization method implemented for this type of connection")
 
-    def fetch_synchronizations(self, *args, **kwargs):
+    def _fetch_synchronizations(self, *args, **kwargs):
         """
+            Return list of dict or a dict
+            the dict should be {
+                'filename': FILENAME (str),
+                'content': str or dict: will be handle by in edi.integration._process_data
+            }
         """
         raise NotImplementedError("No fetch_synchronizations method implemented for this type of connection")
 
-    def clean_synchronization(self, filename, status, *args, **kwargs):
+    def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
         """
+            Status: done if everything went well
+                    error if there is something that went wrong
         """
         raise NotImplementedError("No clean_synchronization method implemented for this type of connection")
 
@@ -61,77 +68,9 @@ class Connection(models.Model):
         return json.loads(self.configuration)
 
 
-import os
-
 class ConnectionApi(models.Model):
 
     _inherit = 'edi.connection'
     _description = 'EDI Connection'
 
     type = fields.Selection(selection_add=[('api', 'Rpc Api')])
-
-class ConnectionFolder(models.Model):
-
-    _inherit = 'edi.connection'
-    _description = 'EDI Connection'
-
-    type = fields.Selection(selection_add=[('folder', 'Folder')])
-
-    def _get_default_configuration(self):
-        if self.type != 'folder':
-            return super()._get_default_configuration()
-
-        return {
-            'in_folder' : '<PATH HERE>',
-            'out_folder' : '<PATH HERE>',
-        }
-
-
-    @api.multi
-    def test(self):
-        """
-        """
-        self.ensure_one()
-        if not self.type == 'folder':
-            return super().test()
-
-        config = self._read_configuration()
-        
-        for fname in [config['in_folder'], config['out_folder']]:
-            path = "%s/test" % config['in_folder']
-            with open(path, "w") as in_f:
-                in_f.write("Test")
-            os.remove(path)
-        raise UserError("Connection Successful")
-
-    def _connect(self):
-        return True
-
-    def send_synchronization(self, synchronization, *args, **kwargs):
-        """
-        """
-
-        self.ensure_one()
-        getattr(self, '_%s_send_synchronization' % self.connection_type)(synchronization, *args, **kwargs)
-
-    def fetch_synchronizations(self, *args, **kwargs):
-        """
-        """
-
-        self.ensure_one()
-        return getattr(self, '_%s_fetch_synchronizations' % self.connection_type)(*args, **kwargs)
-
-    def clean_synchronization(self, filename, status, *args, **kwargs):
-        """
-        """
-
-        self.ensure_one()
-        getattr(
-            self,
-            '_%s_%s_clean_synchronization' % (self.connection_type, status),
-            getattr(
-                self,
-                '_%s_clean_synchronization' % self.connection_type,
-                lambda *a, **kw: None
-            )
-        )(filename, *args, **kwargs)

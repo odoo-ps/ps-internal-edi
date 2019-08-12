@@ -6,87 +6,25 @@ import logging
 import traceback
 import time
 
-from inspect import getargspec, signature
-from datetime import datetime as dt
-
+from datetime import datetime
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
-from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT, safe_eval
+from odoo.tools import safe_eval
 
 _logger = logging.getLogger(__name__)
 
-
-SYNCHRONIZATION_STATES = ['new', 'fail', 'done', 'cancel']
-
-def get_integration(integration_obj, provider_name):
-    integration = integration_obj.search([('provider_name', '=', provider_name), '|', ('active', '=', False), ('active', '=', True)], limit=1)
-    if not integration: 
-            _logger.info("No integration found, create a default one")
-            api_connection = integration_obj.env.ref('edi_base.api_connection')
-            integration = integration_obj.create({
-                'integration_flow' : 'in',
-                'connection_id': api_connection.id,
-                'type': 'api',
-                'provider_name': provider_name,
-                'name' : provider_name,
-                'synchronization_content_type': 'json',
-                'active': False,
-            })
-    return integration
-
-def create_synchronization(integration, pool, args, kwargs, fct):
-    data = {
-        'name' : '%s @%s' % (integration.provider_name, time.time()),
-        'integration_id' : integration.id,
-        'synchronization_date': fields.Datetime.now(),
-        'content': """
-Function
-\t%s.%s
-Args
-\t%s
-Kwarg
-\t%s
-Context
-\t%s""" % (pool._name, fct.__name__, args, kwargs, pool._context),
-        'user_id': pool.env.user.id,
-    }
-    return integration.env['edi.synchronization'].create(data)
-
-def integration(name):
-    def decorator(fct):
-        def wrapper(*args, **kwargs):
-            self = args[0]
-            with api.Environment.manage():
-                new_cr = self.pool.cursor()
-                integration_obj = self.env['edi.integration'].sudo().with_env(self.env(cr=new_cr))
-                integration = get_integration(integration_obj, name)
-                sync = create_synchronization(integration, self, args, kwargs, fct)
-                try:
-                    res = fct(*args, **kwargs)
-                except Exception as e:
-                    sync._report_error(name, e)
-                    raise
-                else:
-                    sync._done()
-                finally:
-                    new_cr.commit()
-                    new_cr.close()
-            return res
-
-        sig = signature(fct)
-        wrapper.__signature__ = sig
-        return wrapper
-    return decorator
 
 class Integration(models.Model):
 
     _name = 'edi.integration'
     _description = 'Integration to process by Odoo instance'
     _inherits = {'ir.cron': 'cron_id'}
+    _order = 'sequence'
 
     integration_flow = fields.Selection([('in', 'From provider to Odoo'), ('out', 'From Odoo to provider')], required=True, string='Flow of data')
+    synchronization_creation = fields.Selection([('one', 'One'), ('multi', 'Multi')], help="Create a synchro for each record (one), or for all record multi", default="multi")
     connection_id = fields.Many2one('edi.connection', required=True, on_delete='restrict', string='Connection')
-    type = fields.Selection(selection=[('api', 'RPC Api')], required=True, string='Type') #Add selection for your integration
+    type = fields.Selection(selection=[('multi', 'Call Sub Integration'),('api', 'RPC Api')], required=True, string='Type') #Add selection for your integration
     parameter = fields.Text(string="Parameter")
 
     synchronization_content_type = fields.Selection(selection=[
@@ -96,22 +34,17 @@ class Integration(models.Model):
         ('json', 'JSON'),
         ('pdf', 'PDF')
     ], default='text', required=True, readonly=True, string='Content type')
-
-    #res_model_id = fields.Many2one('ir.model', required=True, string='Resource model')
-
-    #post_message_needed = fields.Boolean(string='Post message')
-    #post_message_available = fields.Boolean(compute='_compute_post_message_available', string='Messaging available')
-    #message_subject = fields.Char(default='EDI Synchronization', string='Subject')
-    #error_message_body = fields.Html(default='<p>Error on synchronization!</p>', string='Error content')
-    #success_message_body = fields.Html(default='<p>Success on synchronization!</p>', string='Success content')
-
     provider_name = fields.Char(string='Provider Name')
-
-    #has_synchronizations = fields.Boolean(compute='_compute_has_synchronizations', string='Has synchronizations?')
 
     # cron inheritance
     cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron job')
-    integration_name = fields.Char(related='cron_id.name', store=True, string='Name')
+    #Multiple Integration at once
+    has_sub_integration = fields.Boolean(string="Has sub Integration", default=False,
+                                         help="if you need to run many integration in a specific order in the same transaction" )
+    sequence = fields.Integer()
+    sub_integration_ids = fields.Many2many('edi.integration',
+                                           'edi_integration_sub_integration_rel', 'integration_id', 'sub_integration_id',
+                                           domain=[('has_sub_integration', '!=', True), '|', ('active', '=', True), ('active', '=', False)])
 
     #Status
     last_success_date = fields.Datetime(compute="_get_status")
@@ -127,10 +60,10 @@ class Integration(models.Model):
                 synchronization_date, 
                 state 
             FROM edi_Synchronization 
-            WHERE integration_id in (%s) 
+            WHERE integration_id in %s and synchronization_date is not null
             ORDER BY integration_id, state, synchronization_date desc;
         """
-        self.env.cr.execute(query, self.ids)
+        self.env.cr.execute(query, (tuple(self.ids),))
         fail_sync = {}
         done_sync = {}
         for sync in self.env.cr.fetchall():
@@ -138,57 +71,19 @@ class Integration(models.Model):
                 fail_sync[sync[0]] = fields.Datetime.to_string(sync[1])
             if sync[2] == 'done':
                 done_sync[sync[0]] = fields.Datetime.to_string(sync[1])
-            
         for rec in self:
             rec.last_success_date = done_sync.get(rec.id, False)
             rec.last_failure_date = fail_sync.get(rec.id, False)
             rec.last_sync_status = 'No Sync Yet'
             rec.color = 4
-            if rec.last_success_date > rec.last_failure_date:
+            if (rec.last_success_date or datetime(1970, 1, 1)) > (rec.last_failure_date or datetime(1970, 1, 1)):
                 rec.last_sync_status = "Success"
                 rec.color = 10
-            if rec.last_success_date < rec.last_failure_date:
+            if (rec.last_success_date or datetime(1970, 1, 1)) < (rec.last_failure_date or datetime(1970, 1, 1)):
                 rec.last_sync_status = "Fail"
                 rec.color = 1
 
-
-    # @api.depends('res_model_id')
-    # def _compute_post_message_available(self):
-    #     """
-    #     """
-
-    #     MailThread = self.pool['mail.thread']
-
-    #     for integration in self:
-
-    #         if not integration.res_model_id:
-    #             integration.post_message_available = False
-    #         else:
-    #             integration.post_message_available = issubclass(
-    #                 self.pool.get(integration.res_model_id.model),
-    #                 MailThread
-    #             )
-
-
-    def _process(self):
-        """
-        """
-
-        # for integration in self:
-        #     if integration.flow_type == in:
-        #         integration.proccess_in()
-        #     else:
-        #         integration.processs_out()
-        #     integration._process_integration()
-
-        return True #TODO make difference between in and out
-
-    def _compute_has_synchronizations(self):
-        for integration in self:
-            integration.has_synchronizations = bool(self.env['edi.synchronization'].search_count([
-                ('integration_id', '=', integration.id)
-            ]))
-
+    #TODO Filter on status
 
     @api.model
     def create(self, values):
@@ -201,9 +96,10 @@ class Integration(models.Model):
         res.code = "model._process(%i)" % res.id
         return res
 
-    @api.model
-    def _process_integration(self, integration_id):
-        self.browse(integration_id)._process()
+    @api.multi
+    def _read_parameter(self):
+        self.ensure_one()
+        return json.loads(self.parameter)
 
 
     @api.multi
@@ -223,216 +119,306 @@ class Integration(models.Model):
 
         action_dict.update({
             'name': _('%s\'s synchronizations') % self.name,
-            'domain': [('integration_id', 'in', self.id)],
+            'domain': [('integration_id', 'in', [self.id] + self.sub_integration_ids.ids)],
             'context': ctx
         })
 
         return action_dict
 
-    @api.model
-    def _get_synchronization_values(self):
-        return {
-            'synchronization_date': self.now.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
-        }
-
-    def _get_synchronizations(self):
-        return getattr(self, '_get_%s_synchronizations' % self.integration_type)()
-
-    def _get_synchronization_domain(self):
-        return [
-            ('integration_id', '=', self.id),
-            ('res_model_id', '=', self.res_model_id.id),
-            ('synchronization_type', '=', self.integration_type),
-            ('content_type', '=', self.synchronization_content_type)
-        ]
-
-    def _check_post_message(self):
-        """
-        """
-
-        if not self.post_message_available or not self.post_message_needed:
-            return False
-
-        # NOTE: the second statement on the condition is to avoid spamming the
-        #       object with error messages.
-        #
-        #       The rationale is as follows:
-        #           if the synchronization failed once, we don't want to post a
-        #           error message, even if the error is different (that can be
-        #           checked on the synchronization 'error_ids' field)
-        fail_stage = self.synchronization_stage_ids.filtered(lambda s: s.state == 'fail')
-        return self.activity == 'done' or (self.activity != 'done' and self.synchronization.stage_id != fail_stage)
-
-    def _process_integration(self):
-        """
-        """
-
-        self.ensure_one()
-
-        synchronizations = self._get_synchronizations()
-
-        # NOTE: When processing outgoing synchronizations, those generated by the
-        #       instance, synchronizations are a RecordSet.
-        #
-        #       On the other hand, when processing incoming synchronizations,
-        #       those obtained from a remote service, synchronizations are a list
-        #       of 'objects'.
-        for s in synchronizations:
-
-            self.synchronization = s
-
-            self.now = dt.utcnow()
-            self.synchronization_values = self._get_synchronization_values()
-
-            try:
-                self._synchronize()
-                self._finalize()
-            except Exception:
-                self._handle_exception()
-
-    def _clean_synchronization(self):
-        """
-        """
-
-        self.synchronization_values['stage_id'] = self.synchronization_stage_ids.filtered(lambda s: s.state == 'done').id
-        self.synchronization_values['error_ids'] = [(5, 0)]
-
-    def _synchronize(self):
-        getattr(self, '_%s_synchronize' % self.integration_type)()
-
-    def _finalize(self):
-        """
-        Update synchronization with last values obtained while processing it,
-        and create a message on related model's chatter if there is a sensible
-        change on its synchronization status.
-        """
-
-        resource = False
-        if not isinstance(self.synchronization, models.BaseModel):
-            self.synchronization = self._get_in_synchronization()
-
-        if self.synchronization:
-            self.synchronization.write(self.synchronization_values)
-            resource = self.env[self.synchronization.res_model].browse(self.synchronization.res_id)
-
-        if self._check_post_message() and resource:
-
-            msg_body = self.success_message_body if self.activity == 'done' else self.error_message_body
-
-            resource.message_post(
-                subject=self.message_subject,
-                body=msg_body
-            )
-
-    def _handle_exception(self):
-        """
-        """
-
-        error = '\n'.join(traceback.format_exc().splitlines())
-
-        # TODO: Create ir.logging record
-        if not isinstance(self.synchronization, models.BaseModel):
-            filename = self.synchronization.get('filename')
-        else:
-            synchronization_error_id = self.env['edi.synchronization.error'].create({
-                'synchronization_id': self.synchronization.id,
-                'activity': self.activity,
-                'description': '\n'.join(traceback.format_exc().splitlines()),
-            })
-
-            self.synchronization_values['error_ids'] = [(4, synchronization_error_id.id)]
-            self.synchronization_values['state'] = self.synchronization_stage_ids.filtered(lambda s: s.state == 'fail').id
-
-            self.synchronization.write(self.synchronization_values)
-
-            filename = self.synchronization.name
-
-        _logger.error(_('Error while processing synchronization: %s\nActivity: %s\n%s') % (filename, self.activity, error))
-
-        self.connection_id.clean_synchronization(filename, 'failure')
-
-    #########################
-    # Incoming Integrations #
-    #########################
-
-    def _get_in_synchronizations(self):
-        self.activity = 'Fetch synchronizations'
-        return self.connection_id.fetch_synchronizations()
-
-    def _get_synchronization_name(self):
-        return '%s_%s_%s_%s_integration_%s_synchronization' % (
-            self.res_model_id.model.replace('.', '_'),
-            self.synchronization_content_type,
-            self.integration_type,
-            self.now.strftime('%s.%f'),
-            self.id
-        )
-
-    def _get_create_synchronzation_values(self):
-
-        result = self._get_synchronization_values()
-
-        result.update({
-            'create_date': self.now.strftime(DEFAULT_SERVER_DATETIME_FORMAT),
+    ###########################################
+    #             Generic API                 #
+    ###########################################
+    #=========================================#
+    def _create_error_sync(self, activity, exception):
+        name = '%s - %s: %s' % (self.provider_name, fields.Datetime.now(), "No Sync Error")
+        res = self.env['edi.synchronization'].create({
             'integration_id': self.id,
-            'name': self._get_synchronization_name(),
-            'filename': self.synchronization['filename'],
-            'content': self.synchronization['content']
+            'name': name,
+            'filename': '%s.%s' % (name, self.synchronization_content_type),
+            'synchronization_date': fields.Datetime.now(),
+        })
+        res._report_error(activity, exception)
+        return res
+
+    def _report_error(self, activity, exception=None, message=None):
+        """ 
+            Method to use to report error that should not block the process but needs to be reported
+            pass exception if you have catch and exception, otherwise pass a message
+            If the error should block the process simply raise an error
+        """
+        if not self.env.fail_safe.env.sync:
+            _logger.error("Cannot log error on sync object, sync object is not created yet")
+            return
+
+        sync = self.env.fail_safe.env.sync[-1]
+        sync._report_error(activity, exception=exception, message=message)
+
+    @api.model
+    def _process(self, integration_id):
+        """
+            Entry point for cron, don't raise error
+        """
+        return self.browse(integration_id).process_integration()
+
+    @api.multi
+    def process_integration(self):
+        """
+            Default raise_error=True if call from button for testing purpose
+        """
+        raise_error = self._context.get('raise_error', False)
+        for integration in self:
+            if integration.sub_integration_ids:
+                integration.sub_integration_ids.process_integration()
+            else:
+                if integration.integration_flow == "in":
+                    integration._process_in(raise_error=raise_error)
+                else:
+                    integration._process_out(raise_error=raise_error)
+
+        return True
+
+
+    #####################################################################
+    #                   Implementation of process out                   #
+    #####################################################################
+    #===================================================================#
+
+    """
+    FLOW OUT
+    ========
+
+    Flow out:
+       _get_record to send #TO IMPLEMENT
+       try:
+            if one
+                for each record
+                    _get_synchronization_name_out: #DEFAULT
+                    _get_content  #TO IMPLEMENT
+                    _send_content  #DEFAULT
+            if multi
+                _get_synchronization_name_out: #DEFAULT
+                _get_content    #TO IMPLEMENT
+                _send_content  #DEFAULT
+        except:
+            _handle_error  #DEFAULT
+    """
+
+    def _create_synchronzation_out(self, records, flow_type):
+        return self.env['edi.synchronization'].create({
+            'integration_id': self.id,
+            'name': self._get_synchronization_name_out(records),
+            'filename': '%s.%s' % (self._get_synchronization_name_out(records), self.synchronization_content_type),
+            'synchronization_date': fields.Datetime.now(),
         })
 
-        return result
-
-    def _get_in_synchronization(self):
-
-        Sync = self.env['edi.synchronization']
-
-        domain = self._get_synchronization_domain()
-        domain.extend([
-            ('filename', '=', self.synchronization['filename']),
-            ('stage_id', 'not in', self.synchronization_stage_ids.filtered(lambda s: s.state in ['done', 'cancel']).ids)
-        ])
-
-        sync = Sync.search(domain)
-        if not sync:
-            sync = Sync.with_context(default_integration_id=self.id).create(self._get_create_synchronzation_values())
-
-        return sync
-
-    def _in_synchronize(self):
+    def _process_out(self, records=None, raise_error=False):
         """
+            For real time trigger
+            call directly _process_out from the business code with the current records
+            with raise_error=True if you want to get the traceback and stop the iteration
         """
-        self.activity = 'create'
-        sync = self._get_in_synchronization()
+        self.ensure_one()
+        with api.Environment.manage():
+            new_cr = self.pool.cursor()
+            self.env.fail_safe = self.with_env(self.env(cr=new_cr))
+            self.env.fail_safe.env.sync = []
+            self.env.fail_safe.env.activity = "Get Record"
+            try:
+                if not records:
+                    records = self._get_record_to_send()
+                if self.synchronization_creation == 'one':
+                    for rec in records:
+                        self._process_record_out(rec, raise_error=raise_error)
+                else:
+                    self._process_record_out(records, raise_error=raise_error)
+            except Exception as e:
+                _logger.exception(str(e))
+                if not self.env.fail_safe.env.sync:
+                    self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
+                if raise_error:
+                    raise
+            finally:
+                new_cr.commit()
+                new_cr.close()
 
-        self.activity = 'process'
-        sync._process(self.synchronization)
 
-    ########################
-    # Outgoing Integration #
-    ########################
+    def _process_record_out(self, records, raise_error=False):
+        """
+            new Self has a cursor that should be called to write the status of the sync
+        """
+        self.ensure_one()
 
-    def _get_out_synchronizations(self):
-        self.activity = 'Get synchronizations'
+        sync = self.env.fail_safe._create_synchronzation_out(records, flow_type=self.integration_flow)
+        self.env.fail_safe.env.sync.append(sync)
+        try:
+            self.env.fail_safe.env.activity = "Get Content"
+            content = self._get_content(records)
+            sync._write_content(content)
+            self.env.fail_safe.env.activity = "Send Synchro"
+            self._send_content(sync.filename, sync.content)
+        except Exception as e:
+            sync._report_error(self.env.fail_safe.env.activity, e)
+            self.env.fail_safe._handle_error(sync.filename)
+            if raise_error:
+                raise
+        else:
+            sync._done()
 
-        domain = self._get_synchronization_domain()
-        domain.extend([
-            ('stage_id', 'not in', self.synchronization_stage_ids.filtered(lambda s: s.state in ['done', 'cancel']).ids)
-        ])
+    ##################################################
+    # Default Behavior: Probably need to reimplement #
+    ##################################################
 
-        return self.env['edi.synchronization'].search(domain)
-
-    def _out_synchronize(self):
-        self.activity = 'send'
-        self._send()
-
-        self.activity = 'done'
-        self._clean_synchronization()
-
-    def _get_send_values(self):
-        return {}
-
-    def _send(self):
-        self.connection_id.send_synchronization(
-            self.synchronization,
-            **self._get_send_values()
+    def _get_synchronization_name_out(self, records):
+        return '%s - %s: %s' % (
+            self.provider_name,
+            fields.Datetime.now(),
+            records.ids
         )
+
+    def _send_content(self, filename, content):
+        """
+            Standard behavior can be overwritte if needed
+            can use self._report_error
+        """
+        self.connection_id._send_synchronization(filename, content)
+        self.connection_id._clean_synchronization(filename, 'done', self.integration_flow)
+
+    ################################
+    # To implement for process out #
+    ################################
+
+    def _get_record_to_send(self):
+        """
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._get_record_to_send()
+            ....
+            Return the list of record use to generate the content
+        """
+        return self.browse()
+
+    def _get_content(self, records):
+        """
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._get_record_to_send()
+            ....
+            Return a string or an dict with the content to synchronized will be passed to send
+            Can use self._report_error
+        """
+        return ""
+
+    #####################################################################
+    #                   Implementation of process in                    #
+    #####################################################################
+    #===================================================================#
+
+    """
+    FLOW IN
+    ========
+
+    Flow in:
+
+    try:
+            _get_in_content  #DEFAULT
+
+            for each record
+                _get_synchronization_name_in: #DEFAULT
+                _process_content  #TO IMPLEMENT
+                _clean   #DEFAULT
+        except:
+            _handle_error  #DEFAULT
+    """
+
+    def _create_synchronzation_in(self, filename, content):
+        return self.env['edi.synchronization'].create({
+            'integration_id': self.id,
+            'name': self._get_synchronization_name_in(filename, content),
+            'filename': filename,
+            'synchronization_date': fields.Datetime.now(),
+            'content': str(content),
+        })
+
+    def _process_in(self, raise_error=False):
+        self.ensure_one()
+        with api.Environment.manage():
+            new_cr = self.pool.cursor()
+            self.env.fail_safe = self.with_env(self.env(cr=new_cr))
+            self.env.fail_safe.env.sync = []
+            self.env.fail_safe.env.activity = "Fetch Content"
+            try:
+                data = self._get_in_content()
+                for d in data:
+                    self._process_in_file(d['filename'], d['content'], raise_error=raise_error)
+            except Exception as e:
+                _logger.exception(str(e))
+                if not self.env.fail_safe.env.sync:
+                    self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
+                if raise_error:
+                    raise
+            finally:
+                new_cr.commit()
+                new_cr.close()
+
+    def _process_in_file(self, filename, content, raise_error=False):
+        self.ensure_one()
+
+        sync = self.env.fail_safe._create_synchronzation_in(filename, content)
+        self.env.fail_safe.env.sync.append(sync)
+        try:
+            self.env.fail_safe.env.activity = "Process Content"
+            status = self._process_content(filename, content)
+            self.env.fail_safe.env.activity = "Clean Synchro"
+            self._clean(filename, status, content)
+        except Exception as e:
+            sync._report_error(self.env.fail_safe.env.activity, e)
+            self.env.fail_safe._handle_error(sync.filename)
+            if raise_error:
+                raise
+        else:
+            sync._done()
+
+    ##################################################
+    # Default Behavior: Probably need to reimplement #
+    ##################################################
+
+    def _get_synchronization_name_in(self, filename, content):
+        return '%s - %s: %s' % (
+            self.provider_name,
+            fields.Datetime.now(),
+            filename
+        )
+
+    def _get_in_content(self):
+        """
+        Return list of dict
+        the dict should be {
+            'filename': FILENAME (str),
+            'content': str or dict: will be handle by in edi.integration._process_data
+        }
+        """
+        return self.connection_id._fetch_synchronizations()
+
+    def _clean(self, filename, status, content):
+        return self.connection_id._clean_synchronization(filename, status, self.integration_flow)
+
+    ################################
+    # To implement for process in  #
+    ################################
+    def _process_content(self, filename, content):
+        """
+            Return status use by _clean
+            Can use self._report_error
+        """
+        return "done"
+
+    ##########################################################
+    # Common default Behavior: Probably need to reimplement  #
+    ##########################################################
+    #========================================================#
+
+    def _handle_error(self, filename):
+        """
+            Common to both process in and process out
+        """
+        self.connection_id._clean_synchronization(filename, 'error', self.integration_flow)

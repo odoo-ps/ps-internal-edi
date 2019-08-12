@@ -4,4 +4,4 @@
 from . import edi_integration
 from . import edi_synchronization
 from . import edi_connection
-from . import edi_test
+

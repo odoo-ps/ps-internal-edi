@@ -10,11 +10,13 @@
                     <button type="object"
                         name="test_connection"
                         string="Test Connection"
+                        attrs="{'invisible': [('has_sub_integration', '=', True)]}"
                     />
                     <button type="object"
                         name="process_integration"
                         string="Synchronize"
                         class="oe_highlight"
+                        context="{'raise_error': True}"
                     />
                 </header>
                 <sheet>
@@ -24,16 +26,6 @@
                         </button>
                         <button type="object" name="open_synchronizations"
                             icon="fa-cloud-upload" class="oe_stat_button"
-                            attrs="{
-                                'invisible': [('integration_flow', '=', 'in')]
-                            }"
-                            string="Synchronizations"
-                        />
-                        <button type="object" name="open_synchronizations"
-                            icon="fa-cloud-download" class="oe_stat_button"
-                            attrs="{
-                                'invisible': [('integration_flow', '=', 'out')]
-                            }"
                             string="Synchronizations"
                         />
                     </div>
@@ -44,26 +36,40 @@
                         </h3>
                     </div>
                     <group>
-                        <field name="provider_name"/>
-                        <field name="type" />
+                        <group>
+                            <field name="provider_name"/>
+                            <field name="sequence" />
+                            <field name="has_sub_integration" />
+                            <field name="integration_flow"/>
+                            <field name="type" />
+                            <field name="synchronization_creation" attrs="{'invisible': ['|', ('has_sub_integration', '=', True), ('integration_flow', '=', 'in')]}" />
+                        </group>
                     </group>
                     <notebook>
-                        <page name="status" string="Status">
+                        <page name="sub_integration" string="Sub Integrations" attrs="{'invisible': [('has_sub_integration', '=', False)]}" >
+                            <field name="sub_integration_ids" >
+                                <tree editable="bottom">
+                                    <field name="sequence" />
+                                    <field name="name" readonly="1" />
+                                    <field name="provider_name" readonly="1" />
+                                </tree>
+                            </field>
+                        </page>
+                        <page name="status" string="Status" attrs="{'invisible': [('has_sub_integration', '=', True)]}">
                             <group>
                                 <field name="last_success_date" />
                                 <field name="last_failure_date" />
                                 <field name="last_sync_status" />
                             </group>
                         </page>
-                        <page name="configuration" string='Configuration'>
+                        <page name="configuration" string='Configuration' attrs="{'invisible': [('has_sub_integration', '=', True)]}">
                             <group>
-                                <group>
-                                    <field name="integration_flow"/>
-                                </group>
                                 <group>
                                     <field name="connection_id"/>
                                 </group>
                             </group>
+                            <separator string="Integration Parameter" />
+                            <field name="parameter" />
                         </page>
                         <page name="cron" string="Cron information">
                             <group>
@@ -79,7 +85,7 @@
                                 </group>
                             </group>
                         </page>
-                        <page name="error" string="Error">
+                        <page name="error" string="Error" attrs="{'invisible': [('has_sub_integration', '=', True)]}">
                             <field name="error_ids" />
                         </page>
                     </notebook>
@@ -149,7 +155,7 @@
         <field name="model">edi.integration</field>
         <field name="arch" type="xml">
             <search>
-                <field name="integration_name"/>
+                <field name="name"/>
                 <field name="integration_flow"/>
                 <field name="type" />
                 <field name="synchronization_content_type"/>

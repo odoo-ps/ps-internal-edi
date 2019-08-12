@@ -10,7 +10,7 @@ Odoo PS EDI Framework Tests
 ===========================
     """,
     'depends': ['edi_base'],
-    'data': ['security/ir.model.access.csv'],
+    'data': [],
     'hidden': True,
     'auto_install': False
 }

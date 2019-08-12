@@ -4,9 +4,33 @@ import traceback
 
 from odoo import api, fields, models, SUPERUSER_ID
 
+class SynchronizationError(models.Model):
 
+    _name = 'edi.synchronization.error'
+    _description = 'Synchronization Error'
+    _order = 'create_date desc'
+
+    integration_id = fields.Many2one(related='synchronization_id.integration_id', store=True)
+    synchronization_id = fields.Many2one(
+        comodel_name='edi.synchronization',
+        on_delete='cascade',
+        string='Synchronization'
+    )
+    activity = fields.Char()
+    description = fields.Text()
+    description_short = fields.Text(compute='_get_short_desc')
+
+    def _get_short_desc(self):
+        for rec in self:
+            if not rec.description or len(rec.description) < 650:
+                rec.description_short = rec.description
+            else:
+                rec.description_short = "%s\n....\n%s" % (rec.description[:150], rec.description[-500:])
 
 class Synchronization(models.Model):
+    """
+        Object to store the status of the synchronization
+    """
 
     _name = 'edi.synchronization'
     _description = 'Synchronization'
@@ -40,45 +64,6 @@ class Synchronization(models.Model):
     errors_count = fields.Integer(_compute='_compute_errors_count', string='# errors')
     user_id = fields.Many2one('res.users', string='Trigger User', help="User that trigger the synchronization or call the API")
 
-    def _process_in(self, data):
-        """
-        """
-        raise NotImplementedError("No _process method implemented for this type of connection")
-
-    def _process_out(self, records):
-        """
-        """
-        raise NotImplementedError("No _process method implemented for this type of connection")
-
-    def _get_content(self):
-        """ 
-            For file sync process return a dict 
-            {
-                'filename': string
-                'filecontent': base64_encoded binary
-            }
-            for web service process return a dict with all the parameter of the query
-        """
-        raise NotImplementedError("No _get_content method implemented for this type of connection")
-
-    def _report_error(self, activity, exception):
-        tb = traceback.format_exc()
-        self.write({
-            'state': 'fail', 
-            'error_ids' : [(0, 0, {
-                'activity': activity,
-                'description': str(tb),
-            })]
-        })
-
-    def _done(self):
-        self.write({'state': 'done'})
-
-    ###################################
-    #    End of abstract interface    #
-    #  don't override these methods   #
-    ###################################
-
     _sql_constraints = [
         (
             'name_integration_id_uniq',
@@ -86,14 +71,6 @@ class Synchronization(models.Model):
             'The name must be unique per integration!'
         )
     ]
-
-
-    
-
-    @api.depends('error_ids')
-    def _compute_errors_count(self):
-        for synchronization in self:
-            synchronization.errors_count = len(synchronization.error_ids)
 
     @api.multi
     def open_integration(self):
@@ -119,28 +96,28 @@ class Synchronization(models.Model):
             'view_mode': 'form'
         }
 
-    
+    ##################
+    #      API       #
+    ##################
+    def _report_error(self, activity, exception=None, message=None):
+        description = "Unkown Error"
+        if exception:
+            tb = traceback.format_exc()
+            description = "%s\n\n%s" % (str(exception), str(tb))
+        if message:
+            description = message
 
+        self.write({
+            'state': 'fail',
+            'error_ids' : [(0, 0, {
+                'activity': activity,
+                'description': description,
+            })]
+        })
 
+    def _write_content(self, content):
+        self.write({'content': content})
 
-class SynchronizationError(models.Model):
+    def _done(self):
+        self.write({'state': 'done'})
 
-    _name = 'edi.synchronization.error'
-    _description = 'Synchronization Error'
-
-    integration_id = fields.Many2one(related='synchronization_id.integration_id', store=True)
-    synchronization_id = fields.Many2one(
-        comodel_name='edi.synchronization',
-        on_delete='cascade',
-        string='Synchronization'
-    )
-    activity = fields.Char()
-    description = fields.Text()
-    description_short = fields.Text(compute='_get_short_desc')
-
-    def _get_short_desc(self):
-        for rec in self:
-            if not rec.description or len(rec.description) < 700:
-                rec.description_short = rec.description
-            else:
-                rec.description_short = "%s\n....\n%s" % (rec.description[:200], rec.description[-500:])
