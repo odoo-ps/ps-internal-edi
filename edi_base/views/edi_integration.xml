@@ -162,7 +162,10 @@
                 <filter name="all" string="All" domain="['|', ('active', '=', True), ('active', '=', False)]"/>
                 <filter name="active" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+                <filter name="success" string="Success" domain="[('last_sync_status', '=', 'Success'), '|', ('active', '=', True), ('active', '=', False)]" />
+                <filter name="success" string="Fail" domain="[('last_sync_status', '=', 'Fail'), '|', ('active', '=', True), ('active', '=', False)]" />
                 <group string="Group By">
+                    <filter name="group_by_last_sync_status" string="Sync Status" context="{'group_by': 'last_sync_status'}" />
                     <filter name="group_by_integration_flow" string="Type" context="{'group_by': 'integration_flow'}"/>
                     <filter name="group_by_synchronization_content_type" string="Content Type" context="{'group_by': 'synchronization_content_type'}"/>
                 </group>
@@ -177,7 +180,7 @@
         <field name="search_view_id" ref="edi_base.integration_search_view"/>
         <field name="context" eval="{
             'search_default_all': True,
-            'search_default_group_by_res_model_id': True
+            'search_default_group_by_last_sync_status' : True,
         }"/>
         <field name="help" type="html">
             <p class="oe_view_nocontent">Here you will find the integrations installed in your system.</p>

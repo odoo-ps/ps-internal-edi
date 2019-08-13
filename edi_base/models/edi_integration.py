@@ -47,12 +47,14 @@ class Integration(models.Model):
                                            domain=[('has_sub_integration', '!=', True), '|', ('active', '=', True), ('active', '=', False)])
 
     #Status
-    last_success_date = fields.Datetime(compute="_get_status")
-    last_failure_date = fields.Datetime(compute="_get_status")
-    last_sync_status = fields.Char(compute="_get_status")
-    color = fields.Integer(compute="_get_status")
+    synchronization_ids = fields.One2many('edi.synchronization', 'integration_id')
     error_ids = fields.One2many('edi.synchronization.error', 'integration_id')
+    last_success_date = fields.Datetime(compute="_get_status", store=True)
+    last_failure_date = fields.Datetime(compute="_get_status", store=True)
+    last_sync_status = fields.Char(compute="_get_status", store=True)
+    color = fields.Integer(compute="_get_status", store=True)
 
+    @api.depends('synchronization_ids', 'synchronization_ids.state', 'synchronization_ids.synchronization_date')
     def _get_status(self):
         query = """
             SELECT DISTINCT ON (integration_id, state) 
