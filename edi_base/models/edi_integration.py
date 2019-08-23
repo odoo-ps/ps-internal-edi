@@ -33,7 +33,7 @@ class Integration(models.Model):
         ('xml', 'XML'),
         ('json', 'JSON'),
         ('pdf', 'PDF')
-    ], default='text', required=True, readonly=True, string='Content type')
+    ], default='text', required=True, string='Content type')
     provider_name = fields.Char(string='Provider Name')
 
     # cron inheritance
@@ -45,6 +45,8 @@ class Integration(models.Model):
     sub_integration_ids = fields.Many2many('edi.integration',
                                            'edi_integration_sub_integration_rel', 'integration_id', 'sub_integration_id',
                                            domain=[('has_sub_integration', '!=', True), '|', ('active', '=', True), ('active', '=', False)])
+    record_filter_id = fields.Many2one('ir.filters', string="Record Filter", ondelete='restrict',
+                                       help="Filter for default behavior of _get_record_to_send")
 
     #Status
     synchronization_ids = fields.One2many('edi.synchronization', 'integration_id')
@@ -190,17 +192,19 @@ class Integration(models.Model):
     ========
 
     Flow out:
-       _get_record to send #TO IMPLEMENT
+       _get_record to send #DEFAULT
        try:
             if one
                 for each record
                     _get_synchronization_name_out: #DEFAULT
                     _get_content  #TO IMPLEMENT
                     _send_content  #DEFAULT
+                    _postprocess #DEFAULT
             if multi
                 _get_synchronization_name_out: #DEFAULT
                 _get_content    #TO IMPLEMENT
                 _send_content  #DEFAULT
+                _postprocess #DEFAULT
         except:
             _handle_error  #DEFAULT
     """
@@ -257,7 +261,8 @@ class Integration(models.Model):
             content = self._get_content(records)
             sync._write_content(content)
             self.env.fail_safe.env.activity = "Send Synchro"
-            self._send_content(sync.filename, sync.content)
+            res = self._send_content(sync.filename, content)
+            self._postprocess(res, sync.filename, content, records)
         except Exception as e:
             sync._report_error(self.env.fail_safe.env.activity, e)
             self.env.fail_safe._handle_error(sync.filename)
@@ -277,18 +282,6 @@ class Integration(models.Model):
             records.ids
         )
 
-    def _send_content(self, filename, content):
-        """
-            Standard behavior can be overwritte if needed
-            can use self._report_error
-        """
-        self.connection_id._send_synchronization(filename, content)
-        self.connection_id._clean_synchronization(filename, 'done', self.integration_flow)
-
-    ################################
-    # To implement for process out #
-    ################################
-
     def _get_record_to_send(self):
         """
             To implement in each integration
@@ -297,7 +290,30 @@ class Integration(models.Model):
             ....
             Return the list of record use to generate the content
         """
+        if self.record_filter_id:
+            domain = json.loads(self.record_filter_id.domain.replace("True", "true").replace("False", "false"))
+            return self.env[self.record_filter_id.model_id].search(domain)
         return self.browse()
+
+    def _send_content(self, filename, content):
+        """
+            Standard behavior can be overwritte if needed
+            can use self._report_error
+        """
+        res = self.connection_id._send_synchronization(filename, content)
+        self.connection_id._clean_synchronization(filename, 'done', self.integration_flow)
+        return res
+
+    def _postprocess(self, send_result, filename, content, records):
+        """
+            Standard behavior can be overwritte if needed
+            Do nothing
+        """
+        return
+
+    ################################
+    # To implement for process out #
+    ################################
 
     def _get_content(self, records):
         """

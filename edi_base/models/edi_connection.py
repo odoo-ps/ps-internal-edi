@@ -42,8 +42,9 @@ class Connection(models.Model):
         """
             Status: done if everything went well
                     error if there is something that went wrong
+            Default behavior: Do Nothing
         """
-        raise NotImplementedError("No clean_synchronization method implemented for this type of connection")
+        return
 
     def _get_default_configuration(self):
         """

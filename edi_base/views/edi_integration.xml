@@ -65,7 +65,9 @@
                         <page name="configuration" string='Configuration' attrs="{'invisible': [('has_sub_integration', '=', True)]}">
                             <group>
                                 <group>
+                                    <field name="synchronization_content_type" />
                                     <field name="connection_id"/>
+                                    <field name="record_filter_id" attrs="{'invisible': [('integration_flow', '=', 'in')]}" />
                                 </group>
                             </group>
                             <separator string="Integration Parameter" />

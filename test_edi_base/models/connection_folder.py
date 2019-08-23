@@ -44,7 +44,7 @@ class ConnectionFolder(models.Model):
     def _send_synchronization(self, filename, content, *args, **kwargs):
         self.ensure_one()
         if not self.type == 'folder':
-            return super()._send_synchronization()
+            return super()._send_synchronization(filename, content, *args, **kwargs)
 
         config = self._read_configuration()
         path = "%s/%s" % (config['out_folder'], filename)
@@ -54,7 +54,7 @@ class ConnectionFolder(models.Model):
     def _fetch_synchronizations(self, *args, **kwargs):
         self.ensure_one()
         if not self.type == 'folder':
-            return super()._send_synchronization()
+            return super()._fetch_synchronizations(*args, **kwargs)
 
         config = self._read_configuration()
         data = []
