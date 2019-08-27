@@ -105,7 +105,6 @@ class Integration(models.Model):
         self.ensure_one()
         return json.loads(self.parameter)
 
-
     @api.multi
     def test_connection(self):
         for integration in self:
@@ -209,7 +208,7 @@ class Integration(models.Model):
             _handle_error  #DEFAULT
     """
 
-    def _create_synchronzation_out(self, records, flow_type):
+    def _create_synchronization_out(self, records, flow_type):
         return self.env['edi.synchronization'].create({
             'integration_id': self.id,
             'name': self._get_synchronization_name_out(records),
@@ -247,14 +246,13 @@ class Integration(models.Model):
                 new_cr.commit()
                 new_cr.close()
 
-
     def _process_record_out(self, records, raise_error=False):
         """
             new Self has a cursor that should be called to write the status of the sync
         """
         self.ensure_one()
 
-        sync = self.env.fail_safe._create_synchronzation_out(records, flow_type=self.integration_flow)
+        sync = self.env.fail_safe._create_synchronization_out(records, flow_type=self.integration_flow)
         self.env.fail_safe.env.sync.append(sync)
         try:
             self.env.fail_safe.env.activity = "Get Content"
@@ -393,8 +391,8 @@ class Integration(models.Model):
             self.env.fail_safe._handle_error(sync.filename)
             if raise_error:
                 raise
-        else:
-            sync._done()
+            else:
+                sync._done()
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
