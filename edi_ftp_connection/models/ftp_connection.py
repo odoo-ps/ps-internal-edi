@@ -3,6 +3,7 @@
 import ftplib
 import logging
 import sys
+import os
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
@@ -49,8 +50,6 @@ class FTPConnection(models.Model):
     def _send_synchronization(self, filename, content, *args, **kwargs):
         """
         """
-
-        # todo : duplicate code with _clean_synchronization
 
         self.ensure_one()
         if not self.type == 'ftp':
@@ -147,9 +146,6 @@ class FTPConnection(models.Model):
         """
         """
 
-        # todo : duplicate code with _clean_synchronization
-        # todo : flow_type in and ou cases
-
         self.ensure_one()
         if not self.type == 'ftp':
             return super()._clean_synchronization()
@@ -157,39 +153,21 @@ class FTPConnection(models.Model):
         self.ftp_server = None
 
         config = self._read_configuration()
-        on_clean_integration = config['on_clean_integration'] \
-            if 'on_clean_integration' in config else 'rename'
-        on_clean_integration_rename_extension = config['on_clean_integration_rename_extension'] \
-            if 'on_clean_integration_rename_extension' in config else 'bak'
+
+        if flow_type == 'out':
+            path = "%s/%s" % (config['out_folder'], filename)
+            if status == 'error':
+                # todo: check if path exists first
+                self.ftp_server.delete(path)
 
         if flow_type == 'in':
-
-            try:
-
-                self.ftp_server = self._connect()
-
-                try:
-                    self._check_filename(
-                        filename,
-                        on_conflict=on_clean_integration,
-                        extension=on_clean_integration_rename_extension
-                    )
-                finally:
-                    if self.ftp_server is not None:
-                        self.ftp_server.quit()
-
-            except Exception as e:
-                params = (
-                    filename,
-                    ustr(self.ftp_server),
-                    e.__class__.__name__,
-                    ustr(e)
-                )
-                msg = _("Cleaning synchronization '%s' failed via FTP server '%s'.\n%s: %s") % params
-
-                _logger.info(msg)
-
-                raise SynchronizationException(_("Failure while cleaning synchronization"), msg)
+            path = "%s/%s" % (config['in_folder'], filename)
+            if status == "done":
+                done_path = "%s/%s" % (config['in_folder_done'], filename)
+            else:
+                done_path = "%s/%s" % (config['in_folder_error'], filename)
+            # todo : option to delete done files
+            os.rename(path, done_path)
 
     def _get_default_configuration(self):
         """
@@ -203,12 +181,15 @@ class FTPConnection(models.Model):
             'host': 'host',
             'user': 'user',
             'password': 'password',
-            'folder': 'root_folder/sub_folder',
             'on_conflict': 'choose one from : raise, rename, replace',
             'on_conflict_rename_extension': 'old',
-            'on_clean_integration': 'choose one from : rename, delete',
-            'on_clean_integration_rename_extension': 'bak',
+            # 'on_clean_integration': 'choose one from : rename, delete',
+            # 'on_clean_integration_rename_extension': 'bak',
             'is_active': 'False',
+            'in_folder': '<PATH HERE>',
+            'in_folder_done': '<PATH HERE>',
+            'in_folder_error': '<PATH HERE>',
+            'out_folder': '<PATH HERE>',
         }
 
     def _connect(self):
@@ -229,8 +210,8 @@ class FTPConnection(models.Model):
         if 'is_active' in config and config['is_active'] == 'True':
             server.set_pasv(False)
 
-        if 'folder' in config:
-            server.cwd(config['folder'])
+        if 'out_folder' in config:
+            server.cwd(config['out_folder'])
 
         return server
 
