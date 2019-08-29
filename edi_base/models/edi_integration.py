@@ -21,7 +21,11 @@ class Integration(models.Model):
     _inherits = {'ir.cron': 'cron_id'}
     _order = 'sequence'
 
-    integration_flow = fields.Selection([('in', 'From provider to Odoo'), ('out', 'From Odoo to provider')], required=True, string='Flow of data')
+    integration_flow = fields.Selection([
+        ('in', 'From provider to Odoo'), 
+        ('out', 'From Odoo to provider'), 
+        ('out_real', 'From Odoo to provider (Realtime)')
+    ], required=True, string='Flow of data')
     synchronization_creation = fields.Selection([('one', 'One'), ('multi', 'Multi')], help="Create a synchro for each record (one), or for all record multi", default="multi")
     connection_id = fields.Many2one('edi.connection', required=True, on_delete='restrict', string='Connection')
     type = fields.Selection(selection=[('multi', 'Call Sub Integration'),('api', 'RPC Api')], required=True, string='Type') #Add selection for your integration
@@ -175,8 +179,10 @@ class Integration(models.Model):
             else:
                 if integration.integration_flow == "in":
                     integration._process_in(raise_error=raise_error)
-                else:
+                elif integration.integration_flow == "out":
                     integration._process_out(raise_error=raise_error)
+                else:
+                    _logger.warning("Do not call process_integration for real time integration call _process_out_realtime")
 
         return True
 
@@ -218,8 +224,6 @@ class Integration(models.Model):
 
     def _process_out(self, records=None, raise_error=False):
         """
-            For real time trigger
-            call directly _process_out from the business code with the current records
             with raise_error=True if you want to get the traceback and stop the iteration
         """
         self.ensure_one()
@@ -323,6 +327,28 @@ class Integration(models.Model):
             Can use self._report_error
         """
         return ""
+
+    #####################################################################
+    #                Implementation of process out Realtime             #
+    #####################################################################
+    #===================================================================#
+
+    def _process_out_realtime(self, records, raise_error=False):
+        """
+            Same as process out but we assume the trigger does not come from a cron
+            but any method in odoo and that method is already aware of the records
+            to synchronize. 
+            use a new cursor to synchronize, so if it fail it does not affect the 
+            the rest of the transaction
+            set raise_error=True if you don't want to have the synchronization
+            to fail silently.
+        """
+        self.ensure_one()
+        with api.Environment.manage():
+            new_cr = self.pool.cursor()
+            self = self.with_env(self.env(cr=new_cr))
+            self._process_out(records=records, raise_error=raise_error)
+
 
     #####################################################################
     #                   Implementation of process in                    #
