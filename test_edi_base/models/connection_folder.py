@@ -27,7 +27,6 @@ class ConnectionFolder(models.Model):
         }
 
 
-    @api.multi
     def test(self):
         self.ensure_one()
         if not self.type == 'folder':
@@ -47,6 +46,7 @@ class ConnectionFolder(models.Model):
             return super()._send_synchronization(filename, content, *args, **kwargs)
 
         config = self._read_configuration()
+        self._check_folder(config['out_folder'])
         path = "%s/%s" % (config['out_folder'], filename)
         with open(path, 'w') as out_file:
             out_file.write(content)
@@ -57,6 +57,7 @@ class ConnectionFolder(models.Model):
             return super()._fetch_synchronizations(*args, **kwargs)
 
         config = self._read_configuration()
+        self._check_folder(config['in_folder'])
         data = []
         for f in os.listdir(config['in_folder']):
             file_path = "%s/%s" % (config['in_folder'], f)
@@ -75,6 +76,7 @@ class ConnectionFolder(models.Model):
 
         config = self._read_configuration()
         if flow_type == 'out':
+            self._check_folder(config['out_folder'])
             path = "%s/%s" % (config['out_folder'], filename)
             if status == 'error':
                 if os.path.isfile(path):
@@ -83,9 +85,21 @@ class ConnectionFolder(models.Model):
         if flow_type == 'in':
             path = "%s/%s" % (config['in_folder'], filename)
             if status == "done":
+                self._check_folder(config['in_folder_done'])
                 done_path = "%s/%s" % (config['in_folder_done'], filename)
             else:
+                self._check_folder(config['in_folder_error'])
                 done_path = "%s/%s" % (config['in_folder_error'], filename)
             os.rename(path, done_path)
 
-
+    def _check_folder(self, folder):
+        current_cwd = os.getcwd()
+        folder_list = folder.split("/")
+        os.chdir("/")
+        for dir in folder_list:
+            if not dir:
+                continue
+            if not os.path.isdir(dir):
+                os.makedirs(dir)
+            os.chdir(dir)
+        os.chdir(current_cwd)

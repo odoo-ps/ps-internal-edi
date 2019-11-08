@@ -55,8 +55,6 @@ class Synchronization(models.Model):
         related='integration_id.synchronization_content_type',
         store=True, readonly=True, string='Content type'
     )
-    #res_model_id = fields.Many2one(related='integration_id.res_model_id', store=True, string='Resource model')
-    #res_model = fields.Char(related='res_model_id.model', string='Resouce model name')
     res_id = fields.Integer(string='Resource ID')
     synchronization_date = fields.Datetime(readonly=True, string='Synchronized on')
     content = fields.Text(readonly=True)
@@ -72,7 +70,6 @@ class Synchronization(models.Model):
         )
     ]
 
-    @api.multi
     def open_integration(self):
         self.ensure_one()
 
@@ -84,7 +81,6 @@ class Synchronization(models.Model):
             'view_mode': 'form'
         }
 
-    @api.multi
     def open_resource_records(self):
         self.ensure_one()
 
@@ -114,10 +110,13 @@ class Synchronization(models.Model):
                 'description': description,
             })]
         })
+        self.flush(fnames=['state', 'error_ids', 'content_type'], records=self)
 
     def _write_content(self, content):
         self.write({'content': content})
+        self.flush(fnames=['content'], records=self)
 
     def _done(self):
         self.write({'state': 'done'})
+        self.flush(fnames=['state', 'content_type', 'synchronization_flow'], records=self)
 

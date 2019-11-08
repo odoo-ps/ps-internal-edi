@@ -1,13 +1,16 @@
 # -*- encoding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import time
+import logging
 
 from inspect import signature
 
 from odoo import api, fields
 
-def get_integration(integration_obj, provider_name):
-    integration = integration_obj.search([('provider_name', '=', provider_name), '|', ('active', '=', False), ('active', '=', True)], limit=1)
+_logger = logging.getLogger(__name__)
+
+def get_integration(integration_obj, name):
+    integration = integration_obj.search([('name', '=', name), '|', ('active', '=', False), ('active', '=', True)], limit=1)
     if not integration:
             _logger.info("No integration found, create a default one")
             api_connection = integration_obj.env.ref('edi_base.api_connection')
@@ -15,8 +18,7 @@ def get_integration(integration_obj, provider_name):
                 'integration_flow' : 'in',
                 'connection_id': api_connection.id,
                 'type': 'api',
-                'provider_name': provider_name,
-                'name' : provider_name,
+                'name': name,
                 'synchronization_content_type': 'json',
                 'active': False,
             })
@@ -24,7 +26,7 @@ def get_integration(integration_obj, provider_name):
 
 def create_synchronization(integration, pool, args, kwargs, fct):
     data = {
-        'name' : '%s @%s' % (integration.provider_name, time.time()),
+        'name' : '%s @%s' % (integration.name, time.time()),
         'integration_id' : integration.id,
         'synchronization_date': fields.Datetime.now(),
         'content': """
@@ -56,11 +58,12 @@ def integration(name):
                     raise
                 else:
                     sync._done()
+                    self.flush()
                 finally:
+                    integration.set_status()
                     new_cr.commit()
                     new_cr.close()
             return res
-
         sig = signature(fct)
         wrapper.__signature__ = sig
         return wrapper

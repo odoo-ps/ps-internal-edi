@@ -16,7 +16,6 @@ class Connection(models.Model):
     type = fields.Selection(selection=[], required=True, string='Type')
     configuration = fields.Text()
 
-    @api.multi
     def test(self):
         """
             Test the connection is successful with the third party component
@@ -75,3 +74,10 @@ class ConnectionApi(models.Model):
     _description = 'EDI Connection'
 
     type = fields.Selection(selection_add=[('api', 'Rpc Api')])
+
+    def test(self):
+        self.ensure_one()
+        if not self.type == 'api':
+            return super().test()
+
+        raise UserError("Not applicable for this type of connection")

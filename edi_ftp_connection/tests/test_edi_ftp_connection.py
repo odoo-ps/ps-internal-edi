@@ -76,7 +76,7 @@ class ConnectionTest(TransactionCase):
             'integration_type': 'out',
             'connection_id': self.out_connection.id,
             'res_model_id': self.partner_model_id.id,
-            'provider_name': 'Test Partner'
+            'name': 'Test Partner'
         })
 
         self.synchronization = self.env['edi.synchronization'].create({
