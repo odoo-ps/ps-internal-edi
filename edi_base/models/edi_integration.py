@@ -38,7 +38,6 @@ class Integration(models.Model):
         ('json', 'JSON'),
         ('pdf', 'PDF')
     ], default='text', required=True, string='Content type')
-    provider_name = fields.Char(string='Provider Name')
 
     # cron inheritance
     cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron job')
@@ -55,13 +54,12 @@ class Integration(models.Model):
     #Status
     synchronization_ids = fields.One2many('edi.synchronization', 'integration_id')
     error_ids = fields.One2many('edi.synchronization.error', 'integration_id')
-    last_success_date = fields.Datetime(compute="_get_status", store=True)
-    last_failure_date = fields.Datetime(compute="_get_status", store=True)
-    last_sync_status = fields.Char(compute="_get_status", store=True)
-    color = fields.Integer(compute="_get_status", store=True)
+    last_success_date = fields.Datetime()
+    last_failure_date = fields.Datetime()
+    last_sync_status = fields.Char()
+    color = fields.Integer()
 
-    @api.depends('synchronization_ids', 'synchronization_ids.state', 'synchronization_ids.synchronization_date')
-    def _get_status(self):
+    def set_status(self):
         query = """
             SELECT DISTINCT ON (integration_id, state) 
                 integration_id, 
@@ -93,18 +91,18 @@ class Integration(models.Model):
 
     #TODO Filter on status
 
-    @api.model
+    @api.model_create_multi
     def create(self, values):
-        """
-        """
-        values['model_id'] = self.env.ref('edi_base.model_edi_integration').id
-        values['state'] = "code"
+        for vals in values:
+            vals['model_id'] = self.env.ref('edi_base.model_edi_integration').id
+            vals['state'] = "code"
+            vals['numbercall'] = -1
 
         res = super(Integration, self).create(values)
-        res.code = "model._process(%i)" % res.id
+        for rec in res:
+            rec.code = "model._process(%i)" % rec.id
         return res
 
-    @api.multi
     def _read_parameter(self):
         self.ensure_one()
         return json.loads(self.parameter)
@@ -137,7 +135,7 @@ class Integration(models.Model):
     ###########################################
     #=========================================#
     def _create_error_sync(self, activity, exception):
-        name = '%s - %s: %s' % (self.provider_name, fields.Datetime.now(), "No Sync Error")
+        name = '%s - %s: %s' % (self.name, fields.Datetime.now(), "No Sync Error")
         res = self.env['edi.synchronization'].create({
             'integration_id': self.id,
             'name': name,
@@ -218,7 +216,7 @@ class Integration(models.Model):
         return self.env['edi.synchronization'].create({
             'integration_id': self.id,
             'name': self._get_synchronization_name_out(records),
-            'filename': '%s.%s' % (self._get_synchronization_name_out(records), self.synchronization_content_type),
+            'filename': ('%s.%s' % (self._get_synchronization_name_out(records), self.synchronization_content_type))[:100],
             'synchronization_date': fields.Datetime.now(),
         })
 
@@ -241,12 +239,14 @@ class Integration(models.Model):
                 else:
                     self._process_record_out(records, raise_error=raise_error)
             except Exception as e:
-                _logger.exception(str(e))
+                if not 'no_exception_log' in self._context: #Only for test purpose
+                    _logger.exception(str(e))
                 if not self.env.fail_safe.env.sync:
                     self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
                 if raise_error:
                     raise
             finally:
+                self.env.fail_safe.set_status()
                 new_cr.commit()
                 new_cr.close()
 
@@ -279,7 +279,7 @@ class Integration(models.Model):
 
     def _get_synchronization_name_out(self, records):
         return '%s - %s: %s' % (
-            self.provider_name,
+            self.name,
             fields.Datetime.now(),
             records.ids
         )
@@ -346,8 +346,16 @@ class Integration(models.Model):
         self.ensure_one()
         with api.Environment.manage():
             new_cr = self.pool.cursor()
+            if self._context.get('no_exception_log'):
+                new_cr._default_log_exceptions = False
             self = self.with_env(self.env(cr=new_cr))
-            self._process_out(records=records, raise_error=raise_error)
+            try:
+                self._process_out(records=records, raise_error=raise_error)
+            except Exception as e:
+                raise
+            finally:
+                new_cr.commit()
+                new_cr.close()
 
 
     #####################################################################
@@ -393,12 +401,14 @@ class Integration(models.Model):
                 for d in data:
                     self._process_in_file(d['filename'], d['content'], raise_error=raise_error)
             except Exception as e:
-                _logger.exception(str(e))
+                if not 'no_exception_log' in self._context: #Only for test purpose
+                    _logger.exception(str(e))
                 if not self.env.fail_safe.env.sync:
                     self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
                 if raise_error:
                     raise
             finally:
+                self.env.fail_safe.set_status()
                 new_cr.commit()
                 new_cr.close()
 
@@ -417,8 +427,8 @@ class Integration(models.Model):
             self.env.fail_safe._handle_error(sync.filename)
             if raise_error:
                 raise
-            else:
-                sync._done()
+        else:
+            sync._done()
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
@@ -426,7 +436,7 @@ class Integration(models.Model):
 
     def _get_synchronization_name_in(self, filename, content):
         return '%s - %s: %s' % (
-            self.provider_name,
+            self.name,
             fields.Datetime.now(),
             filename
         )

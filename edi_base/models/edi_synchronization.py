@@ -55,8 +55,6 @@ class Synchronization(models.Model):
         related='integration_id.synchronization_content_type',
         store=True, readonly=True, string='Content type'
     )
-    #res_model_id = fields.Many2one(related='integration_id.res_model_id', store=True, string='Resource model')
-    #res_model = fields.Char(related='res_model_id.model', string='Resouce model name')
     res_id = fields.Integer(string='Resource ID')
     synchronization_date = fields.Datetime(readonly=True, string='Synchronized on')
     content = fields.Text(readonly=True)
