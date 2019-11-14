@@ -257,6 +257,7 @@ class Integration(models.Model):
         self.ensure_one()
 
         sync = self.env.fail_safe._create_synchronization_out(records, flow_type=self.integration_flow)
+        self.env.fail_safe.env.cr.commit()
         self.env.fail_safe.env.sync.append(sync)
         try:
             self.env.fail_safe.env.activity = "Get Content"
@@ -416,6 +417,7 @@ class Integration(models.Model):
         self.ensure_one()
 
         sync = self.env.fail_safe._create_synchronzation_in(filename, content)
+        self.env.fail_safe.env.cr.commit()
         self.env.fail_safe.env.sync.append(sync)
         try:
             self.env.fail_safe.env.activity = "Process Content"

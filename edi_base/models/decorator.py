@@ -51,6 +51,7 @@ def integration(name):
                 integration_obj = self.env['edi.integration'].sudo().with_env(self.env(cr=new_cr))
                 integration = get_integration(integration_obj, name)
                 sync = create_synchronization(integration, self, args, kwargs, fct)
+                new_cr.commit()
                 try:
                     res = fct(*args, **kwargs)
                 except Exception as e:
