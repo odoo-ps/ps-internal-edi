@@ -63,7 +63,7 @@
             <field name="active" eval="False" />
             <field name="parameter"><![CDATA[
 {
-  "filter" : [["name","ilike","EDI TEST"],
+  "filter" : [["name","ilike","EDI TEST"]],
   "fields" : ["id", "name"]
 }
             ]]></field>

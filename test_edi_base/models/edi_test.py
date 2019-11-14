@@ -19,8 +19,12 @@ class ResPartner(models.Model):
     def create_partner(self, data):
         """
             import odoolib
-            odoolib.get_connection(database='edi_test', login='admin', password='admin', hostname="localhost").get_model("res.partner").create_partner({'name': 'Hello'})
+            odoolib.get_connection(database='edi_test', login='admin', password='admin', hostname="localhost").get_model("res.partner").create_partner({'name': 'Hello', 'time': 10})
         """
+        if "time" in data:
+            import time
+            time.sleep(data.pop('time'))
+
         return self.create([data]).id
 
     def sync_real_time(self, raise_error=False):
@@ -53,6 +57,10 @@ class Integration(models.Model):
             self._report_error("Export Partner", message="Cannot export the partner")
             return "Error: wrong partner"
 
+        if len(records) == 1 and 'time' in records.name:
+            import time
+            time.sleep(30)
+
         if len(records) == 1 and 'raise' in records.name:
             #Generate an error that break an sql constraint
             self.env['res.partner'].create({'name': False})
@@ -79,6 +87,10 @@ class Integration(models.Model):
         #Code to test when something go wrong
         if content == 'raise':
             self.env['res.partner'].create({'name': False})
+
+        if content.strip() == 'time':
+            import time
+            time.sleep(30)
 
         csv_file = StringIO(content)
         reader = csv.reader(csv_file, delimiter=',')
