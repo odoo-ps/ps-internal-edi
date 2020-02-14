@@ -32,7 +32,6 @@ class FTPConnection(models.Model):
 
     type = fields.Selection(selection_add=[('ftp', 'FTP')])
 
-    @api.multi
     def test(self):
 
         self.ensure_one()
@@ -98,7 +97,7 @@ class FTPConnection(models.Model):
         self.ftp_server = None
 
         try:
-            self.ftp_server = self._connect()
+            self.ftp_server = self._connect(integration_flow='in')
             existing_filenames = getattr(self.ftp_server, 'mlst', self.ftp_server.nlst)()
 
             filenames = []
@@ -150,7 +149,7 @@ class FTPConnection(models.Model):
         if not self.type == 'ftp':
             return super()._clean_synchronization()
 
-        self.ftp_server = None
+        self.ftp_server = self._connect(integration_flow=flow_type)
 
         config = self._read_configuration()
 
@@ -161,13 +160,13 @@ class FTPConnection(models.Model):
                 self.ftp_server.delete(path)
 
         if flow_type == 'in':
-            path = "%s/%s" % (config['in_folder'], filename)
+            full_path= self.ftp_server.pwd() + '/' + filename
             if status == "done":
-                done_path = "%s/%s" % (config['in_folder_done'], filename)
+                done_path = full_path.replace('/' + config['in_folder'] + '/', '/' + config['in_folder_done'] + '/')
             else:
-                done_path = "%s/%s" % (config['in_folder_error'], filename)
+                done_path = full_path.replace('/' + config['in_folder'] + '/', '/' + config['in_folder_error'] + '/')
             # todo : option to delete done files
-            os.rename(path, done_path)
+            self.ftp_server.rename(full_path, done_path)
 
     def _get_default_configuration(self):
         """
@@ -192,7 +191,7 @@ class FTPConnection(models.Model):
             'out_folder': '<PATH HERE>',
         }
 
-    def _connect(self):
+    def _connect(self, integration_flow='out'):
 
         self.ensure_one()
         if not self.type == 'ftp':
@@ -210,8 +209,12 @@ class FTPConnection(models.Model):
         if 'is_active' in config and config['is_active'] == 'True':
             server.set_pasv(False)
 
-        if 'out_folder' in config:
-            server.cwd(config['out_folder'])
+        if integration_flow == 'in':
+            if 'in_folder' in config:
+                server.cwd(config['in_folder'])
+        else:
+            if 'out_folder' in config:
+                server.cwd(config['out_folder'])
 
         return server
 
