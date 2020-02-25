@@ -1,214 +1,214 @@
-# -*- coding: utf-8 -*-
-# Part of Odoo. See LICENSE file for full copyright and licensing details.
+# # -*- coding: utf-8 -*-
+# # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import ftplib
-import json
-import sys
+# import ftplib
+# import json
+# import sys
 
-from datetime import datetime as dt
+# from datetime import datetime as dt
 
-from odoo.addons.edi_ftp_connection.models.ftp_connection import SynchronizationException
-from odoo.exceptions import UserError
-from odoo.tests import TransactionCase
-from odoo.tools import mute_logger
+# from odoo.addons.edi_ftp_connection.models.ftp_connection import SynchronizationException
+# from odoo.exceptions import UserError
+# from odoo.tests import TransactionCase
+# from odoo.tools import mute_logger
 
-PY2 = sys.version_info[0] == 2
+# PY2 = sys.version_info[0] == 2
 
-if PY2:
-    from StringIO import StringIO
-else:
-    from io import BytesIO as StringIO
-
-
-HOST = 'api3.odoo.com'
-USER = 'odoo'
-PASSWORD = 'OdooAPI32018'
+# if PY2:
+#     from StringIO import StringIO
+# else:
+#     from io import BytesIO as StringIO
 
 
-class ConnectionTest(TransactionCase):
+# HOST = 'api3.odoo.com'
+# USER = 'odoo'
+# PASSWORD = 'OdooAPI32018'
 
-    @classmethod
-    def setUpClass(cls):
-        super(ConnectionTest, cls).setUpClass()
 
-        cls.ftp = ftplib.FTP(host=HOST, user=USER, passwd=PASSWORD)
+# class ConnectionTest(TransactionCase):
 
-    @classmethod
-    def tearDownClass(cls):
-        super(ConnectionTest, cls).tearDownClass()
+#     @classmethod
+#     def setUpClass(cls):
+#         super(ConnectionTest, cls).setUpClass()
 
-        if cls.ftp:
-            cls.ftp.quit()
+#         cls.ftp = ftplib.FTP(host=HOST, user=USER, passwd=PASSWORD)
 
-    def setUp(self):
+#     @classmethod
+#     def tearDownClass(cls):
+#         super(ConnectionTest, cls).tearDownClass()
 
-        super(ConnectionTest, self).setUp()
+#         if cls.ftp:
+#             cls.ftp.quit()
 
-        now = dt.utcnow()
+#     def setUp(self):
 
-        self.partner_model_id = self.env.ref('base.model_res_partner')
+#         super(ConnectionTest, self).setUp()
 
-        self.out_connection = self.env['edi.connection'].create({
-            'name': 'API3 FTP Connection',
-            'connection_type': 'ftp',
-            'configuration': json.dumps({
-                'host': HOST,
-                'user': USER,
-                'password': PASSWORD,
-                'folder': 'ftp/out',
-                'on_conflict': 'rename'
-            })
-        })
+#         now = dt.utcnow()
 
-        self.in_connection = self.env['edi.connection'].create({
-            'name': 'API3 FTP Connection',
-            'connection_type': 'ftp',
-            'configuration': json.dumps({
-                'host': HOST,
-                'user': USER,
-                'password': PASSWORD,
-                'folder': 'ftp/in'
-            })
-        })
+#         self.partner_model_id = self.env.ref('base.model_res_partner')
 
-        self.out_integration = self.env['edi.integration'].create({
-            'name': 'Test Outgoing Integration 1',
-            'integration_type': 'out',
-            'connection_id': self.out_connection.id,
-            'res_model_id': self.partner_model_id.id,
-            'name': 'Test Partner'
-        })
+#         self.out_connection = self.env['edi.connection'].create({
+#             'name': 'API3 FTP Connection',
+#             'connection_type': 'ftp',
+#             'configuration': json.dumps({
+#                 'host': HOST,
+#                 'user': USER,
+#                 'password': PASSWORD,
+#                 'folder': 'ftp/out',
+#                 'on_conflict': 'rename'
+#             })
+#         })
 
-        self.synchronization = self.env['edi.synchronization'].create({
-            'name': '%s_%s_%s_integration_%s_synchronization.txt' % (
-                'out',
-                self.partner_model_id.id,
-                now.strftime('%s'),
-                self.out_integration.id
-            ),
-            'integration_id': self.out_integration.id,
-            'synchronization_type': 'out',
-            'content': 'Hello world!'
-        })
+#         self.in_connection = self.env['edi.connection'].create({
+#             'name': 'API3 FTP Connection',
+#             'connection_type': 'ftp',
+#             'configuration': json.dumps({
+#                 'host': HOST,
+#                 'user': USER,
+#                 'password': PASSWORD,
+#                 'folder': 'ftp/in'
+#             })
+#         })
 
-    def _clean_ftp(self, folder=None):
-        """
-        """
+#         self.out_integration = self.env['edi.integration'].create({
+#             'name': 'Test Outgoing Integration 1',
+#             'integration_type': 'out',
+#             'connection_id': self.out_connection.id,
+#             'res_model_id': self.partner_model_id.id,
+#             'name': 'Test Partner'
+#         })
 
-        pwd = self.ftp.pwd()
+#         self.synchronization = self.env['edi.synchronization'].create({
+#             'name': '%s_%s_%s_integration_%s_synchronization.txt' % (
+#                 'out',
+#                 self.partner_model_id.id,
+#                 now.strftime('%s'),
+#                 self.out_integration.id
+#             ),
+#             'integration_id': self.out_integration.id,
+#             'synchronization_type': 'out',
+#             'content': 'Hello world!'
+#         })
 
-        if not folder:
-            folder = '.'
+#     def _clean_ftp(self, folder=None):
+#         """
+#         """
 
-        self.ftp.cwd(folder)
+#         pwd = self.ftp.pwd()
 
-        filenames = self.ftp.nlst()
-        for filename in filenames:
-            self.ftp.delete(filename)
+#         if not folder:
+#             folder = '.'
 
-        self.ftp.cwd(pwd)
+#         self.ftp.cwd(folder)
 
-    def test_connect_fail(self):
-        """
-        """
+#         filenames = self.ftp.nlst()
+#         for filename in filenames:
+#             self.ftp.delete(filename)
 
-        connection = self.env['edi.connection'].create({
-            'name': 'Test FTP Connection',
-            'connection_type': 'ftp',
-            'configuration': json.dumps({
-                'host': 'test.odoo.com',
-                'user': 'odoo',
-                'password': 'odoo'
-            })
-        })
+#         self.ftp.cwd(pwd)
 
-        with self.assertRaises(UserError) as cm:
-            connection.test()
+#     def test_connect_fail(self):
+#         """
+#         """
 
-        exc = cm.exception
+#         connection = self.env['edi.connection'].create({
+#             'name': 'Test FTP Connection',
+#             'connection_type': 'ftp',
+#             'configuration': json.dumps({
+#                 'host': 'test.odoo.com',
+#                 'user': 'odoo',
+#                 'password': 'odoo'
+#             })
+#         })
 
-        self.assertTrue('Connection Test Failed!' in exc.name)
+#         with self.assertRaises(UserError) as cm:
+#             connection.test()
 
-    def test_connect_success(self):
-        with self.assertRaises(UserError) as cm:
-            self.out_connection.test()
+#         exc = cm.exception
 
-        exc = cm.exception
+#         self.assertTrue('Connection Test Failed!' in exc.name)
 
-        self.assertTrue('Connection Test Succeeded!' in exc.name)
+#     def test_connect_success(self):
+#         with self.assertRaises(UserError) as cm:
+#             self.out_connection.test()
 
-    @mute_logger('odoo.addons.edi_ftp_connection.models.ftp_connection')
-    def test_send_synchronization(self):
-        """
-        """
+#         exc = cm.exception
 
-        self._clean_ftp('ftp/out')
-        self.ftp.cwd('ftp/out')
+#         self.assertTrue('Connection Test Succeeded!' in exc.name)
 
-        # First send: file doesn\'t exist on FTP server
-        self.out_connection.send_synchronization(self.synchronization)
+#     @mute_logger('odoo.addons.edi_ftp_connection.models.ftp_connection')
+#     def test_send_synchronization(self):
+#         """
+#         """
 
-        filenames = self.ftp.nlst()
+#         self._clean_ftp('ftp/out')
+#         self.ftp.cwd('ftp/out')
 
-        self.assertEqual(len(filenames), 1)
-        self.assertEqual(filenames[0], self.synchronization.name)
+#         # First send: file doesn\'t exist on FTP server
+#         self.out_connection.send_synchronization(self.synchronization)
 
-        # Second send: file already exists on FTP server -> rename
-        self.out_connection.send_synchronization(self.synchronization)
+#         filenames = self.ftp.nlst()
 
-        filenames = self.ftp.nlst()
+#         self.assertEqual(len(filenames), 1)
+#         self.assertEqual(filenames[0], self.synchronization.name)
 
-        self.assertEqual(len(filenames), 2)
-        self.assertTrue(self.synchronization.name in filenames)
-        self.assertTrue(self.synchronization.name + '.old' in filenames)
+#         # Second send: file already exists on FTP server -> rename
+#         self.out_connection.send_synchronization(self.synchronization)
 
-        # Third send: file already exists on FTP server -> replace
-        self.out_connection.on_conflict = 'replace'
-        self.synchronization.content = 'Replaced hello world!'
-        self.out_connection.send_synchronization(self.synchronization)
+#         filenames = self.ftp.nlst()
 
-        filenames = self.ftp.nlst()
+#         self.assertEqual(len(filenames), 2)
+#         self.assertTrue(self.synchronization.name in filenames)
+#         self.assertTrue(self.synchronization.name + '.old' in filenames)
 
-        self.assertEqual(len(filenames), 2)
-        self.assertTrue(self.synchronization.name in filenames)
-        self.assertTrue(self.synchronization.name + '.old' in filenames)
+#         # Third send: file already exists on FTP server -> replace
+#         self.out_connection.on_conflict = 'replace'
+#         self.synchronization.content = 'Replaced hello world!'
+#         self.out_connection.send_synchronization(self.synchronization)
 
-        data = StringIO()
-        self.ftp.retrbinary('RETR %s' % self.synchronization.name, data.write)
-        content = data.getvalue().decode()
-        data.close()
+#         filenames = self.ftp.nlst()
 
-        self.assertEqual(content, self.synchronization.content)
+#         self.assertEqual(len(filenames), 2)
+#         self.assertTrue(self.synchronization.name in filenames)
+#         self.assertTrue(self.synchronization.name + '.old' in filenames)
 
-        # Fourth send: file already exists on FTP server -> raise
-        self.out_connection.on_conflict = 'raise'
-        with self.assertRaises(SynchronizationException) as cm:
-            self.out_connection.send_synchronization(self.synchronization)
+#         data = StringIO()
+#         self.ftp.retrbinary('RETR %s' % self.synchronization.name, data.write)
+#         content = data.getvalue().decode()
+#         data.close()
 
-        exc = cm.exception
+#         self.assertEqual(content, self.synchronization.content)
 
-        self.assertTrue('File \'%s\' already present if FTP server' % self.synchronization.name in exc.value)
+#         # Fourth send: file already exists on FTP server -> raise
+#         self.out_connection.on_conflict = 'raise'
+#         with self.assertRaises(SynchronizationException) as cm:
+#             self.out_connection.send_synchronization(self.synchronization)
 
-        self.ftp.cwd('../..')
-        self._clean_ftp('ftp/out')
+#         exc = cm.exception
 
-    @mute_logger('odoo.addons.edi_ftp_connection.models.ftp_connection')
-    def test_fetch_synchronizations(self):
-        """
-        """
+#         self.assertTrue('File \'%s\' already present if FTP server' % self.synchronization.name in exc.value)
 
-        self._clean_ftp('ftp/in')
-        self.ftp.cwd('ftp/in')
+#         self.ftp.cwd('../..')
+#         self._clean_ftp('ftp/out')
 
-        self.ftp.storbinary('STOR %s' % 'test_file.txt', StringIO(b'Hello world!'))
-        self.ftp.storbinary('STOR %s' % 'test_file.txt.old', StringIO(b'Hello old world!'))
+#     @mute_logger('odoo.addons.edi_ftp_connection.models.ftp_connection')
+#     def test_fetch_synchronizations(self):
+#         """
+#         """
 
-        result = self.in_connection.fetch_synchronizations()
+#         self._clean_ftp('ftp/in')
+#         self.ftp.cwd('ftp/in')
 
-        self.assertEqual(len(result), 1)
-        result = result[0]
-        self.assertTrue('test_file.txt' in result['filename'])
-        self.assertEqual(result['content'], 'Hello world!')
+#         self.ftp.storbinary('STOR %s' % 'test_file.txt', StringIO(b'Hello world!'))
+#         self.ftp.storbinary('STOR %s' % 'test_file.txt.old', StringIO(b'Hello old world!'))
 
-        self.ftp.cwd('../..')
-        self._clean_ftp('ftp/in')
+#         result = self.in_connection.fetch_synchronizations()
+
+#         self.assertEqual(len(result), 1)
+#         result = result[0]
+#         self.assertTrue('test_file.txt' in result['filename'])
+#         self.assertEqual(result['content'], 'Hello world!')
+
+#         self.ftp.cwd('../..')
+#         self._clean_ftp('ftp/in')
