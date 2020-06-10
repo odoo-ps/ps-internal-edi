@@ -246,7 +246,8 @@ class Integration(models.Model):
                 if raise_error:
                     raise
             finally:
-                self.env.fail_safe.set_status()
+                # self.env.fail_safe.set_status()
+                # The line above was transferred from the code to the cron 'edi_update_status' due to a deadlock
                 new_cr.commit()
                 new_cr.close()
 
@@ -409,7 +410,8 @@ class Integration(models.Model):
                 if raise_error:
                     raise
             finally:
-                self.env.fail_safe.set_status()
+                # self.env.fail_safe.set_status()
+                # The line above was transferred from the code to the cron 'edi_update_status' due to a deadlock
                 new_cr.commit()
                 new_cr.close()
 

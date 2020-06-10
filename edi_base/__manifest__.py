@@ -16,6 +16,7 @@ Odoo PS EDI Framework
         'views/edi_integration.xml',
         'views/edi_synchronization.xml',
         'data/connection.xml',
+        'data/cron.xml',
     ],
     'hidden': True,
     'auto_install': False

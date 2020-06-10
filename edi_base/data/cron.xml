@@ -1,0 +1,15 @@
+<odoo>
+    <record model="ir.cron" id="edi_update_status">
+        <field name="name">EDI : Update Status</field>
+        <field eval="True" name="active"/>
+        <field name="priority">5</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">10</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field eval="False" name="doall"/>
+        <field name="model_id" ref="edi_base.model_edi_integration"/>
+        <field name="state">code</field>
+        <field name="code">model.search([]).set_status()</field>
+    </record>
+</odoo>
