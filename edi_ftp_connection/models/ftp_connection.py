@@ -126,15 +126,14 @@ class FTPConnection(models.Model):
                     result.append(values)
 
         except Exception as e:
-            params = (
+            msg = _("Fetching synchronizations failed via FTP server '%s: %s'.\n%s: %s") % (
                 ustr(self.ftp_server),
-                ustr(self.ftp_server.host),
+                ustr(self.ftp_server.host) if self.ftp_server else False,
                 e.__class__.__name__,
                 ustr(e)
             )
-            msg = _("Fetching synchronizations failed via FTP server '%s: %s'.\n%s: %s") % params
-
             _logger.info(msg)
+            raise SynchronizationException(_("Failure to fetch synchronization"), msg)
 
         finally:
             if self.ftp_server is not None:
@@ -153,11 +152,8 @@ class FTPConnection(models.Model):
 
         config = self._read_configuration()
 
-        if flow_type == 'out':
-            path = "%s/%s" % (config['out_folder'], filename)
-            if status == 'error':
-                # todo: check if path exists first
-                self.ftp_server.delete(path)
+        if flow_type == 'out' and status == 'error' and filename in self.ftp_server.nlst():
+            self.ftp_server.delete("%s/%s" % (config['out_folder'], filename))
 
         if flow_type == 'in':
             full_path= self.ftp_server.pwd() + '/' + filename
