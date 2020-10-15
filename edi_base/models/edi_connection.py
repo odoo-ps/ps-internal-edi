@@ -73,7 +73,7 @@ class ConnectionApi(models.Model):
     _inherit = 'edi.connection'
     _description = 'EDI Connection'
 
-    type = fields.Selection(selection_add=[('api', 'Rpc Api')])
+    type = fields.Selection(selection_add=[('api', 'Rpc Api')], ondelete={'api': 'cascade'})
 
     def test(self):
         self.ensure_one()
