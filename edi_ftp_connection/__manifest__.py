@@ -11,6 +11,6 @@ FTP Connection for Odoo PS EDI Framework
     'depends': ['edi_base'],
     'data': [
     ],
-    'hidden': True,
-    'auto_install': False
+    'auto_install': False,
+    'installable': False,
 }
