@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import traceback
+from odoo import fields, models
 
-from odoo import api, fields, models, SUPERUSER_ID
 
 class SynchronizationError(models.Model):
 
@@ -13,7 +13,7 @@ class SynchronizationError(models.Model):
     integration_id = fields.Many2one(related='synchronization_id.integration_id', store=True)
     synchronization_id = fields.Many2one(
         comodel_name='edi.synchronization',
-        on_delete='cascade',
+        ondelete='cascade',
         string='Synchronization'
     )
     activity = fields.Char()
@@ -26,6 +26,7 @@ class SynchronizationError(models.Model):
                 rec.description_short = rec.description
             else:
                 rec.description_short = "%s\n....\n%s" % (rec.description[:150], rec.description[-500:])
+
 
 class Synchronization(models.Model):
     """
@@ -119,4 +120,3 @@ class Synchronization(models.Model):
     def _done(self):
         self.write({'state': 'done'})
         self.flush(fnames=['state', 'content_type', 'synchronization_flow'], records=self)
-

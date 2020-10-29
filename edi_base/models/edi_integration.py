@@ -3,12 +3,9 @@
 
 import json
 import logging
-import traceback
-import time
 
 from datetime import datetime
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
 from odoo.tools import safe_eval
 
 _logger = logging.getLogger(__name__)
@@ -26,9 +23,13 @@ class Integration(models.Model):
         ('out', 'From Odoo to provider'), 
         ('out_real', 'From Odoo to provider (Realtime)')
     ], required=True, string='Flow of data')
-    synchronization_creation = fields.Selection([('one', 'One'), ('multi', 'Multi')], help="Create a synchro for each record (one), or for all record multi", default="multi")
-    connection_id = fields.Many2one('edi.connection', required=True, on_delete='restrict', string='Connection')
-    type = fields.Selection(selection=[('multi', 'Call Sub Integration'),('api', 'RPC Api')], required=True, string='Type') #Add selection for your integration
+    synchronization_creation = fields.Selection([('one', 'One'), ('multi', 'Multi')],
+                                                help="Create a synchro for each record (one), or for all record multi",
+                                                default="multi")
+    connection_id = fields.Many2one('edi.connection', required=True, string='Connection')
+    type = fields.Selection(selection=[('multi', 'Call Sub Integration'),('api', 'RPC Api')],
+                            required=True,
+                            string='Type')  # Add selection for your integration
     parameter = fields.Text(string="Parameter")
 
     synchronization_content_type = fields.Selection(selection=[
@@ -41,17 +42,18 @@ class Integration(models.Model):
 
     # cron inheritance
     cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron job')
-    #Multiple Integration at once
-    has_sub_integration = fields.Boolean(string="Has sub Integration", default=False,
-                                         help="if you need to run many integration in a specific order in the same transaction" )
+    # Multiple Integration at once
+    has_sub_integration = fields.Boolean(string="Has sub Integration", default=False, help="if you need to run many integration in a specific order in the same transaction" )
     sequence = fields.Integer()
     sub_integration_ids = fields.Many2many('edi.integration',
-                                           'edi_integration_sub_integration_rel', 'integration_id', 'sub_integration_id',
-                                           domain=[('has_sub_integration', '!=', True), '|', ('active', '=', True), ('active', '=', False)])
+                                           'edi_integration_sub_integration_rel',
+                                           'integration_id', 'sub_integration_id',
+                                           domain=[('has_sub_integration', '!=', True),
+                                                   '|', ('active', '=', True), ('active', '=', False)])
     record_filter_id = fields.Many2one('ir.filters', string="Record Filter", ondelete='restrict',
                                        help="Filter for default behavior of _get_record_to_send")
 
-    #Status
+    # Status
     synchronization_ids = fields.One2many('edi.synchronization', 'integration_id')
     error_ids = fields.One2many('edi.synchronization.error', 'integration_id')
     last_success_date = fields.Datetime()
@@ -89,7 +91,7 @@ class Integration(models.Model):
                 rec.last_sync_status = "Fail"
                 rec.color = 1
 
-    #TODO Filter on status
+    # TODO Filter on status
 
     @api.model_create_multi
     def create(self, values):
@@ -180,7 +182,6 @@ class Integration(models.Model):
                     _logger.warning("Do not call process_integration for real time integration call _process_out_realtime")
 
         return True
-
 
     #####################################################################
     #                   Implementation of process out                   #
