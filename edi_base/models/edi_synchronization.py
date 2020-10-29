@@ -60,7 +60,6 @@ class Synchronization(models.Model):
     synchronization_date = fields.Datetime(readonly=True, string='Synchronized on')
     content = fields.Text(readonly=True)
     error_ids = fields.One2many('edi.synchronization.error', 'synchronization_id', string='synchronization_id')
-    errors_count = fields.Integer(_compute='_compute_errors_count', string='# errors')
     user_id = fields.Many2one('res.users', string='Trigger User', help="User that trigger the synchronization or call the API")
 
     _sql_constraints = [
