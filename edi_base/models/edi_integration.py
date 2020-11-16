@@ -211,10 +211,11 @@ class Integration(models.Model):
     """
 
     def _create_synchronization_out(self, records, flow_type):
+        name = self._get_synchronization_name_out(records)
         return self.env['edi.synchronization'].create({
             'integration_id': self.id,
-            'name': self._get_synchronization_name_out(records),
-            'filename': ('%s.%s' % (self._get_synchronization_name_out(records), self.synchronization_content_type))[:100],
+            'name': name,
+            'filename': ('%s.%s' % (name[:100], self.synchronization_content_type)),
             'synchronization_date': fields.Datetime.now(),
         })
 
