@@ -3,10 +3,14 @@
 
 import json
 import logging
+import os
+import tarfile
+import tempfile
+import time
 
 from datetime import datetime
 from odoo import api, fields, models, _
-from odoo.tools import safe_eval
+from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
@@ -39,6 +43,17 @@ class Integration(models.Model):
         ('json', 'JSON'),
         ('pdf', 'PDF')
     ], default='text', required=True, string='Content type')
+    in_process_type = fields.Selection([('content', 'Content of the file'), ('file', 'File')],
+                                       default='content',
+                                       help="""
+For integrations from provider to Odoo only :
+
+- If "content" then the "_process_content" method will receive the content of the file in text mode
+- If "file" then "_process_content" method will receive the file and has to open it and load the content
+
+Interesting if you want to load huge files with a stream parser for example.
+
+Default is content.""")
 
     # cron inheritance
     cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron job')
@@ -134,6 +149,7 @@ class Integration(models.Model):
     #             Generic API                 #
     ###########################################
     #=========================================#
+
     def _create_error_sync(self, activity, exception):
         name = '%s - %s: %s' % (self.name, fields.Datetime.now(), "No Sync Error")
         res = self.env['edi.synchronization'].create({
@@ -399,11 +415,12 @@ class Integration(models.Model):
             self.env.fail_safe.env.sync = []
             self.env.fail_safe.env.activity = "Fetch Content"
             try:
-                data = self._get_in_content()
-                for d in data:
-                    self._process_in_file(d['filename'], d['content'], raise_error=raise_error)
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    data = self._get_in_content(tmp_dir)
+                    for d in data:
+                        self._process_in_files(d, raise_error=raise_error)
             except Exception as e:
-                if not 'no_exception_log' in self._context: #Only for test purpose
+                if 'no_exception_log' not in self._context:  # Only for test purpose
                     _logger.exception(str(e))
                 if not self.env.fail_safe.env.sync:
                     self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
@@ -414,17 +431,60 @@ class Integration(models.Model):
                 new_cr.commit()
                 new_cr.close()
 
-    def _process_in_file(self, filename, content, raise_error=False):
+    def _process_in_files(self, data, raise_error=False):
+        """ Before really process a file, check if the file is an archive
+         If yes, we can extract the content the process each file
+         If no we just process the downloaded file
+         """
         self.ensure_one()
+        file = data.get('file')
+
+        # If the file is a tar, then untar to process all files insides
+        if tarfile.is_tarfile(file):
+            data['archive'] = True
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                # Extract the tar & pass file names to the process file
+                start = time.time()
+                tar_file = tarfile.open(file)
+                tar_file.extractall(tmp_dir)
+                _logger.info("%s - untar %s in %.3fs", self.type, data['filename'],time.time() - start)
+                files = [os.path.join(path, name) for path, subdirs, files in os.walk(tmp_dir) for name in files]
+                data['files'] = files
+                self._process_in_file(data, raise_error=raise_error)
+        else:
+            data['files'] = [file]
+            self._process_in_file(data, raise_error=raise_error)
+
+    def _process_in_file(self, data, raise_error=False):
+        filename = data.get('filename')
+        files = data.get('files')
+
+        # TODO Check if it's ok to never add anymore the content of the file on a synchronization (which was never displayed anyway...)
+        content = False #'%s files' % len(files) if files else data.get('content')  # If many files we just log the file names
 
         sync = self.env.fail_safe._create_synchronzation_in(filename, content)
         self.env.fail_safe.env.cr.commit()
         self.env.fail_safe.env.sync.append(sync)
         try:
             self.env.fail_safe.env.activity = "Process Content"
-            status = self._process_content(filename, content)
+            start = time.time()
+            sub_start = time.time()
+            i = 0
+            status = 'done'
+            for file in files:
+                file_status = self._process_in_file_or_content(filename, file, data.get('archive'))
+                if file_status != 'done':
+                    status = file_status
+                    # TODO Should we stop here since we had an issue ?
+                i += 1
+                if i % 1000 == 0:
+                    _logger.info("%s - process %s : %s file(s) in %.3fs, still working",
+                                 self.type, filename, i, time.time() - sub_start)
+                    sub_start = time.time()
+            _logger.info("%s - process %s : %s file(s) in %.3fs, done",
+                         self.type, filename, i,  time.time() - start)
             self.env.fail_safe.env.activity = "Clean Synchro"
-            self._clean(filename, status, content)
+            self._clean(filename, status)
         except Exception as e:
             sync._report_error(self.env.fail_safe.env.activity, e)
             self.env.fail_safe._handle_error(sync.filename)
@@ -433,6 +493,21 @@ class Integration(models.Model):
         else:
             self.flush()
             sync._done()
+
+    def _process_in_file_or_content(self, filename, file, archive=False):
+
+        # Add file info in the context (so we don't change the signature of the method _process_content)
+        if archive:
+            self = self.with_context(archive=filename,
+                                     log_file_name=os.path.join(filename, os.path.basename(file)))
+        else:
+            self = self.with_context(log_file_name=filename)
+
+        if self.in_process_type == 'file':
+            return self._process_content(file, None)
+        else:
+            with open(file, 'r') as f:
+                return self._process_content(file, f.read())
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
@@ -445,7 +520,7 @@ class Integration(models.Model):
             filename
         )
 
-    def _get_in_content(self):
+    def _get_in_content(self, directory):
         """
         Return list of dict
         the dict should be {
@@ -453,18 +528,36 @@ class Integration(models.Model):
             'content': str or dict: will be handle by in edi.integration._process_data
         }
         """
-        return self.connection_id._fetch_synchronizations()
+        return self.connection_id._fetch_synchronizations(integration_id=self, directory=directory)
 
-    def _clean(self, filename, status, content):
+    def _clean(self, filename, status):
         return self.connection_id._clean_synchronization(filename, status, self.integration_flow)
 
     ################################
     # To implement for process in  #
     ################################
     def _process_content(self, filename, content):
-        """
-            Return status use by _clean
-            Can use self._report_error
+        """ Allow the integration to redefine the processing of the content
+
+        :param filename:
+            the full path of the name
+            (which is now always in a temporary directory during the processing)
+        :param content:
+            the content of the file if in_process_type == 'content'
+            if in_process_type == 'file' it means that :
+                - the content is not passed to the method (so content = None)
+                - we can use the filename to open the file
+        :return:
+            status use by _clean
+
+        Can use self._report_error
+
+        Note : 2 keys are added in the context just before the call of this method :
+            - archive : if we process a file coming from an archive, the name of the archive file, ex. products.tar
+            - log_file_name :
+                - if archive, the concat of the archive & file processing, ex. products.tar/product-xx.xml
+                - else just the base filename product-xx.xml
+            Useful for traceability (log, save info in DB...)
         """
         return "done"
 
