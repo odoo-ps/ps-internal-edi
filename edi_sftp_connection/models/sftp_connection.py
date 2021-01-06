@@ -2,10 +2,8 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import pysftp
 import logging
-from io import BytesIO as StringIO
-from odoo import fields, models, _
-from odoo.exceptions import UserError
-from odoo.tools import ustr
+import os
+from odoo import api, fields, models
 _logger = logging.getLogger(__name__)
 
 
@@ -15,178 +13,178 @@ class SFTPConnection(models.Model):
 
     type = fields.Selection(selection_add=[('sftp', 'SFTP')], ondelete={'sftp': 'cascade'})
 
-    def _connect(self):
-        """ Open a connection on a SFTP server & check for specific flow directories
-        Note : in_folder & out_folder fall back on the root directory if they are not defined
-        """
-        self.ensure_one()
-        if not self.type == 'sftp':
-            return super()._connect()
-
-        config = self._read_configuration()
-
-        server = False
-        try:
-            server = pysftp.Connection(
-                host=config['host'],
-                username=config['user'],
-                password=config['password']
-                # TODO Allow to connect with RSA key
-                # private_key=paramiko.RSAKey.from_private_key_file(privatekeyfile)
-            )
-
-            paths = {}
-            for folder, default in [('out_folder', '/'),
-                                    ('in_folder', '/'), ('in_folder_done', False), ('in_folder_error', False)]:
-
-                # Handle not defined
-                path = config.get(folder, default)
-                if not path:
-                    continue
-
-                # Handle relative path
-                if not path.startswith('/'):
-                    path = server.pwd + path
-
-                # Handle non existing path
-                if not server.exists(path):
-                    raise UserError(_('Folder "%s" : "%s" does not exists') % (folder, path))
-
-                # Handle same path for different folders
-                if path in paths:
-                    raise UserError(_('Try to use path "%s" for folder "%s", but folder "%s" already use this one')
-                                    % (path, folder, paths[path]))
-                paths[path] = folder
-
-                # Add attribute to the server
-                server.__setattr__(folder, path)
-
-            return server
-        except Exception as e:
-            if server:
-                server.close()
-            raise e
+    ####################################################################
+    #             Methods overridden from edi_base                      #
+    #####################################################################
 
     def test(self):
-        """ Try to connect to the SFTP server """
+        """ Try to connect to the server """
         self.ensure_one()
         if not self.type == 'sftp':
             return super().test()
 
-        try:
-            with self._connect():
-                pass
-        except Exception as e:
-            raise UserError(_('Connection Test Failed! Here is what we got instead:\n %s') % ustr(e))
-        else:
-            raise UserError(_('Connection Test Succeeded! Everything seems properly set up!'))
+        self._ftp_test_connection()
 
     def _send_synchronization(self, filename, content, *args, **kwargs):
-        """ Override to upload the file on the SFTP server """
+        """ Override to upload the file """
         self.ensure_one()
         if not self.type == 'sftp':
             return super()._send_synchronization(filename, content, *args, **kwargs)
 
-        with self._connect() as server:
-            try:
-                server.chdir(server.out_folder)
-                self._manage_conflict(server, filename)
-                server.putfo(StringIO(content.encode()), filename)
-            except Exception as e:
-                _logger.error(e)
-                raise UserError(_('Send synchronization failed for file %s:\n%s') % (filename, ustr(e)))
+        return self._ftp_send_file(filename, content, args, kwargs)
 
     def _fetch_synchronizations(self, *args, **kwargs):
-        """ Override to download the file from the SFTP server """
+        """ Override to download the file from the FTP server """
         self.ensure_one()
         if not self.type == 'sftp':
             return super()._fetch_synchronizations(*args, **kwargs)
 
-        result = []
-        with self._connect() as server:
-            server.chdir(server.in_folder)
-            for filename in server.listdir():
-                if not server.isfile(filename):
-                    continue
-                try:
-                    data = StringIO()
-                    with server.open(filename, mode='r') as content_file:
-                        data.write(content_file.read())
-                    content = data.getvalue()
-                    data.closes()
-                    result.append({
-                        'filename': filename,
-                        'content': content.decode()
-                    })
-                except Exception as e:
-                    _logger.error(e)
-                    raise UserError(_('Fetch synchronization failed for file %s:\n%s') % (filename, ustr(e)))
-        return result
+        return self._ftp_fetch_files(*args, **kwargs)
 
-    def _clean_synchronization(self, filename, status, flow_type, **kwargs):
-        """ Override to take actions after the file transfer
-        - out : delete the file if an error has occurred
-        - in :
-            - if done : move if done folder is defined, else delete
-            - if error : move if error folder is defined, else just let the file
-        """
-        if not self.type == 'sftp':
-            return super()._clean_synchronization()
-
+    def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
         self.ensure_one()
-        if flow_type == 'in' or \
-           flow_type == 'out' and status == 'error':  # Test 1st to avoid a connection if not necessary
-            with self._connect() as server:
+        if not self.type == 'sftp':
+            return super()._clean_synchronization(filename, status, flow_type, kwargs)
 
-                # out : delete file if an error occurred
-                if flow_type == 'out':
-                    path = '%s/%s' % (server.out_folder, filename)
-                    if server.exists(path):
-                        server.remove(path)
-
-                # in : move or delete when done, move to error folder if defined
-                else:
-                    old_path = '%s/%s' % (server.in_folder, filename)
-                    if status == 'done':
-                        if hasattr(server, 'in_folder_done'):
-                            server.rename(old_path, '%s/%s' % (server.in_folder_done, filename))
-                        else:
-                            server.remove(old_path)
-                    elif hasattr(server, 'in_folder_error'):
-                        server.rename(old_path,  '%s/%s' % (server.in_folder_error, filename))
+        self._clean(filename, status, flow_type, *args, **kwargs)
 
     def _get_default_configuration(self):
         """ Provide a configuration template for this type of connection """
         if self.type != 'sftp':
             return super()._get_default_configuration()
 
+        return self._sftp_default_configuration()
+
+    #####################################################################
+    #    Specific SFTP Methods that should be overridden                #
+    #    by a connection based on SFTP                                  #
+    #####################################################################
+
+    def connect(self):
+        """ Open a connection """
+        self.ensure_one()
+        if not self.type == 'sftp':
+            return super().connect()
+
+        config = self._read_configuration()
+
+        cnopts = pysftp.CnOpts()
+        cnopts.hostkeys = None
+        # TODO Improve by allowing to verify the host
+        #  For now we just ignore that by setting "cnopts.hostkeys = None", but it raise security issue
+        #  (no protection against man-in-the-middle attacks)
+        #  How to solve that ?
+        #  One solution is to add the remote key of the server (the one we have to accept at the first connection)
+        #  on a known_hosts file.
+        #  See for ex. https://stackoverflow.com/questions/38939454/verify-host-key-with-pysftp
+        #  This should be improved when it will be needed for an integration.
+
+        server = pysftp.Connection(
+            host=config['host'],
+            username=config['user'],
+            password=config['password'],
+            cnopts=cnopts
+            # TODO Allow to connect with RSA key instead of a password
+            #  private_key=paramiko.RSAKey.from_private_key_file(privatekeyfile)
+            #  This should be improved when it will be needed for an integration.
+        )
+
+        self.ftp_load_config(server, config)
+        return server
+
+    @api.model
+    def pwd(self, server):
+        """ Get the current directory """
+        if not self.type == 'sftp':
+            return super().pwd(server)
+
+        return server.pwd()
+
+    @api.model
+    def dir_exists(self, server, path):
+        """ Check if the directory exists """
+        if not self.type == 'sftp':
+            return super().dir_exists(server, path)
+
+        try:
+            server.cwd(path)
+            return True
+        except Exception:
+            return False
+
+    @api.model
+    def file_exists(self, server, path, filename):
+        """ Check if the file exists """
+        if not self.type == 'sftp':
+            return super().file_exists(server, path, filename)
+
+        for file in self.list_files(server, path):
+            if file == filename:
+                return True
+        return False
+
+    @api.model
+    def delete_file(self, server, path):
+        if not self.type == 'sftp':
+            return super().delete_file(server, path)
+
+        server.remove(path)
+
+    @api.model
+    def change_dir(self, server, path):
+        if not self.type == 'sftp':
+            return super().change_dir(server, path)
+
+        server.chdir(path)
+
+    @api.model
+    def rename(self, server, old, new):
+        if not self.type == 'sftp':
+            return super().rename(server, old, new)
+
+        server.rename(old, new)
+
+    @api.model
+    def list_files(self, server, path=False):
+        if not self.type == 'sftp':
+            return super().list_files(server, path)
+
+        if path:
+            self.change_dir(server, path)
+
+        names = server.listdir()
+        filenames = []
+        for name in names:
+            if not server.isfile(name):
+                continue
+            filenames.append(name)
+        return filenames
+
+    @api.model
+    def _upload_file(self, server, filename, binary_content):
+        if not self.type == 'sftp':
+            return super()._upload_file(server, filename, binary_content)
+
+        server.putfo(binary_content, filename)
+
+    @api.model
+    def _download_file(self, server, directory, filename):
+        if not self.type == 'sftp':
+            return super()._download_file(server, directory, filename)
+
+        server.get(filename, os.path.join(directory, filename))
+        return os.path.join(directory, filename)
+
+    @api.model
+    def _sftp_default_configuration(self):
         return {
             'host': 'host',
             'user': 'user',
             'password': 'password',
-            'is_active': 'False',
-            'out_folder': '<PATH HERE>, "/" if not defined',
-            'in_folder': '<PATH HERE>, "/" if not defined',
-            'in_folder_done': '<PATH HERE>, deleted if not defined',
-            'in_folder_error': '<PATH HERE>, left in the same place of not defined',
-            'on_conflict': 'choose one from (raise, rename, replace), default raise',
+            'on_conflict': 'choose one from : raise, rename, replace',
             'on_conflict_rename_extension': 'old',
-            # 'on_clean_integration': 'choose one from : rename, delete',
-            # 'on_clean_integration_rename_extension': 'bak',
+            'in_folder': '<PATH HERE>',
+            'in_folder_done': '<PATH HERE>',
+            'in_folder_error': '<PATH HERE>',
+            'out_folder': '<PATH HERE>',
         }
-
-    def _manage_conflict(self, server, path):
-        """ Check if the file already exists, manage the conflict by rename, replace or raise """
-        if not server.exists(path):
-            return
-
-        config = self._read_configuration()
-        on_conflict = config.get('on_conflict', 'raise')
-        if on_conflict == 'rename':
-            server.rename(path, '%s.%s.%s' % (path,
-                                              fields.Datetime.now().strftime('%Y%m%d%H%M%S'),
-                                              config.get('on_conflict_rename_extension', 'old')))
-        elif on_conflict == 'replace':
-            server.remove(path)
-        else:
-            raise UserError(_('File \'%s\' already present on SFTP server') % path)
