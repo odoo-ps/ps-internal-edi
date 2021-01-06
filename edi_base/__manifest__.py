@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Odoo PS EDI Framework',
-    'version': '0.1',
+    'version': '1.0',
     'summary': '',
     'category': 'Tools',
     'description': """

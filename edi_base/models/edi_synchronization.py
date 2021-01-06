@@ -35,6 +35,7 @@ class Synchronization(models.Model):
 
     _name = 'edi.synchronization'
     _description = 'Synchronization'
+    _order = 'create_date desc'
 
     name = fields.Char(readonly=True, required=True)
     filename = fields.Char(readonly=True)
@@ -61,14 +62,6 @@ class Synchronization(models.Model):
     content = fields.Text(readonly=True)
     error_ids = fields.One2many('edi.synchronization.error', 'synchronization_id', string='synchronization_id')
     user_id = fields.Many2one('res.users', string='Trigger User', help="User that trigger the synchronization or call the API")
-
-    _sql_constraints = [
-        (
-            'name_integration_id_uniq',
-            'unique (name, integration_id)',
-            'The name must be unique per integration!'
-        )
-    ]
 
     def open_integration(self):
         self.ensure_one()

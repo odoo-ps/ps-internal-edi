@@ -8,6 +8,7 @@
         <tree string="Synchronization errors" edit="0" create="0" delete="0">
             <field name="synchronization_id"/>
             <field name="create_date"/>
+            <field name="write_date"/>
             <field name="activity"/>
             <field name="description_short"/>
         </tree>
@@ -68,6 +69,7 @@
                 <group>
                     <group>
                         <field name="create_date"/>
+                        <field name="write_date"/>
                     </group>
                     <group>
                         <field name="synchronization_date"/>
@@ -111,11 +113,10 @@
     <field name="model">edi.synchronization</field>
     <field name="arch" type="xml">
         <tree string="Synchronizations" edit="1" create="1" delete="0"
-            decoration-success="[('state', '=', 'done')]"
-            decoration-bf="[('state', '=', 'new')]"
-            decoration-muted="[('state', '=', 'cancel')]"
-            decoration-danger="[('state', '=', 'fail')]"
-        >
+              decoration-success="state=='done'"
+              decoration-info="state=='new'"
+              decoration-muted="state=='cancel'"
+              decoration-danger="state=='fail'">
             <field name="name"/>
             <field name="content_type"/>
             <field name="create_date"/>
@@ -257,9 +258,6 @@
     <field name="help" type="html">
         <p class="oe_view_nocontent">Here you will find the files created to be synchronized with the remote servers configured on your integrations.</p>
     </field>
-    <field name="context" eval="{
-        'search_default_group_by_state': True
-    }"/>
 </record>
 
 <menuitem id="synchronizations_menu" parent="root_menu" name="Synchronizations" sequence="10" action="synchronizations_act_window"/>
