@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 import ftplib
 import logging
+import os
 from io import BytesIO as StringIO
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
@@ -20,46 +21,28 @@ class FTPConnection(models.Model):
     _inherit = 'edi.connection'
 
     type = fields.Selection(selection_add=[('ftp', 'FTP')], ondelete={'ftp': 'cascade'})
+    in_done_let = fields.Boolean('Let in "in_folder"',
+                                 help='When downloading, let the file on the folder when process is done')
+
+    #####################################################################
+    #             Methods overridden from edi_base                      #
+    #####################################################################
 
     def test(self):
-        """ Try to connect to the FTP server """
+        """ Try to connect to the server """
         self.ensure_one()
         if not self.type == 'ftp':
             return super().test()
 
-        try:
-            conn = self._connect()
-            conn.quit()
-        except Exception as e:
-            raise UserError(_('Connection Test Failed! Here is what we got instead:\n %s') % ustr(e))
-        else:
-            raise UserError(_('Connection Test Succeeded! Everything seems properly set up!'))
+        self._ftp_test_connection()
 
     def _send_synchronization(self, filename, content, *args, **kwargs):
-        """ Override to upload the file on the FTP server """
+        """ Override to upload the file """
         self.ensure_one()
         if not self.type == 'ftp':
             return super()._send_synchronization(filename, content, *args, **kwargs)
 
-        ftp_server = None
-        try:
-            ftp_server = self._connect()
-            try:
-                self._check_filename(ftp_server, filename)
-                ftp_server.storbinary('STOR %s' % filename, StringIO(content.encode()))
-            finally:
-                if ftp_server is not None:
-                    ftp_server.quit()
-
-        except Exception as e:
-            msg = _("Sending synchronization failed via FTP server '%s: %s'.\n%s: %s") % (
-                ustr(ftp_server),
-                ustr(ftp_server.host) if ftp_server else False,
-                e.__class__.__name__,
-                ustr(e)
-            )
-            _logger.info(msg)
-            raise SynchronizationException(_("Failure to send synchronization"), msg)
+        return self._ftp_send_file(filename, content, args, kwargs)
 
     def _fetch_synchronizations(self, *args, **kwargs):
         """ Override to download the file from the FTP server """
@@ -67,96 +50,33 @@ class FTPConnection(models.Model):
         if not self.type == 'ftp':
             return super()._fetch_synchronizations(*args, **kwargs)
 
-        result = []
-        ftp_server = False
-        try:
-            ftp_server = self._connect(integration_flow='in')
-            existing_filenames = getattr(ftp_server, 'mlst', ftp_server.nlst)()
+        return self._ftp_fetch_files(*args, **kwargs)
 
-            filenames = []
-            for fname in existing_filenames:
-                if not self._is_valid_filename(fname):
-                    continue
-                filenames.append(fname)
-
-            for filename in filenames:
-                try:
-                    data = StringIO()
-                    ftp_server.retrbinary('RETR %s' % filename, data.write)
-                    content = data.getvalue()
-                    data.close()
-                    result.append({
-                        'filename': filename,
-                        'content': content.decode()
-                    })
-                except Exception as e:
-                    _logger.info(_("Fetching file '%s' failed via FTP server '%s: %s'.\n%s: %s") % (
-                        filename, ustr(ftp_server), ustr(ftp_server.host), e.__class__.__name__, ustr(e)))
-
-        except Exception as e:
-            msg = _("Fetching synchronizations failed via FTP server '%s: %s'.\n%s: %s") % (
-                ustr(ftp_server),
-                ustr(ftp_server.host) if ftp_server else False,
-                e.__class__.__name__,
-                ustr(e)
-            )
-            _logger.info(msg)
-            raise SynchronizationException(_("Failure to fetch synchronization"), msg)
-
-        finally:
-            if ftp_server:
-                ftp_server.quit()
-        return result
-
-    def _clean_synchronization(self, filename, status, flow_type, **kwargs):
-        """ Override to take actions after the file transfer
-        - out : delete the file if an error has occurred
-        - in : move in in_done or in_error
-        """
+    def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
         self.ensure_one()
         if not self.type == 'ftp':
-            return super()._clean_synchronization()
+            return super()._clean_synchronization(filename, status, flow_type, kwargs)
 
-        ftp_server = self._connect(integration_flow=flow_type)
-        config = self._read_configuration()
-
-        if flow_type == 'out' and status == 'error' and filename in ftp_server.nlst():
-            ftp_server.delete("%s/%s" % (config['out_folder'], filename))
-
-        if flow_type == 'in':
-            full_path = ftp_server.pwd() + '/' + filename
-            if status == "done":
-                done_path = full_path.replace('/' + config['in_folder'] + '/', '/' + config['in_folder_done'] + '/')
-            else:
-                done_path = full_path.replace('/' + config['in_folder'] + '/', '/' + config['in_folder_error'] + '/')
-            # todo : option to delete done files
-            ftp_server.rename(full_path, done_path)
+        self._clean(filename, status, flow_type, *args, **kwargs)
 
     def _get_default_configuration(self):
         """ Provide a configuration template for this type of connection """
         if self.type != 'ftp':
             return super()._get_default_configuration()
 
-        return {
-            'host': 'host',
-            'user': 'user',
-            'password': 'password',
-            'on_conflict': 'choose one from : raise, rename, replace',
-            'on_conflict_rename_extension': 'old',
-            # 'on_clean_integration': 'choose one from : rename, delete',
-            # 'on_clean_integration_rename_extension': 'bak',
-            'is_active': 'False',
-            'in_folder': '<PATH HERE>',
-            'in_folder_done': '<PATH HERE>',
-            'in_folder_error': '<PATH HERE>',
-            'out_folder': '<PATH HERE>',
-        }
+        return self._ftp_default_configuration()
 
-    def _connect(self, integration_flow='out'):
-        """ Open a connection on a FTP server """
+
+    #####################################################################
+    #    Specific FTP Methods that should be overridden                 #
+    #    by a connection based on FTP                                   #
+    #####################################################################
+
+    def connect(self):
+        """ Open a connection """
         self.ensure_one()
         if not self.type == 'ftp':
-            return super()._connect()
+            return super().connect()
 
         config = self._read_configuration()
         server = ftplib.FTP(host=config['host'],
@@ -166,38 +86,94 @@ class FTPConnection(models.Model):
         if 'is_active' in config and config['is_active'] == 'True':
             server.set_pasv(False)
 
-        if integration_flow == 'in':
-            if 'in_folder' in config:
-                server.cwd(config['in_folder'])
-        else:
-            if 'out_folder' in config:
-                server.cwd(config['out_folder'])
-
+        self.ftp_load_config(server, config)
         return server
 
     @api.model
-    def _check_filename(self, ftp_server, filename):
-        """ Check if the file already exists, and rename or replace if it's the case """
-        if self.type == 'ftp':
-            config = self._read_configuration()
-            on_conflict = config.get('on_conflict', 'raise')
-            extension = config.get('on_conflict_rename_extension', 'old')
+    def pwd(self, server):
+        """ Get the current directory """
+        if not self.type == 'ftp':
+            return super().pwd(server)
 
-            existing_filenames = getattr(ftp_server, 'mlst', ftp_server.nlst)()
-            conflicts = set(existing_filenames) & set([filename])
-
-            if not conflicts:
-                return
-
-            if conflicts and on_conflict == 'rename':
-                ftp_server.rename(filename, filename + '.' + extension)
-            elif conflicts and on_conflict == 'replace':
-                ftp_server.delete(filename)
-            else:
-                raise UserError(_('File \'%s\' already present if FTP server') % filename)
+        return server.pwd()
 
     @api.model
-    def _is_valid_filename(self, filename):
+    def dir_exists(self, server, path):
+        """ Check if the directory exists """
+        if not self.type == 'ftp':
+            return super().dir_exists(server, path)
+
+        try:
+            server.cwd(path)
+            return True
+        except Exception:
+            return False
+
+    @api.model
+    def file_exists(self, server, path, filename):
+        """ Check if the file exists """
+        if not self.type == 'ftp':
+            return super().file_exists(server, path, filename)
+
+        for file in self.list_files(server, path):
+            if file == filename:
+                return True
+        return False
+
+    @api.model
+    def delete_file(self, server, path):
+        if not self.type == 'ftp':
+            return super().delete_file(server, path)
+
+        server.delete(path)
+
+    @api.model
+    def change_dir(self, server, path):
+        if not self.type == 'ftp':
+            return super().change_dir(server, path)
+
+        server.cwd(path)
+
+    @api.model
+    def rename(self, server, old, new):
+        if not self.type == 'ftp':
+            return super().rename(server, old, new)
+
+        server.rename(old, new)
+
+    @api.model
+    def list_files(self, server, path=False):
+        if not self.type == 'ftp':
+            return super().list_files(server, path)
+
+        if path:
+            self.change_dir(server, path)
+        names = getattr(server, 'mlst', server.nlst)()
+        filenames = []
+        for name in names:
+            if not self._ftp_is_valid_filename(name):
+                continue
+            filenames.append(name)
+        return filenames
+
+    @api.model
+    def _upload_file(self, server, filename, binary_content):
+        if not self.type == 'ftp':
+            return super()._upload_file(server, filename, binary_content)
+
+        server.storbinary('STOR %s' % filename, binary_content)
+
+    @api.model
+    def _download_file(self, server, directory, filename):
+        if not self.type == 'ftp':
+            return super()._download_file(server, directory, filename)
+
+        with open(os.path.join(directory, filename), 'wb') as file:
+            server.retrbinary('RETR %s' % filename, file.write)
+            return file.name
+
+    @api.model
+    def _ftp_is_valid_filename(self, filename):
         if filename in ['.', '..']:
             return False
 
@@ -209,3 +185,160 @@ class FTPConnection(models.Model):
             return False
 
         return True
+
+    #####################################################################
+    #   Generic methods between FTP connection and other based on FTP   #
+    #####################################################################
+
+    @api.model
+    def ftp_load_config(self, server, config):
+        paths = {}
+        for folder, fallback_folder in [('out_folder', '/'),
+                                        ('in_folder', '/'),
+                                        ('in_folder_done', False),
+                                        ('in_folder_error', False)]:
+
+            # Handle not defined
+            path = config.get(folder, fallback_folder)
+            if not path:
+                continue
+
+            # Handle relative path
+            if not path.startswith('/'):
+                path = self.pwd(server) + path
+
+            # Handle non existing path
+            if not self.dir_exists(server, path):
+                raise UserError(_('Folder "%s" : "%s" does not exists') % (folder, path))
+
+            # Handle same path for different folders
+            if path in paths:
+                raise UserError(_('Try to use path "%s" for folder "%s", but folder "%s" already use this one')
+                                % (path, folder, paths[path]))
+            paths[path] = folder
+
+            # Add attribute to the server
+            server.__setattr__(folder, path)
+
+        if self.in_done_let and hasattr(server, 'in_folder_done'):
+            raise UserError(_("You shouldn't have an in_folder_done if you want to let the file on the folder"))
+
+    def _ftp_test_connection(self):
+        """ Just try to connect """
+        try:
+            with self.connect():
+                pass
+        except Exception as e:
+            raise UserError(_('Connection Test Failed! Here is what we got instead:\n %s') % ustr(e))
+        else:
+            raise UserError(_('Connection Test Succeeded! Everything seems properly set up!'))
+
+    def _ftp_send_file(self, filename, content, *args, **kwargs):
+        with self.connect() as server:
+            try:
+                self.change_dir(server, server.out_folder)
+                self._manage_conflict(server, server.out_folder, filename)
+                self._upload_file(server, filename, StringIO(content.encode()))
+            except Exception as e:
+                _logger.error(e)
+                raise UserError(_('Send synchronization failed for file %s:\n%s') % (filename, ustr(e)))
+                #raise SynchronizationException(_("Failure to send synchronization"), msg)
+
+    def _ftp_fetch_files(self, *args, **kwargs):
+        directory = kwargs.get('directory')
+        result = []
+        with self.connect() as server:
+            filenames = self.list_files(server, server.in_folder)
+            filtered_ones = self._filter_files(filenames, kwargs.get('integration_id'))
+            for filename in filtered_ones:
+                try:
+                    result.append({
+                        'filename': filename,
+                        'file': self._download_file(server, directory, filename)
+                    })
+                except Exception as e:
+                    _logger.error(e)
+                    raise UserError(_('Fetch synchronization failed for file %s:\n%s') % (filename, ustr(e)))
+                    # raise SynchronizationException(_("Failure to fetch synchronization"), msg)
+        return result
+
+    def _filter_files(self, filenames, integration_id):
+        """ If we have to let the downloaded files on the server, then we have to excluded them from the next synchros
+        :param filenames:
+        :param integration_id:
+        :return:
+        """
+        if not self.in_done_let or not integration_id:
+            return filenames
+
+        sync_filenames = integration_id.synchronization_ids.filtered(lambda x: x.state == 'done').mapped('filename')
+        return [x for x in filenames if x not in sync_filenames]
+
+        # TODO Improvement : maybe already filter the files by type (info coming from the integration)
+        #  but considering that .tar & .zip must not be filtered since we now unarchive them
+        #  (Filter files with os.path.splitext() and integration_id.synchronization_content_type)
+
+    def _clean(self, filename, status, flow_type, *args, **kwargs):
+        """ Override to take actions after the file transfer
+        - out : delete the file if an error has occurred
+        - in :
+            - done :
+                - if in_done_let == True => let
+                - if in_folder_done is configured ==> move
+                - otherwise delete
+            - error :
+                - if in_folder_error is configured ==> move
+                - otherwise let (to allow to retry next time)
+        """
+        # No need to connect if :
+        if (flow_type == 'in' and self.in_done_let  # the downloaded file must be let on the server
+                or flow_type == 'out' and status == 'done'):  # the file could be uploaded without error
+            return
+
+        with self.connect() as server:
+
+            if flow_type == 'out':
+                if self.file_exists(server, server.out_folder, filename):
+                    self.delete_file(server, os.path.join(server.out_folder, filename))
+
+            else:
+                current_path = os.path.join(server.in_folder, filename)
+                if status == 'done':
+                    if hasattr(server, 'in_folder_done'):
+                        self.rename(server, current_path, os.path.join(server.in_folder_done, filename))
+                    else:
+                        self.delete_file(server, current_path)
+                elif hasattr(server, 'in_folder_error'):
+                    self.rename(server, current_path, os.path.join(server.in_folder_error, filename))
+
+    def _manage_conflict(self, server, path, filename):
+        """ Check if the file already exists, manage the conflict by rename, replace or raise """
+        if not self.file_exists(server, path, filename):
+            return
+
+        config = self._read_configuration()
+        on_conflict = config.get('on_conflict', 'raise')
+        file_path = os.path.join(path, filename)
+        if on_conflict == 'rename':
+            self.rename(server, file_path, '%s.%s.%s' % (file_path,
+                                                         fields.Datetime.now().strftime('%Y%m%d%H%M%S'),
+                                                         config.get('on_conflict_rename_extension', 'old')))
+        elif on_conflict == 'replace':
+            self.delete_file(server, file_path)
+        else:
+            raise UserError(_('File \'%s\' already present on SFTP server') % file_path)
+
+    @api.model
+    def _ftp_default_configuration(self):
+        return {
+            'host': 'host',
+            'user': 'user',
+            'password': 'password',
+            'on_conflict': 'choose one from : raise, rename, replace',
+            'on_conflict_rename_extension': 'old',
+            'is_active': 'False',
+            'in_folder': '<PATH HERE>',
+            'in_folder_done': '<PATH HERE>',
+            'in_folder_error': '<PATH HERE>',
+            'out_folder': '<PATH HERE>',
+        }

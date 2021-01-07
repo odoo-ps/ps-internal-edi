@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="connection_form_view_ftp" model="ir.ui.view">
+        <field name="name">edi.connection.form.ftp</field>
+        <field name="model">edi.connection</field>
+        <field name="inherit_id" ref="edi_base.connection_form_view"/>
+        <field name="arch" type="xml">
+            <field name="configuration" position="after">
+                <field name="in_done_let"/>
+            </field>
+        </field>
+    </record>
+</odoo>
