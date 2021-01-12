@@ -187,6 +187,10 @@ Default is content.""")
         """
         raise_error = self._context.get('raise_error', False)
         for integration in self:
+
+            # Force to execute with the scheduled user (if we execute it from the interface)
+            integration = integration.with_user(integration.user_id)
+
             if integration.sub_integration_ids:
                 integration.sub_integration_ids.process_integration()
             else:
