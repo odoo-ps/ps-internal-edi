@@ -10,6 +10,7 @@ import time
 
 from datetime import datetime
 from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
 from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
@@ -418,18 +419,29 @@ Default is content.""")
             self.env.fail_safe = self.with_env(self.env(cr=new_cr))
             self.env.fail_safe.env.sync = []
             self.env.fail_safe.env.activity = "Fetch Content"
+
+            exceptions = []
             try:
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    data = self._get_in_content(tmp_dir)
-                    for d in data:
-                        self._process_in_files(d, raise_error=raise_error)
-            except Exception as e:
-                if 'no_exception_log' not in self._context:  # Only for test purpose
-                    _logger.exception(str(e))
-                if not self.env.fail_safe.env.sync:
-                    self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
-                if raise_error:
-                    raise
+                try:  # We make a second try so the "if exceptions" can be done inside the finally
+                    with tempfile.TemporaryDirectory() as tmp_dir:
+                        data = self._get_in_content(tmp_dir)
+                        for d in data:
+                            try:
+                                self._process_in_files(d, raise_error=raise_error)
+                            except Exception as e:  # To allow to continue processing files event if we have errors
+                                exceptions.append(e)
+                except Exception as e:  # For exceptions when get the content through the connection
+                    exceptions.append(e)
+
+                if exceptions:
+                    for e in exceptions:
+                        if 'no_exception_log' not in self._context:  # Only for test purpose
+                            _logger.exception(str(e))
+                        if not self.env.fail_safe.env.sync:
+                            self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
+                    if raise_error:
+                        raise ValidationError('\n'.join(map(str, exceptions)))
+
             finally:
                 self.env.fail_safe.set_status()
                 new_cr.commit()
@@ -475,21 +487,41 @@ Default is content.""")
             sub_start = time.time()
             i = 0
             status = 'done'
+
+            # Parse the files (we can have multiple files if we come from an archive)
             for file in files:
-                file_status = self._process_in_file_or_content(filename, file, data.get('archive'))
+                file_status = self.env.fail_safe._process_in_file_or_content(filename, file, data.get('archive'))
                 if file_status != 'done':
                     status = file_status
-                    # TODO Should we stop here since we had an issue ?
+                    continue  # No need to continue since we will rollback
+
+                # Log for huge archives being processed
                 i += 1
                 if i % 1000 == 0:
                     _logger.info("%s - process %s : %s file(s) in %.3fs, still working",
                                  self.type, filename, i, time.time() - sub_start)
                     sub_start = time.time()
+
+            # Log some execution info
             _logger.info("%s - process %s : %s file(s) in %.3fs, done",
                          self.type, filename, i,  time.time() - start)
             self.env.fail_safe.env.activity = "Clean Synchro"
             self._clean(filename, status)
+
+            # Commit processed files
+            # because when clean is done, it means for ex. delete/move a file on a directory,
+            # so the transaction has to be validated after the clean to be consistent
+            if status == 'done':
+                self.env.fail_safe.env.cr.commit()
+            else:
+                self.env.fail_safe.env.cr.rollback()
+            # TODO Evaluate the usage of the return value 'done' :
+            #  It seems better to raise an exception if something goes wrong than to return something else than 'done'.
+            #  Here the issue is : if we don't return 'done' then we rollback the transaction, BUT we still consider the
+            #  synchronization as Done while the "clean" method of the connection will maybe apply an error treatment
+            #  (like move a file to an error directory for FTP case) => not very consistent...
         except Exception as e:
+            self.env.fail_safe.env.cr.rollback()
             sync._report_error(self.env.fail_safe.env.activity, e)
             self.env.fail_safe._handle_error(sync.filename)
             if raise_error:
