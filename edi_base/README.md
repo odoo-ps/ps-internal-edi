@@ -37,11 +37,64 @@ It allows configuring :
 - **a connection :** a link to a connection record
 - **some synchronizations :** link to synchronizations
 
-## How to start a new intgration
+## How to start a new integration
 
 2 things to add in a new or existing module :
 - XML data to create a new record for a connection, an integration, and an ir.filter (if "out" flow)
 - Python class that inherits an integration & redefine 
+
+### Example "out" flow :
+```
+<data>
+    <record id="send_products_to_xx_software_filter" model="ir.filters">
+        <field name="name">Products to send to xx software</field>
+        <field name="model_id">product.template</field>
+        <field name="domain">[["type","=","product"]]</field>
+    </record>
+</data>
+<data noupdate="1">
+  <record id="send_products_to_xx_software_connection" model="edi.connection">
+      <field name="name">xx software Products</field>
+      <field name="type">ftp</field>
+      <field name="configuration"><![CDATA[
+{
+"host": "localhost",
+"user": "myuser",
+"password": "mypassword",
+"out_folder": "/home/ftp/my_project/xx_software/products/out"
+}
+    ]]></field>
+  </record>
+  
+  <record id="send_products_to_xx_software_integration" model="edi.integration">
+      <field name="name">Send Products to xx software</field>
+      <field name="type">send_products_to_xx_software</field>
+      <field name="integration_flow">out</field>
+      <field name="interval_number">1</field>
+      <field name="interval_type">days</field>
+      <field name="synchronization_content_type">xml</field>
+      <field name="synchronization_creation">one</field> <!-- 1 XML file per product  -->
+      <field name="connection_id" ref="send_products_to_xx_software"/>
+      <field name="record_filter_id" ref="send_products_to_xx_software_filter"/>
+      <field name="active" eval="False" /> <!-- archived by default to avoid automatic cron execution during the dev !-->
+  </record>
+</data>
+```
+
+```
+class SendProducts(models.Model):
+    _inherit = 'edi.integration'
+
+    type = fields.Selection(
+        selection_add=[('send_products_to_xx_software', 'Send Products to xx software')],
+        ondelete={'send_products_to_xx_software': 'cascade'})
+
+    def _process_record_out(self, records, raise_error=False):
+        if self.type != 'send_products_to_xx_software':
+            return super()._process_record_out(records, raise_error)
+
+        # Generate a string containing XML data
+```
 
 ### Example "in" flow :
 ```
@@ -91,59 +144,6 @@ class GetProducts(models.Model):
         return 'done'
 ```
 
-### Example "out" flow :
-```
-<data>
-    <record id="send_products_to_xx_software_filter" model="ir.filters">
-        <field name="name">Products to send to xx software</field>
-        <field name="model_id">product.template</field>
-        <field name="domain">[["type","=","product"]]</field>
-    </record>
-</data>
-<data noupdate="1">
-  <record id="send_products_to_xx_software_connection" model="edi.connection">
-      <field name="name">xx software Products</field>
-      <field name="type">ftp</field>
-      <field name="configuration"><![CDATA[
-{
-"host": "localhost",
-"user": "myuser",
-"password": "mypassword",
-"in_folder": "/home/ftp/my_project/xx_software/products/out"
-}
-    ]]></field>
-  </record>
-  
-  <record id="send_products_to_xx_software_integration" model="edi.integration">
-      <field name="name">Send Products to xx software</field>
-      <field name="type">send_products_to_xx_software</field>
-      <field name="integration_flow">out</field>
-      <field name="interval_number">1</field>
-      <field name="interval_type">days</field>
-      <field name="synchronization_content_type">xml</field>
-      <field name="synchronization_creation">one</field> <!-- 1 XML file per product  -->
-      <field name="connection_id" ref="send_products_to_xx_software"/>
-      <field name="record_filter_id" ref="send_products_to_xx_software_filter"/>
-      <field name="active" eval="False" /> <!-- archived by default to avoid automatic cron execution during the dev !-->
-  </record>
-</data>
-```
-
-```
-class SendProducts(models.Model):
-    _inherit = 'edi.integration'
-
-    type = fields.Selection(
-        selection_add=[('send_products_to_xx_software', 'Send Products to xx software')],
-        ondelete={'send_products_to_xx_software': 'cascade'})
-
-    def _process_record_out(self, records, raise_error=False):
-        if self.type != 'send_products_to_xx_software':
-            return super()._process_record_out(records, raise_error)
-
-        # Generate a string containing XML data
-```
-
 ## More development info
 
 ### Connection
@@ -169,7 +169,7 @@ See these modules for more information.
 The data model Integration provides a bunch of methods that can be redefined.  
 Most methods have a default behaviour, and just 2 **must** be redefined :
 
-#### For an "out" flow : _get_content(self, records):
+#### For an "out" flow : __process_record_out(self, records):
 
 This method takes some records as input (basically the ones from the ir.filter defined), and the purpose is to convert
 the records to something else, like a JSON or XML data.  
