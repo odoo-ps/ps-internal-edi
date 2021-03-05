@@ -89,9 +89,9 @@ class SendProducts(models.Model):
         selection_add=[('send_products_to_xx_software', 'Send Products to xx software')],
         ondelete={'send_products_to_xx_software': 'cascade'})
 
-    def _process_record_out(self, records, raise_error=False):
+    def _get_content(self, records):
         if self.type != 'send_products_to_xx_software':
-            return super()._process_record_out(records, raise_error)
+            return super()._get_content(records)
 
         # Generate a string containing XML data
 ```
@@ -109,7 +109,7 @@ class SendProducts(models.Model):
 "password": "mypassword",
 "in_folder": "/home/ftp/my_project/xx_software/products/in",
 "in_folder_done": "/home/ftp/my_project/xx_software/products/in/done",
-"in_folder_error": "/home/ftp/my_project/xx_software/products/in/error",
+"in_folder_error": "/home/ftp/my_project/xx_software/products/in/error"
 }
     ]]></field>
   </record>
