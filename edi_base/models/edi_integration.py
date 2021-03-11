@@ -477,7 +477,7 @@ Default is content.""")
         files = data.get('files')
 
         # TODO Check if it's ok to never add anymore the content of the file on a synchronization (which was never displayed anyway...)
-        content = False #'%s files' % len(files) if files else data.get('content')  # If many files we just log the file names
+        content = False  # '%s files' % len(files) if files else data.get('content')  # If many files we just log the file names
 
         sync = self.env.fail_safe._create_synchronzation_in(filename, content)
         self.env.fail_safe.env.cr.commit()
@@ -500,14 +500,14 @@ Default is content.""")
                 i += 1
                 if i % 1000 == 0:
                     _logger.info("%s - process %s : %s file(s) in %.3fs, still working",
-                                 self.type, filename, i, time.time() - sub_start)
+                                 self.env.fail_safe.type, filename, i, time.time() - sub_start)
                     sub_start = time.time()
 
             # Log some execution info
             _logger.info("%s - process %s : %s file(s) in %.3fs, done",
-                         self.type, filename, i,  time.time() - start)
+                         self.env.fail_safe.type, filename, i, time.time() - start)
             self.env.fail_safe.env.activity = "Clean Synchro"
-            self._clean(filename, status)
+            self.env.fail_safe._clean(filename, status)
 
             # Commit processed files
             # because when clean is done, it means for ex. delete/move a file on a directory,
