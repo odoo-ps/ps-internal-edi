@@ -253,11 +253,12 @@ Default is content.""")
             try:
                 if not records:
                     records = self._get_record_to_send()
-                if self.synchronization_creation == 'one':
-                    for rec in records:
-                        self._process_record_out(rec, raise_error=raise_error)
-                else:
-                    self._process_record_out(records, raise_error=raise_error)
+                if records:
+                    if self.synchronization_creation == 'one':
+                        for rec in records:
+                            self._process_record_out(rec, raise_error=raise_error)
+                    else:
+                        self._process_record_out(records, raise_error=raise_error)
             except Exception as e:
                 if not 'no_exception_log' in self._context: #Only for test purpose
                     _logger.exception(str(e))
