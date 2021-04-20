@@ -1,15 +1,14 @@
-# -*- coding: utf-8 -*-
-# Part of Odoo. See LICENSE file for full copyright and licensing details.
-import logging
 import csv
+import logging
+
 from io import StringIO
 
-from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
-from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT, safe_eval
+from odoo import api, fields, models
 from odoo.addons.edi_base.models.decorator import integration
 
+
 _logger = logging.getLogger(__name__)
+
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
@@ -32,12 +31,21 @@ class ResPartner(models.Model):
         edi = self.env.ref('test_edi_base.export_partner_filter_integration')
         edi._process_out_realtime(self, raise_error=raise_error)
 
-class Integration(models.Model):
+
+class TestIntegration(models.Model):
 
     _inherit = 'edi.integration'
 
-    type = fields.Selection(selection_add=[('partner_folder_out', 'Export Partner in Folder')])
-
+    type = fields.Selection(
+        selection_add=[
+            ('partner_folder_out', 'Export Partner in Folder'),
+            ('partner_folder_in', 'Import Partner in Folder')
+        ],
+        ondelete={
+            'partner_folder_out': 'cascade',
+            'partner_folder_in': 'cascade'
+        }
+    )
 
     def _get_record_to_send(self):
         if self.type != 'partner_folder_out':
@@ -74,12 +82,6 @@ class Integration(models.Model):
         rows = records.export_data(fields)['datas']
         writer.writerows(rows)
         return content.getvalue()
-
-class Integration(models.Model):
-
-    _inherit = 'edi.integration'
-
-    type = fields.Selection(selection_add=[('partner_folder_in', 'Import Partner in Folder')])
 
     def _process_content(self, filename, content):
         if self.type != 'partner_folder_in':

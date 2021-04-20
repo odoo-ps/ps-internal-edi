@@ -14,5 +14,5 @@ Odoo PS EDI Framework Tests
         'data/edi_integration.xml',
     ],
     'auto_install': False,
-    'installable': False,
+    'installable': True
 }

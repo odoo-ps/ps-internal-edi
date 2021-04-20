@@ -1,17 +1,15 @@
-# -*- coding: utf-8 -*-
-# Part of Odoo. See LICENSE file for full copyright and licensing details.
-import time
-import os
-import logging
 import csv
-
-from odoo.tests.common import TransactionCase
-from odoo import fields
+import os
 
 from psycopg2 import IntegrityError
 
+from odoo import fields
+from odoo.tests.common import TransactionCase
+
+
 FILE_IN = "/tmp/edi/in/partner.csv"
 FOLDER_OUT = "/tmp/edi/out/"
+
 
 class TestEdiCases(TransactionCase):
     def tearDown(self):
@@ -19,6 +17,7 @@ class TestEdiCases(TransactionCase):
         self.env['edi.synchronization'].search([]).unlink()
         self.env['edi.integration'].with_context(active_test=False).search([]).set_status()
         self.env.cr.commit()
+
 
 class TestEdiApiCases(TestEdiCases):
 
@@ -68,6 +67,7 @@ class TestEdiApiCases(TestEdiCases):
         self.assertTrue(sync.content)
         self.assertEqual(len(sync.error_ids), 1)
         self.env.cr._default_log_exceptions = True
+
 
 class TestEdiINCases(TestEdiCases):
 
@@ -132,7 +132,6 @@ class TestEdiINCases(TestEdiCases):
         self.assertEqual(len(sync.error_ids), 1)
         self.assertTrue(sync.error_ids.description)
 
-
     def test_import_partner_crash(self):
         self.env.cr._default_log_exceptions = False
         now = fields.Datetime.now()
@@ -176,6 +175,7 @@ class TestEdiINCases(TestEdiCases):
         self.assertEqual(len(sync.error_ids), 1)
         self.assertTrue(sync.error_ids.description)
         self.env.cr._default_log_exceptions = True
+
 
 class TestEdiOUTCases(TestEdiCases):
 
