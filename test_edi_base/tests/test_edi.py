@@ -243,7 +243,7 @@ class TestEdiOUTCases(TestEdiCases):
         sync = self.env['edi.synchronization'].search([('integration_id', '=', self.edi_one.id), ('synchronization_date', '>=', now)])
         self.assertEqual(len(sync), 20)
         for s in sync:
-            self.assertEquals(s.state, 'done')
+            self.assertEqual(s.state, 'done')
             self.assertTrue(s.content)
             self.assertEqual(len(s.error_ids), 0)
 
