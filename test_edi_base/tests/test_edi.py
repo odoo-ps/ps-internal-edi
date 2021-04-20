@@ -5,6 +5,7 @@ from psycopg2 import IntegrityError
 
 from odoo import fields
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 
 FILE_IN = "/tmp/edi/in/partner.csv"
@@ -12,6 +13,8 @@ FOLDER_OUT = "/tmp/edi/out/"
 
 
 class TestEdiCases(TransactionCase):
+
+    @mute_logger('odoo.models.unlink')
     def tearDown(self):
         super().tearDown()
         self.env['edi.synchronization'].search([]).unlink()
@@ -21,6 +24,7 @@ class TestEdiCases(TransactionCase):
 
 class TestEdiApiCases(TestEdiCases):
 
+    @mute_logger('odoo.models.unlink')
     def tearDown(self):
         self.env['res.partner'].search([('name', 'ilike', 'Test partner')]).unlink()
         super().tearDown()
@@ -78,6 +82,7 @@ class TestEdiINCases(TestEdiCases):
         if not os.path.isdir("/tmp/edi/in"):
             os.mkdir("/tmp/edi/in")
 
+    @mute_logger('odoo.models.unlink')
     def tearDown(self):
         self.env['res.partner'].search([('name', 'ilike', 'Partner Test')]).unlink()
         super().tearDown()
@@ -186,6 +191,7 @@ class TestEdiOUTCases(TestEdiCases):
         self.edi_one = self.env.ref('test_edi_base.export_partner_filter_integration_one')
 
 
+    @mute_logger('odoo.models.unlink')
     def tearDown(self):
         super().tearDown()
         self.env['res.partner'].search([('name', 'ilike', 'EDI TEST')]).unlink()
