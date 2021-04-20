@@ -4,10 +4,6 @@
 import ast
 import json
 import logging
-import os
-import tarfile
-import tempfile
-import time
 
 from datetime import datetime
 from odoo import api, fields, models, _
@@ -425,13 +421,12 @@ Default is content.""")
             exceptions = []
             try:
                 try:  # We make a second try so the "if exceptions" can be done inside the finally
-                    with tempfile.TemporaryDirectory() as tmp_dir:
-                        data = self._get_in_content(tmp_dir)
-                        for d in data:
-                            try:
-                                self._process_in_files(d, raise_error=raise_error)
-                            except Exception as e:  # To allow to continue processing files event if we have errors
-                                exceptions.append(e)
+                    data = self._get_in_content()
+                    for d in data:
+                        try:
+                            self._process_in_file(d['filename'], d['content'], raise_error=raise_error)
+                        except Exception as e:  # To allow to continue processing files event if we have errors
+                            exceptions.append(e)
                 except Exception as e:  # For exceptions when get the content through the connection
                     exceptions.append(e)
 
@@ -449,79 +444,16 @@ Default is content.""")
                 new_cr.commit()
                 new_cr.close()
 
-    def _process_in_files(self, data, raise_error=False):
-        """ Before really process a file, check if the file is an archive
-         If yes, we can extract the content the process each file
-         If no we just process the downloaded file
-         """
+    def _process_in_file(self, filename, content, raise_error=False):
         self.ensure_one()
-        file = data.get('file')
-
-        # If the file is a tar, then untar to process all files insides
-        if self.in_process_type == 'file' and tarfile.is_tarfile(file):
-            data['archive'] = True
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                # Extract the tar & pass file names to the process file
-                start = time.time()
-                tar_file = tarfile.open(file)
-                tar_file.extractall(tmp_dir)
-                _logger.info("%s - untar %s in %.3fs", self.type, data['filename'],time.time() - start)
-                files = [os.path.join(path, name) for path, subdirs, files in os.walk(tmp_dir) for name in files]
-                data['files'] = files
-                self._process_in_file(data, raise_error=raise_error)
-        else:
-            data['files'] = [file]
-            self._process_in_file(data, raise_error=raise_error)
-
-    def _process_in_file(self, data, raise_error=False):
-        filename = data.get('filename')
-        files = data.get('files')
-
-        # TODO Check if it's ok to never add anymore the content of the file on a synchronization (which was never displayed anyway...)
-        content = False  # '%s files' % len(files) if files else data.get('content')  # If many files we just log the file names
-
         sync = self.env.fail_safe._create_synchronzation_in(filename, content)
         self.env.fail_safe.env.cr.commit()
         self.env.fail_safe.env.sync.append(sync)
         try:
             self.env.fail_safe.env.activity = "Process Content"
-            start = time.time()
-            sub_start = time.time()
-            i = 0
-            status = 'done'
-
-            # Parse the files (we can have multiple files if we come from an archive)
-            for file in files:
-                file_status = self.env.fail_safe._process_in_file_or_content(filename, file, data)
-                if file_status != 'done':
-                    status = file_status
-                    continue  # No need to continue since we will rollback
-
-                # Log for huge archives being processed
-                i += 1
-                if i % 1000 == 0:
-                    _logger.info("%s - process %s : %s file(s) in %.3fs, still working",
-                                 self.env.fail_safe.type, filename, i, time.time() - sub_start)
-                    sub_start = time.time()
-
-            # Log some execution info
-            _logger.info("%s - process %s : %s file(s) in %.3fs, done",
-                         self.env.fail_safe.type, filename, i, time.time() - start)
+            status = self._process_content(filename, content)
             self.env.fail_safe.env.activity = "Clean Synchro"
-            self.env.fail_safe._clean(filename, status)
-
-            # Commit processed files
-            # because when clean is done, it means for ex. delete/move a file on a directory,
-            # so the transaction has to be validated after the clean to be consistent
-            if status == 'done':
-                self.env.fail_safe.env.cr.commit()
-            else:
-                self.env.fail_safe.env.cr.rollback()
-            # TODO Evaluate the usage of the return value 'done' :
-            #  It seems better to raise an exception if something goes wrong than to return something else than 'done'.
-            #  Here the issue is : if we don't return 'done' then we rollback the transaction, BUT we still consider the
-            #  synchronization as Done while the "clean" method of the connection will maybe apply an error treatment
-            #  (like move a file to an error directory for FTP case) => not very consistent...
+            self._clean(filename, status, content)
         except Exception as e:
             self.env.fail_safe.env.cr.rollback()
             sync._report_error(self.env.fail_safe.env.activity, e)
@@ -559,7 +491,7 @@ Default is content.""")
             filename
         )
 
-    def _get_in_content(self, directory):
+    def _get_in_content(self):
         """
         Return list of dict
         the dict should be {
@@ -567,9 +499,9 @@ Default is content.""")
             'content': str or dict: will be handle by in edi.integration._process_data
         }
         """
-        return self.connection_id._fetch_synchronizations(integration_id=self, directory=directory)
+        return self.connection_id._fetch_synchronizations()
 
-    def _clean(self, filename, status):
+    def _clean(self, filename, status, content):
         return self.connection_id._clean_synchronization(filename, status, self.integration_flow)
 
     ################################
