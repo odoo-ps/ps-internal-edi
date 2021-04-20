@@ -93,44 +93,66 @@ class TestEdiINCases(TestEdiCases):
         """ Use an integration that import partner from file """
 
         now = fields.Datetime.now()
+
         with open(FILE_IN, "w") as f:
-            f.writelines(['name,id\n',
-                          'Partner Test 1,partner_test_1\n',
-                          'Partner Test 2,partner_test_2\n',
+            f.writelines([
+                'name,id\n',
+                'Partner Test 1,partner_test_1\n',
+                'Partner Test 2,partner_test_2\n',
             ])
+
         edi = self.env.ref('test_edi_base.import_partner_integration')
         edi._process(edi.id)
+
         self.env.cr.commit()
+
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
+
         self.assertEqual(len(partner), 2)
         self.assertTrue(partner.mapped('display_name'), partner.mapped('name'))
 
         self.assertGreaterEqual(edi.last_success_date, now)
         self.assertEqual(edi.last_sync_status, "Success")
 
-        sync = self.env['edi.synchronization'].search([('integration_id', '=', edi.id), ('synchronization_date', '>=', now)])
+        sync = self.env['edi.synchronization'].search([
+            ('integration_id', '=', edi.id),
+            ('synchronization_date', '>=', now)
+        ])
+
         self.assertEqual(len(sync), 1)
         self.assertEqual(sync.state, 'done')
         self.assertTrue(sync.content)
 
     def test_import_partner_report_error(self):
         """ Use an integration that import partner from file with wrong record """
+
         now = fields.Datetime.now()
+
         with open(FILE_IN, "w") as f:
-            f.writelines(['name,id\n',
-                          ',partner_test_1\n',
-                          'Partner Test 2,partner_test_2\n',
+            f.writelines([
+                'name,id\n',
+                ',partner_test_1\n',
+                'Partner Test 2,partner_test_2\n',
             ])
+
         edi = self.env.ref('test_edi_base.import_partner_integration')
         edi._process(edi.id)
-        self.env.cr.commit()
+
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
+
         self.assertEqual(len(partner), 1)
-        self.assertTrue(partner.mapped('display_name'), partner.mapped('name'))
+        self.assertTrue(
+            partner.mapped('display_name'),
+            partner.mapped('name')
+        )
         self.assertGreaterEqual(edi.last_success_date, now)
         self.assertEqual(edi.last_sync_status, "Success")
 
-        sync = self.env['edi.synchronization'].search([('integration_id', '=', edi.id), ('synchronization_date', '>=', now)])
+        sync = self.env['edi.synchronization'].search([
+            ('integration_id', '=', edi.id),
+            ('synchronization_date', '>=', now)
+        ])
+
         self.assertEqual(len(sync), 1)
         self.assertEqual(sync.state, 'done')
         self.assertTrue(sync.content)
@@ -138,42 +160,62 @@ class TestEdiINCases(TestEdiCases):
         self.assertTrue(sync.error_ids.description)
 
     def test_import_partner_crash(self):
+
         self.env.cr._default_log_exceptions = False
         now = fields.Datetime.now()
+
         with open(FILE_IN, "w") as f:
             f.write('raise')
 
         edi = self.env.ref('test_edi_base.import_partner_integration')
         edi._process(edi.id)
+
         self.env.cr.rollback()
+
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
+
         self.assertEqual(len(partner), 0)
         self.assertGreaterEqual(edi.last_failure_date, now)
         self.assertEqual(edi.last_sync_status, "Fail")
 
-        sync = self.env['edi.synchronization'].search([('integration_id', '=', edi.id), ('synchronization_date', '>=', now)])
+        sync = self.env['edi.synchronization'].search([
+            ('integration_id', '=', edi.id),
+            ('synchronization_date', '>=', now)
+        ])
+
         self.assertEqual(len(sync), 1)
         self.assertEqual(sync.state, 'fail')
         self.assertTrue(sync.content)
         self.assertEqual(len(sync.error_ids), 1)
         self.assertTrue(sync.error_ids.description)
+
         self.env.cr._default_log_exceptions = True
 
     def test_import_partner_crash_raise(self):
+
         self.env.cr._default_log_exceptions = False
         now = fields.Datetime.now()
+
         with open(FILE_IN, "w") as f:
             f.write('raise')
+
         edi = self.env.ref('test_edi_base.import_partner_integration')
         with self.assertRaises(IntegrityError):
             edi.with_context(raise_error=True, no_exception_log=True)._process(edi.id)
+
         self.env.cr.rollback()
+
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
+
         self.assertEqual(len(partner), 0)
         self.assertGreaterEqual(edi.last_failure_date, now)
         self.assertEqual(edi.last_sync_status, "Fail")
 
-        sync = self.env['edi.synchronization'].search([('integration_id', '=', edi.id), ('synchronization_date', '>=', now)])
+        sync = self.env['edi.synchronization'].search([
+            ('integration_id', '=', edi.id),
+            ('synchronization_date', '>=', now)
+        ])
+
         self.assertEqual(len(sync), 1)
         self.assertEqual(sync.state, 'fail')
         self.assertTrue(sync.content)
@@ -189,7 +231,6 @@ class TestEdiOUTCases(TestEdiCases):
         self.country = self.env.ref('base.be')
         self.edi = self.env.ref('test_edi_base.export_partner_filter_integration')
         self.edi_one = self.env.ref('test_edi_base.export_partner_filter_integration_one')
-
 
     @mute_logger('odoo.models.unlink')
     def tearDown(self):

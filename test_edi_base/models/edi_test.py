@@ -102,4 +102,5 @@ class TestIntegration(models.Model):
                 self._report_error("Import Partner", message="No value for field name, name is required \n %s" % line)
                 continue
             self.env['res.partner'].load(header, [line])
+
         return "done"
