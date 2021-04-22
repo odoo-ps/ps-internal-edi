@@ -7,6 +7,8 @@ from odoo import fields
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
+from odoo.addons.edi_base.models.edi_integration import ProcessIntegrationException
+
 
 FILE_IN = "/tmp/edi/in/partner.csv"
 FOLDER_OUT = "/tmp/edi/out/"
@@ -16,10 +18,12 @@ class TestEdiCases(TransactionCase):
 
     @mute_logger('odoo.models.unlink')
     def tearDown(self):
-        super().tearDown()
         self.env['edi.synchronization'].search([]).unlink()
         self.env['edi.integration'].with_context(active_test=False).search([]).set_status()
+
         self.env.cr.commit()
+
+        super().tearDown()
 
 
 class TestEdiApiCases(TestEdiCases):
@@ -27,6 +31,7 @@ class TestEdiApiCases(TestEdiCases):
     @mute_logger('odoo.models.unlink')
     def tearDown(self):
         self.env['res.partner'].search([('name', 'ilike', 'Test partner')]).unlink()
+
         super().tearDown()
 
     def test_api_decorator(self):
@@ -84,10 +89,14 @@ class TestEdiINCases(TestEdiCases):
 
     @mute_logger('odoo.models.unlink')
     def tearDown(self):
-        self.env['res.partner'].search([('name', 'ilike', 'Partner Test')]).unlink()
-        super().tearDown()
+        partners = self.env['res.partner'].search([('name', 'ilike', 'Partner Test')])
+        partners.unlink()
         if os.path.isfile(FILE_IN):
             os.remove(FILE_IN)
+
+        self.env.cr.commit()
+
+        super().tearDown()
 
     def test_import_partner(self):
         """ Use an integration that import partner from file """
@@ -104,24 +113,21 @@ class TestEdiINCases(TestEdiCases):
         edi = self.env.ref('test_edi_base.import_partner_integration')
         edi._process(edi.id)
 
-        self.env.cr.commit()
+        self.assertEqual(edi.last_sync_status, "Success", "The integration should have succeed")
+        self.assertGreaterEqual(edi.last_success_date, now, "The integration should be updated after the initial date")
 
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
 
-        self.assertEqual(len(partner), 2)
-        self.assertTrue(partner.mapped('display_name'), partner.mapped('name'))
-
-        self.assertGreaterEqual(edi.last_success_date, now)
-        self.assertEqual(edi.last_sync_status, "Success")
+        self.assertEqual(len(partner), 2, "The integration should create 2 partners")
 
         sync = self.env['edi.synchronization'].search([
             ('integration_id', '=', edi.id),
             ('synchronization_date', '>=', now)
         ])
 
-        self.assertEqual(len(sync), 1)
-        self.assertEqual(sync.state, 'done')
-        self.assertTrue(sync.content)
+        self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
+        self.assertEqual(sync.state, 'done', "The synchronization should be in 'done'")
+        self.assertTrue(sync.content, "")
 
     def test_import_partner_report_error(self):
         """ Use an integration that import partner from file with wrong record """
@@ -138,26 +144,23 @@ class TestEdiINCases(TestEdiCases):
         edi = self.env.ref('test_edi_base.import_partner_integration')
         edi._process(edi.id)
 
+        self.assertEqual(edi.last_sync_status, "Success", "The integration should have succeed")
+        self.assertGreaterEqual(edi.last_success_date, now, "The integration should be updated after the initial date")
+
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
 
-        self.assertEqual(len(partner), 1)
-        self.assertTrue(
-            partner.mapped('display_name'),
-            partner.mapped('name')
-        )
-        self.assertGreaterEqual(edi.last_success_date, now)
-        self.assertEqual(edi.last_sync_status, "Success")
+        self.assertEqual(len(partner), 1, "The integration should create 1 partners")
 
         sync = self.env['edi.synchronization'].search([
             ('integration_id', '=', edi.id),
             ('synchronization_date', '>=', now)
         ])
 
-        self.assertEqual(len(sync), 1)
-        self.assertEqual(sync.state, 'done')
-        self.assertTrue(sync.content)
-        self.assertEqual(len(sync.error_ids), 1)
-        self.assertTrue(sync.error_ids.description)
+        self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
+        self.assertEqual(sync.state, 'done', "The synchronization should be in 'done'")
+        self.assertTrue(sync.content, "")
+        self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
+        self.assertTrue(sync.error_ids.description, "")
 
     def test_import_partner_crash(self):
 
@@ -170,24 +173,23 @@ class TestEdiINCases(TestEdiCases):
         edi = self.env.ref('test_edi_base.import_partner_integration')
         edi._process(edi.id)
 
-        self.env.cr.rollback()
+        self.assertEqual(edi.last_sync_status, "Fail", "The integration should have failed")
+        self.assertGreaterEqual(edi.last_failure_date, now, "The integration should be updated after the initial date")
 
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
 
-        self.assertEqual(len(partner), 0)
-        self.assertGreaterEqual(edi.last_failure_date, now)
-        self.assertEqual(edi.last_sync_status, "Fail")
+        self.assertEqual(len(partner), 0, "The integration should create any partners")
 
         sync = self.env['edi.synchronization'].search([
             ('integration_id', '=', edi.id),
             ('synchronization_date', '>=', now)
         ])
 
-        self.assertEqual(len(sync), 1)
-        self.assertEqual(sync.state, 'fail')
-        self.assertTrue(sync.content)
-        self.assertEqual(len(sync.error_ids), 1)
-        self.assertTrue(sync.error_ids.description)
+        self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
+        self.assertEqual(sync.state, 'fail', "The synchronization should be in 'fail'")
+        self.assertTrue(sync.content, "")
+        self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
+        self.assertTrue(sync.error_ids.description, "")
 
         self.env.cr._default_log_exceptions = True
 
@@ -200,27 +202,31 @@ class TestEdiINCases(TestEdiCases):
             f.write('raise')
 
         edi = self.env.ref('test_edi_base.import_partner_integration')
-        with self.assertRaises(IntegrityError):
+
+        with self.assertRaises(
+            ProcessIntegrationException,
+            msg="The integration should raise a ProcessIntegrationException"
+        ):
             edi.with_context(raise_error=True, no_exception_log=True)._process(edi.id)
 
-        self.env.cr.rollback()
+        self.assertEqual(edi.last_sync_status, "Fail", "The integration should have failed")
+        self.assertGreaterEqual(edi.last_failure_date, now, "The integration should be updated after the initial date")
 
         partner = self.env['res.partner'].search([('write_date', '>=', now)])
 
-        self.assertEqual(len(partner), 0)
-        self.assertGreaterEqual(edi.last_failure_date, now)
-        self.assertEqual(edi.last_sync_status, "Fail")
+        self.assertEqual(len(partner), 0, "The integration should create any partners")
 
         sync = self.env['edi.synchronization'].search([
             ('integration_id', '=', edi.id),
             ('synchronization_date', '>=', now)
         ])
 
-        self.assertEqual(len(sync), 1)
-        self.assertEqual(sync.state, 'fail')
-        self.assertTrue(sync.content)
-        self.assertEqual(len(sync.error_ids), 1)
-        self.assertTrue(sync.error_ids.description)
+        self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
+        self.assertEqual(sync.state, 'fail', "The synchronization should be in 'fail'")
+        self.assertTrue(sync.content, "")
+        self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
+        self.assertTrue(sync.error_ids.description, "")
+
         self.env.cr._default_log_exceptions = True
 
 

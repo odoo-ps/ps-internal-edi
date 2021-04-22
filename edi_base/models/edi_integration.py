@@ -6,11 +6,19 @@ import json
 import logging
 
 from datetime import datetime
-from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo import api, fields, models, registry, _
 from odoo.tools.safe_eval import safe_eval
 
+
 _logger = logging.getLogger(__name__)
+
+
+class ProcessIntegrationException(Exception):
+
+    def __init__(self, name, value=None):
+        self.name = name
+        self.value = value
+        self.args = (name, value)
 
 
 class Integration(models.Model):
@@ -75,34 +83,83 @@ Default is content.""")
     color = fields.Integer()
 
     def set_status(self):
-        query = """
-            SELECT DISTINCT ON (integration_id, state) 
-                integration_id, 
-                synchronization_date, 
-                state 
-            FROM edi_Synchronization 
-            WHERE integration_id in %s and synchronization_date is not null
-            ORDER BY integration_id, state, synchronization_date desc;
-        """
-        self.env.cr.execute(query, (tuple(self.ids),))
-        fail_sync = {}
+
+        self.env.cr.execute("""
+            SELECT DISTINCT ON (integration_id, state)
+                   integration_id,
+                   synchronization_date,
+                   state
+              FROM edi_synchronization
+             WHERE integration_id in %s
+               AND synchronization_date IS NOT NULL
+             ORDER BY integration_id, state, synchronization_date DESC
+        """, (tuple(self.ids),))
+        sync_datas = self.env.cr.dictfetchall()
+
         done_sync = {}
-        for sync in self.env.cr.fetchall():
-            if sync[2] == 'fail':
-                fail_sync[sync[0]] = fields.Datetime.to_string(sync[1])
-            if sync[2] == 'done':
-                done_sync[sync[0]] = fields.Datetime.to_string(sync[1])
+        fail_sync = {}
+
+        for sync_data in sync_datas:
+
+            state = sync_data['state']
+
+            if state not in ('done', 'fail'):
+                continue
+
+            dest = fail_sync if state == 'fail' else done_sync
+            opp = done_sync if state == 'fail' else fail_sync
+
+            integration_id = sync_data['integration_id']
+
+            # NOTE: A more recent synch has already been treated, we ignore it,
+            #       thus we only have one entry per integration on the dicts
+            if integration_id in opp:
+                continue
+
+            dest[integration_id] = fields.Datetime.from_string(sync_data['synchronization_date'])
+
         for rec in self:
-            rec.last_success_date = done_sync.get(rec.id, False)
-            rec.last_failure_date = fail_sync.get(rec.id, False)
-            rec.last_sync_status = 'No Sync Yet'
-            rec.color = 4
-            if (rec.last_success_date or datetime(1970, 1, 1)) > (rec.last_failure_date or datetime(1970, 1, 1)):
-                rec.last_sync_status = "Success"
-                rec.color = 10
-            if (rec.last_success_date or datetime(1970, 1, 1)) < (rec.last_failure_date or datetime(1970, 1, 1)):
-                rec.last_sync_status = "Fail"
-                rec.color = 1
+
+            vals = {
+                'last_sync_status': 'No Sync Yet',
+                'color': 4
+            }
+
+            last_success_date = done_sync.get(rec.id, False)
+            last_failure_date = fail_sync.get(rec.id, False)
+
+            if last_success_date:
+                vals['last_success_date'] = last_success_date
+
+            if last_failure_date:
+                vals['last_failure_date'] = last_failure_date
+
+            if last_success_date or last_failure_date:
+
+                # NOTE: If the last synchronization is a success, we consider the
+                #       integration as succeeded
+                if last_success_date and (last_failure_date or datetime(1970, 1, 1)) <= last_success_date:
+                    vals.update({
+                        'last_sync_status': 'Success',
+                        'color': 10
+                    })
+
+                # NOTE: If the last synchronization is a failure, we consider the
+                #       integration as failed
+                elif last_failure_date and (last_success_date or datetime(1970, 1, 1)) <= last_failure_date:
+                    vals.update({
+                        'last_sync_status': 'Fail',
+                        'color': 1
+                    })
+
+            # NOTE: Reset values
+            else:
+                vals.update({
+                    'last_success_date': False,
+                    'last_failure_date': False
+                })
+
+            rec.write(vals)
 
     # TODO Filter on status
 
@@ -156,7 +213,7 @@ Default is content.""")
             'filename': '%s.%s' % (name, self.synchronization_content_type),
             'synchronization_date': fields.Datetime.now(),
         })
-        res._report_error(activity, exception)
+        res._report_error(activity, exception=exception)
         return res
 
     def _report_error(self, activity, exception=None, message=None):
@@ -411,74 +468,80 @@ Default is content.""")
         })
 
     def _process_in(self, raise_error=False):
+
         self.ensure_one()
-        with api.Environment.manage():
-            new_cr = self.pool.cursor()
+
+        with api.Environment.manage(), registry(self.env.cr.dbname).cursor() as new_cr:
+
             self.env.fail_safe = self.with_env(self.env(cr=new_cr))
             self.env.fail_safe.env.sync = []
             self.env.fail_safe.env.activity = "Fetch Content"
 
             exceptions = []
+
             try:
-                try:  # We make a second try so the "if exceptions" can be done inside the finally
-                    data = self._get_in_content()
-                    for d in data:
-                        try:
-                            self._process_in_file(d['filename'], d['content'], raise_error=raise_error)
-                        except Exception as e:  # To allow to continue processing files event if we have errors
-                            exceptions.append(e)
-                except Exception as e:  # For exceptions when get the content through the connection
-                    exceptions.append(e)
+                data = self._get_in_content()
+            except Exception as e:
+                exceptions.append(e)
+            else:
+                for d in data:
+                    try:
+                        self._process_in_file(
+                            d['filename'],
+                            d['content'],
+                            raise_error=raise_error
+                        )
+                    except Exception as e:
+                        exceptions.append(e)
 
-                if exceptions:
-                    for e in exceptions:
-                        if 'no_exception_log' not in self._context:  # Only for test purpose
-                            _logger.exception(str(e))
-                        if not self.env.fail_safe.env.sync:
-                            self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
-                    if raise_error:
-                        raise ValidationError('\n'.join(map(str, exceptions)))
+            # NOTE: Update integration's update after processing each file
+            self.env.fail_safe.set_status()
+            self.env.fail_safe.env.cr.commit()
 
-            finally:
-                self.env.fail_safe.set_status()
-                new_cr.commit()
-                new_cr.close()
+            for e in exceptions:
+
+                if 'no_exception_log' not in self._context:  # Only for test purpose
+                    _logger.exception(str(e))
+
+                if not self.env.fail_safe.env.sync:
+                    self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
+
+            if exceptions:
+
+                self.env.cr.rollback()
+
+                if raise_error:
+                    raise ProcessIntegrationException('\n'.join(map(str, exceptions)))
 
     def _process_in_file(self, filename, content, raise_error=False):
+
         self.ensure_one()
+
         sync = self.env.fail_safe._create_synchronzation_in(filename, content)
         self.env.fail_safe.env.cr.commit()
         self.env.fail_safe.env.sync.append(sync)
+
         try:
+
             self.env.fail_safe.env.activity = "Process Content"
             status = self._process_content(filename, content)
+
             self.env.fail_safe.env.activity = "Clean Synchro"
             self._clean(filename, status, content)
+
         except Exception as e:
-            self.env.fail_safe.env.cr.rollback()
+
             sync._report_error(self.env.fail_safe.env.activity, e)
             self.env.fail_safe._handle_error(sync.filename)
+            self.env.fail_safe.env.cr.commit()
+
             if raise_error:
                 raise
+
         else:
-            self.flush()
             sync._done()
-
-    def _process_in_file_or_content(self, filename, file, data):
-        # Add file info in the context (so we don't change the signature of the method _process_content)
-        if data.get('archive'):
-            self = self.with_context(archive=filename,
-                                     log_file_name=os.path.join(filename, os.path.basename(file)))
-        else:
-            self = self.with_context(log_file_name=filename)
-
-        if self.in_process_type == 'file':
-            return self._process_content(file, None)
-        elif file:
-            with open(file, 'r') as f:
-                return self._process_content(file, f.read())
-        else:
-            return self._process_content(file, data)
+        finally:
+            self.env.cr.commit()
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
