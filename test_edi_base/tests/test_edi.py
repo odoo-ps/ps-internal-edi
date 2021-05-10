@@ -2,6 +2,7 @@ import csv
 import os
 
 from psycopg2 import IntegrityError
+from unittest import mock
 
 from odoo import fields
 from odoo.tests.common import TransactionCase
@@ -226,6 +227,47 @@ class TestEdiINCases(TestEdiCases):
         self.assertTrue(sync.content, "")
         self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
         self.assertTrue(sync.error_ids.description, "")
+
+        self.env.cr._default_log_exceptions = True
+
+    def test_import_partner_crash_raise_get_in_content(self):
+
+        self.env.cr._default_log_exceptions = False
+        now = fields.Datetime.now()
+
+        edi = self.env.ref('test_edi_base.import_partner_integration')
+
+        with mock.patch.object(
+            type(edi),
+            '_get_in_content',
+            side_effect=ProcessIntegrationException('Failed fetching content')
+        ):
+
+            with self.assertRaises(
+                ProcessIntegrationException,
+                msg="The integration should raise a ProcessIntegrationException"
+            ):
+                edi.with_context(raise_error=True, no_exception_log=True)._process(edi.id)
+
+            self.assertEqual(edi.last_sync_status, "Fail", "The integration should have failed")
+            self.assertGreaterEqual(edi.last_failure_date, now, "The integration should be updated after the initial date")
+
+            partner = self.env['res.partner'].search([('write_date', '>=', now)])
+
+            self.assertEqual(len(partner), 0, "The integration should create any partners")
+
+            sync = self.env['edi.synchronization'].search([
+                ('integration_id', '=', edi.id),
+                ('synchronization_date', '>=', now)
+            ])
+
+            self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
+            self.assertEqual(sync.state, 'fail', "The synchronization should be in 'fail'")
+            # NOTE: Here the failure is before fetching any content, so it should
+            #       be empty
+            self.assertFalse(sync.content, "")
+            self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
+            self.assertTrue(sync.error_ids.description, "")
 
         self.env.cr._default_log_exceptions = True
 

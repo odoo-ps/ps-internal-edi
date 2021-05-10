@@ -482,7 +482,12 @@ Default is content.""")
             try:
                 data = self._get_in_content()
             except Exception as e:
+
+                self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
+                self.env.fail_safe.env.cr.commit()
+
                 exceptions.append(e)
+
             else:
                 for d in data:
                     try:
@@ -502,9 +507,6 @@ Default is content.""")
 
                 if 'no_exception_log' not in self._context:  # Only for test purpose
                     _logger.exception(str(e))
-
-                if not self.env.fail_safe.env.sync:
-                    self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
 
             if exceptions:
 
