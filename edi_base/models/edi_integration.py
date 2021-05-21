@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import ast
 import json
 import logging
 import os
@@ -316,7 +317,7 @@ Default is content.""")
             Return the list of record use to generate the content
         """
         if self.record_filter_id:
-            domain = json.loads(self.record_filter_id.domain.replace("True", "true").replace("False", "false"))
+            domain = ast.literal_eval(self.record_filter_id.domain)
             return self.env[self.record_filter_id.model_id].search(domain)
         return self.browse()
 
