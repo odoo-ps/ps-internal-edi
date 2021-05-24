@@ -165,15 +165,24 @@ Default is content.""")
 
     @api.model_create_multi
     def create(self, values):
-        for vals in values:
-            vals['model_id'] = self.env.ref('edi_base.model_edi_integration').id
-            vals['state'] = "code"
-            vals['numbercall'] = -1
 
-        res = super(Integration, self).create(values)
-        for rec in res:
-            rec.code = "model._process(%i)" % rec.id
-        return res
+        for vals in values:
+            vals.update({
+                'model_id': self.env.ref('edi_base.model_edi_integration').id,
+                'state': 'code',
+                'numbercall': -1
+            })
+
+        integrations = super().create(values)
+
+        for integration, vals in zip(integrations, values):
+
+            if 'code' in vals:
+                continue
+
+            integration.code = 'model._process(%i)' % integration.id
+
+        return integrations
 
     def _read_parameter(self):
         self.ensure_one()
