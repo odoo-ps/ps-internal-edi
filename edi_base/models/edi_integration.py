@@ -458,7 +458,7 @@ Default is content.""")
         file = data.get('file')
 
         # If the file is a tar, then untar to process all files insides
-        if tarfile.is_tarfile(file):
+        if self.in_process_type == 'file' and tarfile.is_tarfile(file):
             data['archive'] = True
             with tempfile.TemporaryDirectory() as tmp_dir:
                 # Extract the tar & pass file names to the process file
@@ -492,7 +492,7 @@ Default is content.""")
 
             # Parse the files (we can have multiple files if we come from an archive)
             for file in files:
-                file_status = self.env.fail_safe._process_in_file_or_content(filename, file, data.get('archive'))
+                file_status = self.env.fail_safe._process_in_file_or_content(filename, file, data)
                 if file_status != 'done':
                     status = file_status
                     continue  # No need to continue since we will rollback
@@ -532,10 +532,9 @@ Default is content.""")
             self.flush()
             sync._done()
 
-    def _process_in_file_or_content(self, filename, file, archive=False):
-
+    def _process_in_file_or_content(self, filename, file, data):
         # Add file info in the context (so we don't change the signature of the method _process_content)
-        if archive:
+        if data.get('archive'):
             self = self.with_context(archive=filename,
                                      log_file_name=os.path.join(filename, os.path.basename(file)))
         else:
@@ -543,9 +542,11 @@ Default is content.""")
 
         if self.in_process_type == 'file':
             return self._process_content(file, None)
-        else:
+        elif file:
             with open(file, 'r') as f:
                 return self._process_content(file, f.read())
+        else:
+            return self._process_content(file, data)
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
