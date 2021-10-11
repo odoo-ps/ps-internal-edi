@@ -5,67 +5,82 @@ import logging
 
 from inspect import signature
 
-from odoo import api, fields
+from odoo import api, fields, registry, SUPERUSER_ID
+
 
 _logger = logging.getLogger(__name__)
 
-def get_integration(integration_obj, name):
-    integration = integration_obj.search([('name', '=', name), '|', ('active', '=', False), ('active', '=', True)], limit=1)
-    if not integration:
-            _logger.info("No integration found, create a default one")
-            api_connection = integration_obj.env.ref('edi_base.api_connection')
-            integration = integration_obj.create({
-                'integration_flow' : 'in',
-                'connection_id': api_connection.id,
-                'type': 'api',
-                'name': name,
-                'synchronization_content_type': 'json',
-                'active': False,
-            })
-    return integration
-
-def create_synchronization(integration, pool, args, kwargs, fct):
-    data = {
-        'name' : '%s @%s' % (integration.name, time.time()),
-        'integration_id' : integration.id,
-        'synchronization_date': fields.Datetime.now(),
-        'content': """
-Function
-\t%s.%s
-Args
-\t%s
-Kwarg
-\t%s
-Context
-\t%s""" % (pool._name, fct.__name__, args, kwargs, pool._context),
-        'user_id': pool.env.user.id,
-    }
-    return integration.env['edi.synchronization'].create(data)
 
 def integration(name):
+
     def decorator(fct):
+
         def wrapper(*args, **kwargs):
+
             self = args[0]
-            with api.Environment.manage():
-                new_cr = self.pool.cursor()
-                integration_obj = self.env['edi.integration'].sudo().with_env(self.env(cr=new_cr))
-                integration = get_integration(integration_obj, name)
-                sync = create_synchronization(integration, self, args, kwargs, fct)
+
+            Integration = self.env['edi.integration']
+
+            edi = Integration.search([
+                ('name', '=', name),
+                '|',
+                ('active', '=', False),
+                ('active', '=', True)
+            ], limit=1)
+
+            if not edi:
+
+                edi = Integration.create({
+                    'integration_flow' : 'in',
+                    'connection_id': self.env.ref('edi_base.api_connection').id,
+                    'type': 'api',
+                    'name': name,
+                    'synchronization_content_type': 'json',
+                    'active': False,
+                })
+
+                _logger.info("No integration found, a default one has been created")
+
+            new_cr = registry(self.env.cr.dbname).cursor()
+
+            new_env = api.Environment(new_cr, SUPERUSER_ID, self.env.context)
+            sync = new_env['edi.synchronization'].create({
+                'name' : '%s @%s' % (edi.name, time.time()),
+                'integration_id' : edi.id,
+                'synchronization_date': fields.Datetime.now(),
+                'content': """
+                    Function
+                    \t%s.%s
+                    Args
+                    \t%s
+                    Kwarg
+                    \t%s
+                    Context
+                    \t%s
+                """ % (self._name, fct.__name__, args, kwargs, self._context),
+                'user_id': self.env.user.id,
+            })
+
+            res = None
+
+            try:
+                res = fct(*args, **kwargs)
+            except Exception as e:
+                sync._report_error(name, e)
+                raise
+            else:
+                sync._done()
+            finally:
+                edi._set_status()
+
                 new_cr.commit()
-                try:
-                    res = fct(*args, **kwargs)
-                except Exception as e:
-                    sync._report_error(name, e)
-                    raise
-                else:
-                    sync._done()
-                    self.flush()
-                finally:
-                    integration.set_status()
-                    new_cr.commit()
-                    new_cr.close()
+                new_cr.close()
+
             return res
+
         sig = signature(fct)
         wrapper.__signature__ = sig
+
         return wrapper
+
     return decorator

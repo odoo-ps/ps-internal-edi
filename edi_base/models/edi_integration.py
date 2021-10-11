@@ -79,22 +79,25 @@ Default is content.""")
     error_ids = fields.One2many('edi.synchronization.error', 'integration_id')
     last_success_date = fields.Datetime()
     last_failure_date = fields.Datetime()
-    last_sync_status = fields.Char()
+    last_sync_status = fields.Char(default='No Sync Yet')
     color = fields.Integer()
 
-    def set_status(self):
+    def _set_status(self):
 
-        self.env.cr.execute("""
-            SELECT DISTINCT ON (integration_id, state)
-                   integration_id,
-                   synchronization_date,
-                   state
-              FROM edi_synchronization
-             WHERE integration_id in %s
-               AND synchronization_date IS NOT NULL
-             ORDER BY integration_id, state, synchronization_date DESC
-        """, (tuple(self.ids),))
-        sync_datas = self.env.cr.dictfetchall()
+        sync_datas = []
+
+        with registry(self.env.cr.dbname).cursor() as new_cr:
+            new_cr.execute("""
+                SELECT DISTINCT ON (integration_id, state)
+                       integration_id,
+                       synchronization_date,
+                       state
+                  FROM edi_synchronization
+                 WHERE integration_id in %s
+                   AND synchronization_date IS NOT NULL
+                 ORDER BY integration_id, state, synchronization_date DESC
+            """, (tuple(self.ids),))
+            sync_datas = new_cr.dictfetchall()
 
         done_sync = {}
         fail_sync = {}
@@ -118,15 +121,15 @@ Default is content.""")
 
             dest[integration_id] = fields.Datetime.from_string(sync_data['synchronization_date'])
 
-        for rec in self:
+        for record in self:
 
             vals = {
                 'last_sync_status': 'No Sync Yet',
                 'color': 4
             }
 
-            last_success_date = done_sync.get(rec.id, False)
-            last_failure_date = fail_sync.get(rec.id, False)
+            last_success_date = done_sync.get(record.id, False)
+            last_failure_date = fail_sync.get(record.id, False)
 
             if last_success_date:
                 vals['last_success_date'] = last_success_date
@@ -159,7 +162,7 @@ Default is content.""")
                     'last_failure_date': False
                 })
 
-            rec.write(vals)
+            record.write(vals)
 
     # TODO Filter on status
 
@@ -216,14 +219,14 @@ Default is content.""")
 
     def _create_error_sync(self, activity, exception):
         name = '%s - %s: %s' % (self.name, fields.Datetime.now(), "No Sync Error")
-        res = self.env['edi.synchronization'].create({
+        synchronization = self.env['edi.synchronization'].create({
             'integration_id': self.id,
             'name': name,
             'filename': '%s.%s' % (name, self.synchronization_content_type),
             'synchronization_date': fields.Datetime.now(),
         })
-        res._report_error(activity, exception=exception)
-        return res
+        synchronization._report_error(activity, exception=exception)
+        return synchronization
 
     def _report_error(self, activity, exception=None, message=None):
         """ 
@@ -231,12 +234,13 @@ Default is content.""")
             pass exception if you have catch and exception, otherwise pass a message
             If the error should block the process simply raise an error
         """
-        if not self.env.fail_safe.env.sync:
-            _logger.error("Cannot log error on sync object, sync object is not created yet")
+
+        if self.env.synchronizations:
+            self.env.synchronizations[-1]._report_error(activity, exception=exception, message=message)
             return
 
-        sync = self.env.fail_safe.env.sync[-1]
-        sync._report_error(activity, exception=exception, message=message)
+        _logger.error("Cannot log error on sync object, sync object is not created yet")
+
 
     @api.model
     def _process(self, integration_id):
@@ -307,32 +311,38 @@ Default is content.""")
         """
             with raise_error=True if you want to get the traceback and stop the iteration
         """
+
         self.ensure_one()
-        with api.Environment.manage():
-            new_cr = self.pool.cursor()
-            self.env.fail_safe = self.with_env(self.env(cr=new_cr))
-            self.env.fail_safe.env.sync = []
-            self.env.fail_safe.env.activity = "Get Record"
-            try:
-                if not records:
-                    records = self._get_record_to_send()
-                if records:
-                    if self.synchronization_creation == 'one':
-                        for rec in records:
-                            self._process_record_out(rec, raise_error=raise_error)
-                    else:
-                        self._process_record_out(records, raise_error=raise_error)
-            except Exception as e:
-                if not 'no_exception_log' in self._context: #Only for test purpose
-                    _logger.exception(str(e))
-                if not self.env.fail_safe.env.sync:
-                    self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
-                if raise_error:
-                    raise
-            finally:
-                self.env.fail_safe.set_status()
-                new_cr.commit()
-                new_cr.close()
+
+        self.env.synchronizations = []
+        self.env.activity = "Get Record"
+
+        try:
+            if not records:
+                records = self._get_record_to_send()
+
+            if not records:
+                _logger.info('No records found to synchronize for %s [%s]', self.name, self.id)
+                return
+
+            if self.synchronization_creation != 'one':
+                self._process_record_out(records, raise_error=raise_error)
+            else:
+                for rec in records:
+                    self._process_record_out(rec, raise_error=raise_error)
+
+        except Exception as e:
+
+            if not 'no_exception_log' in self._context: #Only for test purpose
+                _logger.exception(str(e))
+
+            if not self.env.synchronizations:
+                self._create_error_sync(self.env.activity, e)
+
+            if raise_error:
+                raise
+        finally:
+            self._set_status()
 
     def _process_record_out(self, records, raise_error=False):
         """
@@ -340,24 +350,41 @@ Default is content.""")
         """
         self.ensure_one()
 
-        sync = self.env.fail_safe._create_synchronization_out(records, flow_type=self.integration_flow)
-        self.env.fail_safe.env.cr.commit()
-        self.env.fail_safe.env.sync.append(sync)
+        new_cr = registry(self.env.cr.dbname).cursor()
+        new_env = api.Environment(
+            new_cr,
+            self.env.user.id,
+            self.env.context
+        )
+
+        sync = self.with_env(new_env)._create_synchronization_out(records, flow_type=self.integration_flow)
+        self.env.synchronizations.append(sync)
+
         try:
-            self.env.fail_safe.env.activity = "Get Content"
+            self.env.activity = "Get Content"
             content = self._get_content(records)
             sync._write_content(content)
-            self.env.fail_safe.env.activity = "Send Synchro"
+
+            self.env.activity = "Send Synchro"
             res = self._send_content(sync.filename, content)
+
+            self.env.activity = "Postprocess"
             self._postprocess(res, sync.filename, content, records)
         except Exception as e:
-            sync._report_error(self.env.fail_safe.env.activity, e)
-            self.env.fail_safe._handle_error(sync.filename)
+
+            self.env.synchronizations[-1]._report_error(self.env.activity, e)
+
+            self.with_env(new_env)._handle_error(sync.filename)
+
             if raise_error:
                 raise
         else:
             self.flush()
             sync._done()
+
+        finally:
+            new_cr.commit()
+            new_cr.close()
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
@@ -430,20 +457,20 @@ Default is content.""")
             to fail silently.
         """
         self.ensure_one()
-        self.flush()
-        with api.Environment.manage():
-            new_cr = self.pool.cursor()
-            if self._context.get('no_exception_log'):
-                new_cr._default_log_exceptions = False
-            self = self.with_env(self.env(cr=new_cr))
-            try:
-                self._process_out(records=records, raise_error=raise_error)
-            except Exception as e:
-                raise
-            finally:
-                new_cr.commit()
-                new_cr.close()
 
+        self.flush()
+
+        no_exception_log = self._context.get('no_exception_log', False)
+
+        self.env.cr._default_log_exceptions = no_exception_log
+
+        try:
+            self._process_out(records=records, raise_error=raise_error)
+        except Exception:
+            if raise_error:
+                raise
+
+        self.env.cr._default_log_exceptions = not no_exception_log
 
     #####################################################################
     #                   Implementation of process in                    #
@@ -467,7 +494,7 @@ Default is content.""")
             _handle_error  #DEFAULT
     """
 
-    def _create_synchronzation_in(self, filename, content):
+    def _create_synchronization_in(self, filename, content):
         return self.env['edi.synchronization'].create({
             'integration_id': self.id,
             'name': self._get_synchronization_name_in(filename, content),
@@ -480,71 +507,63 @@ Default is content.""")
 
         self.ensure_one()
 
-        with api.Environment.manage(), registry(self.env.cr.dbname).cursor() as new_cr:
+        self.env.synchronizations = []
+        self.env.activity = "Fetch Content"
 
-            self.env.fail_safe = self.with_env(self.env(cr=new_cr))
-            self.env.fail_safe.env.sync = []
-            self.env.fail_safe.env.activity = "Fetch Content"
+        exceptions = []
 
-            exceptions = []
+        try:
+            data = self._get_in_content()
+        except Exception as e:
+            with registry().cursor() as new_cr:
+                self.with_env(api.Environment(
+                    new_cr,
+                    self.env.user.id,
+                    self.env.context
+                ))._create_error_sync(self.env.activity, e)
+            exceptions.append(e)
+        else:
+            for d in data:
+                try:
+                    self._process_in_file(d['filename'], d['content'], raise_error=raise_error)
+                except Exception as e:
+                    exceptions.append(e)
+        finally:
+            # NOTE: Update integration's status after processing all files
+            self._set_status()
 
-            try:
-                data = self._get_in_content()
-            except Exception as e:
-
-                self.env.fail_safe._create_error_sync(self.env.fail_safe.env.activity, e)
-                self.env.fail_safe.env.cr.commit()
-
-                exceptions.append(e)
-
-            else:
-                for d in data:
-                    try:
-                        self._process_in_file(
-                            d['filename'],
-                            d['content'],
-                            raise_error=raise_error
-                        )
-                    except Exception as e:
-                        exceptions.append(e)
-
-            # NOTE: Update integration's update after processing each file
-            self.env.fail_safe.set_status()
-            self.env.fail_safe.env.cr.commit()
-
-            for e in exceptions:
-
-                if 'no_exception_log' not in self._context:  # Only for test purpose
+            if 'no_exception_log' not in self._context:  # Only for test purpose
+                for e in exceptions:
                     _logger.exception(str(e))
 
-            if exceptions:
-
-                self.env.cr.rollback()
-
-                if raise_error:
-                    raise ProcessIntegrationException('\n'.join(map(str, exceptions)))
+            if exceptions and raise_error:
+                raise ProcessIntegrationException('\n'.join(map(str, exceptions)))
 
     def _process_in_file(self, filename, content, raise_error=False):
 
         self.ensure_one()
 
-        sync = self.env.fail_safe._create_synchronzation_in(filename, content)
-        self.env.fail_safe.env.cr.commit()
-        self.env.fail_safe.env.sync.append(sync)
+        new_cr = registry(self.env.cr.dbname).cursor()
+
+        sync = self.with_env(api.Environment(
+            new_cr,
+            self.env.user.id,
+            self.env.context
+        ))._create_synchronization_in(filename, content)
+        self.env.synchronizations.append(sync)
 
         try:
 
-            self.env.fail_safe.env.activity = "Process Content"
+            self.env.activity = "Process Content"
             status = self._process_content(filename, content)
 
-            self.env.fail_safe.env.activity = "Clean Synchro"
+            self.env.activity = "Clean Synchro"
             self._clean(filename, status, content)
 
         except Exception as e:
 
-            sync._report_error(self.env.fail_safe.env.activity, e)
-            self.env.fail_safe._handle_error(sync.filename)
-            self.env.fail_safe.env.cr.commit()
+            sync._report_error(self.env.activity, e)
+            self._handle_error(sync.filename)
 
             if raise_error:
                 raise
@@ -552,7 +571,8 @@ Default is content.""")
         else:
             sync._done()
         finally:
-            self.env.cr.commit()
+            new_cr.commit()
+            new_cr.close()
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
