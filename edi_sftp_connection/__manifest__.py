@@ -1,8 +1,7 @@
-# -*- encoding: utf-8 -*-
-# Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'SFTP Connection for Odoo PS EDI Framework',
     'version': '1.0',
+    'license': 'Other proprietary',
     'summary': '',
     'category': 'Tools',
     'description': """
