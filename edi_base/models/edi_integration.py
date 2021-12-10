@@ -298,7 +298,7 @@ Default is content.""")
             _handle_error  #DEFAULT
     """
 
-    def _create_synchronization_out(self, records, flow_type):
+    def _create_synchronization_out(self, records):
         name = self._get_synchronization_name_out(records)
         return self.env['edi.synchronization'].create({
             'integration_id': self.id,
@@ -357,7 +357,7 @@ Default is content.""")
             self.env.context
         )
 
-        sync = self.with_env(new_env)._create_synchronization_out(records, flow_type=self.integration_flow)
+        sync = self.with_env(new_env)._create_synchronization_out(records)
         self.env.synchronizations.append(sync)
 
         try:
@@ -374,7 +374,7 @@ Default is content.""")
 
             self.env.synchronizations[-1]._report_error(self.env.activity, e)
 
-            self.with_env(new_env)._handle_error(sync.filename)
+            self.with_env(new_env)._handle_error(records, sync, e)
 
             if raise_error:
                 raise
@@ -631,8 +631,8 @@ Default is content.""")
     ##########################################################
     #========================================================#
 
-    def _handle_error(self, filename):
+    def _handle_error(self, records, sync, exc):
         """
             Common to both process in and process out
         """
-        self.connection_id._clean_synchronization(filename, 'error', self.integration_flow)
+        self.connection_id._clean_synchronization(sync.filename, 'error', self.integration_flow)
