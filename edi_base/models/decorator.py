@@ -12,6 +12,13 @@ _logger = logging.getLogger(__name__)
 
 
 def integration(name):
+    """
+    The idea behind that decorator is to allow to mark some RPC'allable methods
+    to behave the same way an integration does.
+
+    As in the regular flow, the synchronization record is created inside a new
+    cursor, but a new one can be used to create the integration for the first time.
+    """
 
     def decorator(fct):
 
