@@ -337,7 +337,13 @@ Default is content.""")
                 _logger.exception(str(e))
 
             if not self.env.synchronizations:
-                self._create_error_sync(self.env.activity, e)
+
+                with registry().cursor() as new_cr:
+                    self.with_env(api.Environment(
+                        new_cr,
+                        self.env.user.id,
+                        self.env.context
+                    ))._create_error_sync(self.env.activity, e)
 
             if raise_error:
                 raise
