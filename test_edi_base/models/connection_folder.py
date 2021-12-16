@@ -1,16 +1,13 @@
 import os
 import os.path
 
-from odoo import fields, models
+from odoo import models
 from odoo.exceptions import UserError
 
 
 class ConnectionFolder(models.Model):
 
     _inherit = 'edi.connection'
-    _description = 'EDI Connection'
-
-    type = fields.Selection(selection_add=[('folder', 'Folder')], ondelete={'folder': 'cascade'})
 
     def _get_default_configuration(self):
         if self.type != 'folder':

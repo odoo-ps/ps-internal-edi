@@ -3,7 +3,7 @@ import logging
 
 from io import StringIO
 
-from odoo import api, fields, models
+from odoo import api, models
 
 from odoo.addons.edi_base.models.decorator import integration
 
@@ -36,17 +36,6 @@ class ResPartner(models.Model):
 class TestIntegration(models.Model):
 
     _inherit = 'edi.integration'
-
-    type = fields.Selection(
-        selection_add=[
-            ('partner_folder_out', 'Export Partner in Folder'),
-            ('partner_folder_in', 'Import Partner in Folder')
-        ],
-        ondelete={
-            'partner_folder_out': 'cascade',
-            'partner_folder_in': 'cascade'
-        }
-    )
 
     def _get_record_to_send(self):
         if self.type != 'partner_folder_out':
