@@ -9,9 +9,6 @@ Odoo PS EDI Framework Tests
 ===========================
     """,
     'depends': ['edi_base'],
-    'data': [
-        'data/edi_integration.xml',
-    ],
     'auto_install': False,
     'installable': True
 }

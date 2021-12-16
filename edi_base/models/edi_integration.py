@@ -86,7 +86,10 @@ Default is content.""")
 
         sync_datas = []
 
+        # NOTE: `edi.synchronization`'s are always created on a different cursor
+        #        thus we need to open a new one
         with registry(self.env.cr.dbname).cursor() as new_cr:
+
             new_cr.execute("""
                 SELECT DISTINCT ON (integration_id, state)
                        integration_id,
@@ -113,13 +116,19 @@ Default is content.""")
             opp = done_sync if state == 'fail' else fail_sync
 
             integration_id = sync_data['integration_id']
+            sync_date = fields.Datetime.from_string(sync_data['synchronization_date'])
 
-            # NOTE: A more recent synch has already been treated, we ignore it,
-            #       thus we only have one entry per integration on the dicts
-            if integration_id in opp:
-                continue
+            # NOTE: Due to the SQL query, `done` state synchronization is always
+            #       before a possible failed one, so if the already succeeded
+            #       synchronization is older, we empty the dict.
+            if (
+                state == 'fail' and
+                integration_id in opp and
+                opp[integration_id] <= sync_date
+            ):
+                opp[integration_id] = False
 
-            dest[integration_id] = fields.Datetime.from_string(sync_data['synchronization_date'])
+            dest[integration_id] = sync_date
 
         for record in self:
 
@@ -163,8 +172,6 @@ Default is content.""")
                 })
 
             record.write(vals)
-
-    # TODO Filter on status
 
     @api.model_create_multi
     def create(self, values):
@@ -367,23 +374,27 @@ Default is content.""")
         self.env.synchronizations.append(sync)
 
         try:
-            self.env.activity = "Get Content"
-            content = self._get_content(records)
-            sync._write_content(content)
 
-            self.env.activity = "Send Synchro"
-            res = self._send_content(sync.filename, content)
+            with self.env.cr.savepoint():
 
-            self.env.activity = "Postprocess"
-            self._postprocess(res, sync.filename, content, records)
+                self.env.activity = "Get Content"
+                content = self._get_content(records)
+                sync._write_content(content)
+
+                self.env.activity = "Send Synchro"
+                res = self._send_content(sync.filename, content)
+
+                self.env.activity = "Postprocess"
+                self._postprocess(res, sync.filename, content, records)
+
         except Exception as e:
 
-            self.env.synchronizations[-1]._report_error(self.env.activity, e)
-
+            sync._report_error(self.env.activity, e)
             self.with_env(new_env)._handle_error(records, sync, e)
 
             if raise_error:
                 raise
+
         else:
             self.flush()
             sync._done()
@@ -550,32 +561,37 @@ Default is content.""")
         self.ensure_one()
 
         new_cr = registry(self.env.cr.dbname).cursor()
-
-        sync = self.with_env(api.Environment(
+        new_env = api.Environment(
             new_cr,
             self.env.user.id,
             self.env.context
-        ))._create_synchronization_in(filename, content)
+        )
+
+        sync = self.with_env(new_env)._create_synchronization_in(filename, content)
         self.env.synchronizations.append(sync)
 
         try:
 
-            self.env.activity = "Process Content"
-            status = self._process_content(filename, content)
+            with self.env.cr.savepoint():
 
-            self.env.activity = "Clean Synchro"
-            self._clean(filename, status, content)
+                self.env.activity = "Process Content"
+                status = self._process_content(filename, content)
+
+                self.env.activity = "Clean Synchro"
+                self._clean(filename, status, content)
 
         except Exception as e:
 
             sync._report_error(self.env.activity, e)
-            self._handle_error(sync.filename)
+            self.with_env(new_env)._handle_error(None, sync, e)
 
             if raise_error:
                 raise
 
         else:
+            self.flush()
             sync._done()
+
         finally:
             new_cr.commit()
             new_cr.close()

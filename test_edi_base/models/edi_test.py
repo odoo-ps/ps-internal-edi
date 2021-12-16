@@ -4,6 +4,7 @@ import logging
 from io import StringIO
 
 from odoo import api, fields, models
+
 from odoo.addons.edi_base.models.decorator import integration
 
 
@@ -86,6 +87,7 @@ class TestIntegration(models.Model):
     def _process_content(self, filename, content):
         if self.type != 'partner_folder_in':
             return super()._get_record_to_send()
+
         #Code to test when something go wrong
         if content == 'raise':
             self.env['res.partner'].create({'name': False})
@@ -97,10 +99,18 @@ class TestIntegration(models.Model):
         csv_file = StringIO(content)
         reader = csv.reader(csv_file, delimiter=',')
         header = reader.__next__()
+
+        data = []
         for line in reader:
             if not line[0]:
-                self._report_error("Import Partner", message="No value for field name, name is required \n %s" % line)
+                self._report_error(
+                    "Import Partner",
+                    message=f"No value for field name, name is required \n {line}"
+                )
                 continue
-            self.env['res.partner'].load(header, [line])
+
+            data.append(line)
+
+        self.env['res.partner'].load(header, data)
 
         return "done"
