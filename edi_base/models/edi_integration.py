@@ -194,6 +194,53 @@ Default is content.""")
 
         return integrations
 
+    def _load_records(self, data_list, update=False):
+
+        result = super()._load_records(data_list, update=update)
+
+        if self._name != 'edi.integration':
+            return result
+
+        # NOTE: Since https://github.com/odoo/odoo/commit/47ae24081, a new test
+        #       checks that no code that should be counted by the `cloc` utility
+        #       in Odoo exists after the installation of the modules.
+        #       The heuristic used is to check the existence of an IMD record for
+        #       server actions.
+        #       In our case (integration -> cron -> server action), the created
+        #       server action does not get automatically an external identifier,
+        #       since the framework only support one level of inheritance.
+        #       Thus, we need to manually create the external identifier for the SA to
+        #       avoid the test to fail.
+
+        IMD = self.env['ir.model.data']
+
+        server_actions = result.mapped('cron_id.ir_actions_server_id')
+
+        server_action_imds = IMD.search([
+            ('model', '=', 'ir.actions.server'),
+            ('res_id', 'in', server_actions.ids)
+        ])
+        if len(server_action_imds) == len(result):
+            return result
+
+        server_action_imds_res_ids = server_action_imds.mapped('res_id')
+
+        imd_data_list = []
+        for server_action in server_actions:
+            if server_action.id in server_action_imds_res_ids:
+                continue
+
+            imd = server_action_imds.filtered(lambda imd: imd.res_id == server_action.id)
+            imd_data_list.append({
+                'xml_id': f'{imd.module}.{imd.name}_ir_actions_server',
+                'record': server_action,
+                'noupdate': True
+            })
+
+        IMD._update_xmlids(imd_data_list, update=update)
+
+        return result
+
     def _read_parameter(self):
         self.ensure_one()
         return json.loads(self.parameter)
