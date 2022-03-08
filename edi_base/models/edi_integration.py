@@ -214,7 +214,8 @@ Default is content.""")
 
         IMD = self.env['ir.model.data']
 
-        server_actions = result.mapped('cron_id.ir_actions_server_id')
+        crons = result.mapped('cron_id')
+        server_actions = crons.mapped('ir_actions_server_id')
 
         server_action_imds = IMD.search([
             ('model', '=', 'ir.actions.server'),
@@ -225,12 +226,18 @@ Default is content.""")
 
         server_action_imds_res_ids = server_action_imds.mapped('res_id')
 
+        cron_imds = IMD.search([
+            ('model', '=', 'ir.cron'),
+            ('res_id', 'in', crons.ids)
+        ])
+
         imd_data_list = []
         for server_action in server_actions:
             if server_action.id in server_action_imds_res_ids:
                 continue
 
-            imd = server_action_imds.filtered(lambda imd: imd.res_id == server_action.id)
+            cron = crons.filtered(lambda c: c.ir_actions_server_id == server_action)
+            imd = cron_imds.filtered(lambda imd: imd.res_id == cron.id)
             imd_data_list.append({
                 'xml_id': f'{imd.module}.{imd.name}_ir_actions_server',
                 'record': server_action,
