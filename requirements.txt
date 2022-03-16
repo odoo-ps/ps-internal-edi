@@ -1,2 +1,3 @@
 pysftp==0.2.9
 google-cloud-storage
+azure-storage-blob==12.10.0
