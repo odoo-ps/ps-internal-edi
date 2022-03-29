@@ -69,8 +69,8 @@ Default is content.""")
     sub_integration_ids = fields.Many2many('edi.integration',
                                            'edi_integration_sub_integration_rel',
                                            'integration_id', 'sub_integration_id',
-                                           domain=[('has_sub_integration', '!=', True),
-                                                   '|', ('active', '=', True), ('active', '=', False)])
+                                           domain=[('has_sub_integration', '!=', True)],
+                                           context={'active_test': False})
     record_filter_id = fields.Many2one('ir.filters', string="Record Filter", ondelete='restrict',
                                        help="Filter for default behavior of _get_record_to_send")
 
