@@ -6,7 +6,8 @@
         <field name="inherit_id" ref="edi_base.connection_form_view"/>
         <field name="arch" type="xml">
             <field name="configuration" position="after">
-                <field name="in_done_let"/>
+                <field name="ftp_in_done_let" attrs="{'invisible': [('type', '!=', 'ftp')]}"/>
+                <field name="ftp_load_content" attrs="{'invisible': [('type', '!=', 'ftp')]}"/>
             </field>
         </field>
     </record>

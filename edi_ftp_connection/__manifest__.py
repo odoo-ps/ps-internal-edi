@@ -1,6 +1,6 @@
 {
     'name': 'FTP Connection for Odoo PS EDI Framework',
-    'version': '1.0',
+    'version': '1.1',
     'license': 'Other proprietary',
     'summary': '',
     'category': 'Tools',

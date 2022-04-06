@@ -2,10 +2,15 @@
 import ftplib
 import logging
 import os
+import tempfile
+import shutil
 from io import BytesIO as StringIO
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 from odoo.tools import ustr
+
+
 _logger = logging.getLogger(__name__)
 
 
@@ -21,8 +26,9 @@ class FTPConnection(models.Model):
     _inherit = 'edi.connection'
 
     type = fields.Selection(selection_add=[('ftp', 'FTP')], ondelete={'ftp': 'cascade'})
-    in_done_let = fields.Boolean('Let in "in_folder"',
-                                 help='When downloading, let the file on the folder when process is done')
+    ftp_in_done_let = fields.Boolean('Let in "in_folder"',
+                                     help='When downloading, let the file on the folder when process is done')
+    ftp_load_content = fields.Boolean('Load Content', default=True, help='Load the content of the file (for "in" flow)')
 
     #####################################################################
     #             Methods overridden from edi_base                      #
@@ -42,7 +48,7 @@ class FTPConnection(models.Model):
         if not self.type == 'ftp':
             return super()._send_synchronization(filename, content, *args, **kwargs)
 
-        return self._ftp_send_file(filename, content, args, kwargs)
+        return self._ftp_send_file(filename, content, *args, **kwargs)
 
     def _fetch_synchronizations(self, *args, **kwargs):
         """ Override to download the file from the FTP server """
@@ -52,12 +58,18 @@ class FTPConnection(models.Model):
 
         return self._ftp_fetch_files(*args, **kwargs)
 
-    def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
-        self.ensure_one()
+    def _clean_synchronization_in(self, data, status, *args, **kwargs):
         if not self.type == 'ftp':
-            return super()._clean_synchronization(filename, status, flow_type, kwargs)
+            return super()._clean_synchronization_in(data, status, *args, **kwargs)
 
-        self._clean(filename, status, flow_type, *args, **kwargs)
+        self._clean_local_file(data, *args, **kwargs)
+        self._clean(data.get('filename'), status, 'in', *args, **kwargs)
+
+    def _clean_synchronization_out(self, filename, status, *args, **kwargs):
+        if not self.type == 'ftp':
+            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
+
+        self._clean(filename, status, 'out', *args, **kwargs)
 
     def _get_default_configuration(self):
         """ Provide a configuration template for this type of connection """
@@ -65,7 +77,6 @@ class FTPConnection(models.Model):
             return super()._get_default_configuration()
 
         return self._ftp_default_configuration()
-
 
     #####################################################################
     #    Specific FTP Methods that should be overridden                 #
@@ -220,7 +231,7 @@ class FTPConnection(models.Model):
             # Add attribute to the server
             server.__setattr__(folder, path)
 
-        if self.in_done_let and hasattr(server, 'in_folder_done'):
+        if self.ftp_in_done_let and hasattr(server, 'in_folder_done'):
             raise UserError(_("You shouldn't have an in_folder_done if you want to let the file on the folder"))
 
     def _ftp_test_connection(self):
@@ -242,11 +253,19 @@ class FTPConnection(models.Model):
             except Exception as e:
                 _logger.error(e)
                 raise UserError(_('Send synchronization failed for file %s:\n%s') % (filename, ustr(e)))
-                #raise SynchronizationException(_("Failure to send synchronization"), msg)
 
     def _ftp_fetch_files(self, *args, **kwargs):
-        directory = kwargs.get('directory')
+        """ Download the file into a temporary dictionnary
+            Add the complete file path under key "file"
+            Load their content under key "content" if ftp_load_content = True
+
+            :return: list of dict
+        """
         result = []
+
+        # create a tempdir
+        directory = tempfile.mkdtemp(prefix="odoo-ftp-")
+
         with self.connect() as server:
             filenames = self.list_files(server, server.in_folder)
             filtered_ones = self._filter_files(filenames, kwargs.get('integration_id'))
@@ -254,12 +273,16 @@ class FTPConnection(models.Model):
                 try:
                     result.append({
                         'filename': filename,
-                        'file': self._download_file(server, directory, filename)
+                        'file': self._download_file(server, directory, filename),
+                        'directory': directory,
                     })
                 except Exception as e:
                     _logger.error(e)
                     raise UserError(_('Fetch synchronization failed for file %s:\n%s') % (filename, ustr(e)))
-                    # raise SynchronizationException(_("Failure to fetch synchronization"), msg)
+        if self.ftp_load_content:
+            for res in result:
+                with open(res['file'], 'r') as f:
+                    res['content'] = f.read()
         return result
 
     def _filter_files(self, filenames, integration_id):
@@ -268,9 +291,10 @@ class FTPConnection(models.Model):
         :param integration_id:
         :return:
         """
-        if not self.in_done_let or not integration_id:
+        if not self.ftp_in_done_let or not integration_id:
             return filenames
 
+        # TODO Filter is too slow, maybe replace by a sql request
         sync_filenames = integration_id.synchronization_ids.filtered(lambda x: x.state == 'done').mapped('filename')
         return [x for x in filenames if x not in sync_filenames]
 
@@ -278,12 +302,29 @@ class FTPConnection(models.Model):
         #  but considering that .tar & .zip must not be filtered since we now unarchive them
         #  (Filter files with os.path.splitext() and integration_id.synchronization_content_type)
 
+    def _clean_local_file(self, data, *args, **kwargs):
+        """ Delete the file locally and the directory if empty
+        :param data: dict
+            return from _fetch_synchronizations
+        """
+        # Delete the local file
+        f = data.get('file')
+        directory = data.get('directory')
+
+        if os.path.exists(f):
+            # delete the file
+            os.remove(f)
+
+        if os.path.exists(directory) and os.path.isdir(directory) and not os.listdir(directory):
+            # delete the directory if it is empty
+            shutil.rmtree(directory)
+
     def _clean(self, filename, status, flow_type, *args, **kwargs):
-        """ Override to take actions after the file transfer
+        """ After the file transfer:
         - out : delete the file if an error has occurred
         - in :
             - done :
-                - if in_done_let == True => let
+                - if ftp_in_done_let == True => let
                 - if in_folder_done is configured ==> move
                 - otherwise delete
             - error :
@@ -291,11 +332,12 @@ class FTPConnection(models.Model):
                 - otherwise let (to allow to retry next time)
         """
         # No need to connect if :
-        if (flow_type == 'in' and self.in_done_let  # the downloaded file must be let on the server
+        if (flow_type == 'in' and self.ftp_in_done_let  # the downloaded file must be let on the server
                 or flow_type == 'out' and status == 'done'):  # the file could be uploaded without error
             return
 
         with self.connect() as server:
+            # Move the files on the FTP
 
             if flow_type == 'out':
                 if self.file_exists(server, server.out_folder, filename):
