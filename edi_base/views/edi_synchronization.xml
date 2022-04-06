@@ -11,6 +11,7 @@
             <field name="write_date"/>
             <field name="activity"/>
             <field name="description_short"/>
+            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}" optional="show"/>
         </tree>
     </field>
 </record>
@@ -27,6 +28,7 @@
                 <group>
                     <group>
                         <field name="activity"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
                     </group>
                 </group>
                 <separator string="Description" />
@@ -70,6 +72,7 @@
                     <group>
                         <field name="create_date"/>
                         <field name="write_date"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
                     </group>
                     <group>
                         <field name="synchronization_date"/>
@@ -123,6 +126,7 @@
             <field name="synchronization_date"/>
             <field name="synchronization_flow" invisible="1"/>
             <field name="state" invisible="1"/>
+            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}" optional="show"/>
         </tree>
     </field>
 </record>
@@ -138,6 +142,7 @@
             <field name="state"/>
             <field name="filename_short"/>
             <field name="synchronization_date"/>
+            <field name="company_id"/>
             <templates>
                 <t t-name="kanban-box">
                     <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon oe_kanban_global_click">
@@ -174,6 +179,11 @@
                                 <div>
                                     <span><i class="fa fa-file-o" aria-label="Content Type"/> <field name="content_type"/></span>
                                 </div>
+                                <t t-if="record.company_id.value">
+                                    <div>
+                                        <strong>Company: <t t-esc="record.company_id.value"/></strong>
+                                    </div>
+                                </t>
                             </div>
                         </div>
                     </div>
@@ -191,6 +201,7 @@
             <field name="name" filter_domain="['|', ('name', 'ilike', self), ('filename', 'ilike', self)]"/>
             <field name="integration_id"/>
             <field name="content"/>
+            <field name="company_id" groups="base.group_multi_company"/>
             <filter name="in_synchronizations" string="Incoming Synchronizations"
                 domain="[('synchronization_flow', '=', 'in')]"
             />
@@ -204,10 +215,11 @@
             
             <group string="Group By">
                 <filter name="group_by_integration" string="Integration" context="{'group_by': 'integration_id'}"/>
-                <filter name="group_by_type" string="Type" context="{'group_by': 'synchronization_flow'}"/>
+                <filter name="group_by_type" string="Flow Type" context="{'group_by': 'synchronization_flow'}"/>
                 <filter name="group_by_content_type" string="Content Type" context="{'group_by': 'content_type'}"/>
                 <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
                 <filter name="group_by_synchronization_month" string="Synchronization Month" context="{'group_by': 'synchronization_date:month'}"/>
+                <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
             </group>
         </search>
     </field>

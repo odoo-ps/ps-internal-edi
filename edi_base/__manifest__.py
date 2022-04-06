@@ -12,11 +12,14 @@ Gateway between odoo and third party components
     """,
     'depends': ['mail'],
     'data': [
+        'security/edi_base.xml',
         'security/ir.model.access.csv',
+
+        'data/connection.xml',
+
         'views/edi_connection.xml',
         'views/edi_integration.xml',
         'views/edi_synchronization.xml',
-        'data/connection.xml',
     ],
     'auto_install': False,
     'installable': False,

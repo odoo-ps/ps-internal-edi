@@ -22,6 +22,7 @@ class SynchronizationError(models.Model):
     activity = fields.Char()
     description = fields.Text()
     description_short = fields.Text(compute='_get_short_desc')
+    company_id = fields.Many2one(related='synchronization_id.company_id', store=True)
 
     def _get_short_desc(self):
         for rec in self:
@@ -55,6 +56,7 @@ class Synchronization(models.Model):
         string='Status'
     )
     integration_id = fields.Many2one('edi.integration', required=True, string='Integration')
+    company_id = fields.Many2one(related='integration_id.company_id', store=True)
     synchronization_flow = fields.Selection(
         related='integration_id.integration_flow',
         store=True, readonly=True, string='Type'

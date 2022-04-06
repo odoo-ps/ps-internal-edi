@@ -42,6 +42,7 @@
                             <field name="integration_flow"/>
                             <field name="type" />
                             <field name="synchronization_creation" attrs="{'invisible': [('has_sub_integration', '=', True)]}" />
+                            <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                     </group>
                     <notebook>
@@ -105,6 +106,7 @@
                 <field name="name"/>
                 <field name="integration_flow"/>
                 <field name="cron_id"/>
+                <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}" optional="show"/>
             </tree>
         </field>
     </record>
@@ -125,6 +127,7 @@
                 <field name="last_sync_status" />
                 <field name="color" />
                 <field name="has_sub_integration" />
+                <field name="company_id" invisible="1"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon">
@@ -169,6 +172,9 @@
                                         <div>
                                             <span>Last Sync Fail: <t t-esc="record.last_failure_date.value"/></span>
                                         </div>
+                                        <t t-if="record.company_id.value">
+                                            <strong>Company: <t t-esc="record.company_id.value"/></strong>
+                                        </t>
                                     </div>
                                 </div>
                             </div>
@@ -193,10 +199,13 @@
                 <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
                 <filter name="success" string="Success" domain="[('last_sync_status', '=', 'Success'), '|', ('active', '=', True), ('active', '=', False)]" />
                 <filter name="success" string="Fail" domain="[('last_sync_status', '=', 'Fail'), '|', ('active', '=', True), ('active', '=', False)]" />
+                <field name="company_id" groups="base.group_multi_company"/>
                 <group string="Group By">
                     <filter name="group_by_last_sync_status" string="Sync Status" context="{'group_by': 'last_sync_status'}" />
-                    <filter name="group_by_integration_flow" string="Type" context="{'group_by': 'integration_flow'}"/>
+                    <filter name="group_by_integration_flow" string="Flow Type" context="{'group_by': 'integration_flow'}"/>
+                    <filter name="group_by_type" string="Type" context="{'group_by': 'type'}"/>
                     <filter name="group_by_synchronization_content_type" string="Content Type" context="{'group_by': 'synchronization_content_type'}"/>
+                    <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
                 </group>
             </search>
         </field>

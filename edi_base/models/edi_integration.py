@@ -51,6 +51,7 @@ class Integration(models.Model):
     _order = 'sequence'
 
     # Common for in/out flows
+    company_id = fields.Many2one('res.company')
     integration_flow = fields.Selection([
         ('in', 'From provider to Odoo'),
         ('out', 'From Odoo to provider'),
@@ -440,6 +441,13 @@ class Integration(models.Model):
                 self.env.context
             )
             self = self.with_env(new_env)
+
+        # integration is executed in priority in the context of its company
+        # so that company_dependent fields are computed in the right company
+        self = self.with_company(self.company_id or self.env.company)
+        if data and isinstance(data, models.BaseModel):
+            # data is a recordset, enforce to be executed in priority in the context of its company
+            data = data.with_company(self.company_id or data.env.company)
 
         self.last_execution_date = fields.Datetime.now()
 

@@ -18,6 +18,9 @@ class Connection(models.Model):
     name = fields.Char(required=True)
     type = fields.Selection(selection=[], required=True, string='Type')
     configuration = fields.Text()
+    company_id = fields.Many2one('res.company')
+    integration_ids = fields.One2many('edi.integration', 'connection_id',
+                                      readonly=True, context={'active_test': False})
 
     def test(self):
         """
