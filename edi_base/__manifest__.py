@@ -1,12 +1,14 @@
 {
     'name': 'Odoo PS EDI Framework',
-    'version': '1.0',
+    'version': '2.0',
     'license': 'Other proprietary',
-    'summary': '',
+    'summary': 'Gateway between odoo and third party components',
     'category': 'Tools',
     'description': """
 Odoo PS EDI Framework
 =====================
+
+Gateway between odoo and third party components
     """,
     'depends': ['mail'],
     'data': [

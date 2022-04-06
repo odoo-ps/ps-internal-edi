@@ -73,7 +73,7 @@ It allows configuring :
       <field name="interval_number">1</field>
       <field name="interval_type">days</field>
       <field name="synchronization_content_type">xml</field>
-      <field name="synchronization_creation">one</field> <!-- 1 XML file per product  -->
+      <field name="synchronization_creation">1</field> <!-- 1 product by synchronization and thus one product by XML file  -->
       <field name="connection_id" ref="send_products_to_xx_software"/>
       <field name="record_filter_id" ref="send_products_to_xx_software_filter"/>
       <field name="active" eval="False" /> <!-- archived by default to avoid automatic cron execution during the dev !-->
@@ -121,6 +121,7 @@ class SendProducts(models.Model):
       <field name="interval_number">1</field>
       <field name="interval_type">days</field>
       <field name="synchronization_content_type">xml</field>
+      <field name="synchronization_creation">1</field> <!-- 1 file by synchronization  -->
       <field name="connection_id" ref="get_products_from_xx_software_connection"/>
       <field name="active" eval="False" /> <!-- archived by default to avoid automatic cron execution during the dev !-->
   </record>
@@ -135,11 +136,15 @@ class GetProducts(models.Model):
         selection_add=[('get_products_from_xx_software', 'Get Products from xx software')],
         ondelete={'get_products_from_xx_software': 'cascade'})
 
-    def _process_content(self, filename, content):
+    def _process_content(self, data):
         if self.type != 'get_products_from_xx_software':
-            return super()._process_content(filename, content)
+            return super()._process_content(data)
 
-        # Process the content
+        # since synchronization_creation = 1, data will be a list with one dictionnary (file)
+        for d in data:
+          filename = d.get('filename')
+          content = d.get('content')
+          # Process the content
         
         return 'done'
 ```
@@ -169,58 +174,112 @@ See these modules for more information.
 The data model Integration provides a bunch of methods that can be redefined.  
 Most methods have a default behaviour, and just 2 **must** be redefined :
 
-#### For an "out" flow : __process_record_out(self, records):
+#### For an "out" flow : `_get_content_(self, records)`:
 
 This method takes some records as input (basically the ones from the ir.filter defined), and the purpose is to convert
-the records to something else, like a JSON or XML data.  
+the records to something else, like a JSON or XML data.
+
 A string with the converted data can be returned by the method. 
 
-#### For an "in" flow : _process_content(self, filename, content):
+#### For an "in" flow : `_process_content(self, data)`:
 
-This method takes a filename & a content as input.  
+This method takes a list of dictionnary as input (basically the ones returned by the _fetch_content method of the connection,
+should always contains the key filename and content).
+
 The content is for example a string representing a JSON or XML data.  
+
 The purpose is to convert this data, and impact the database (by create, update,...)
 
-*new since version 1.0 :*
-- **In Process Type :**  
-  A field "In Process Type" allows choosing to get directly the content of the file, or to let it empty, so the file has 
-  to be opened inside the method (thanks to the 1st parameter).  
-  Why ?  
-  Because when I have huge files I prefer to choose a different way to process the file, with a stream parser
-  for example.
-- **Tar files :**  
-  Integrations are now able to uncompress tar files & pass each file of the tar into the method _process_content()
-
 #### Other methods can be redefined & usage
-- **_get_synchronization_name_out :**  
+- **`_get_synchronization_name_out` :**  
   set a specific name for a file to send
-- **_postprocess :**  
-  make something special at the end of an "out" process (change a status of a processed record,...)
-- **_clean :**  
+- **`_postprocess` :**  
+  make something special at the end of an "out" process (change a status of processed records,...)
+- **`_clean` :**  
   make something special at the end of an "in" process
+- **`_handle_error` :**
+  make something special at the end of an "in/out" process in case an error occured during the synchronization
+  (change a status of processed records,...)
+
   
 #### Other useful options
 
 - **type of an integration :**  
+
   The type field is required, and corresponds to a unique name for an integration.
   As many integrations can define or redefine methods with a same name, it allows to be sure that I execute a method
   only for a specific type. So a check on the type is a required security when I define a method on an integration.
   For example : 
   ```
-  def _process_content(self, filename, content):
+  def _process_content(self, data):
         if self.type != 'get_products_from_xx_software':
-            return super()._process_content(filename, content)
+            return super()._process_content(data)
         # then I can write my code
   ```
-- **synchronization_creation  (one/multi) for "out" flows :**  
-  Allows to create one file per record, or one file with all records.  
-  So if I have 10 products to send, "one" will allow to send 10 files with 1 product,
-  and "multi" will allow to send 1 file with 10 products.
-- **method  _process_out_realtime() for "out" flows :**  
-  By default the processed is started by a cron task. But sometimes I want to deliver something immediately
-  (through an action called from a button for ex.).  
-  In this case my action can call the method _process_out_realtime(), which will also call the same method 
-  _get_content(), but also take care of the SQL transaction.
+- **synchronization_creation field :**
+
+  Since version 2.0, this field is now used for "in/out" flows (not only "out" flows).
+
+  It allows to specify how many "data" you want to process by synchronization.
+
+  Field values:
+  - 1: one piece of data by synchronization (default value)
+  - 0: all data into one synchronization
+  - n: n piece of data by synchronization
+
+  Data type:
+  - For "in" flow:
+
+    "data" is a list of dictionnary.
+
+    The field synchronization_creation commands the number of dictionnary in the list.
+
+    In case of ftp connection, it allows to process multiple files per synchronization, or one file per synchronization,... 
+
+    For example if I have 20 files to process via FTP:
+
+      - 1: will process one file per synchronization and thus it will generate 20 synchronizations
+      - 0: will process all files into one synchronization and thus it will generate 1 synchronization
+      - 8: will process at most 8 files per synchronization.
+           it will generate 3 synchronizations
+              - first synchronization: 8 files
+              - second synchronization: 8 files
+              - third synchronization: 4 files
+
+  - For "out" flow:
+
+    "data" is a recordset.
+
+    The field synchronization_creation commands the number of records in the recordset.
+
+    In case of ftp connection, it allows to create one file per record, one file with all records,...
+
+    For example if I have 20 products to send via FTP :
+
+      - 1: will process one product per synchronization and thus generate 20 synchronizations and 20 files
+      - 0: will process all products into one synchronization and thus generate 1 synchronization and 1 file
+      - 8: will process at most 8 products per synchronization.
+           it will generate 3 synchronizations and 3 files
+              - first synchronization: 8 products
+              - second synchronization: 8 products
+              - third synchronization: 4 products
+
+- **method  `_process_realtime()` :**
+
+  Since version 2.0, this method is now used for "in/out" flows (not only "out" flows).
+
+  By default, the process is started by a cron task. But sometimes I want to deliver something immediately
+  (through an action called from a button for ex.).
+
+  In this case my action can call the method `_process_realtime()`, which will also call the same edi methods.
+
+  If no data is provided, the integration will automatically fetch the data to synchronize by itself.
+
+  If data are provided, the integration will only process the given data.
+
+  The data you have to provide depends on the integration flow type:
+    - "in" flow: list of dict
+    - "out" flow: recordset
 
 #### Want to go deeper ?
 

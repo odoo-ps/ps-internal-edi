@@ -127,89 +127,52 @@
     </field>
 </record>
 
-<!-- <record id="synchronization_kanban_view" model="ir.ui.view">
+<record id="synchronization_kanban_view" model="ir.ui.view">
     <field name="name">edi.syncrhonization.kanban.view</field>
     <field name="model">edi.synchronization</field>
     <field name="arch" type="xml">
-        <kanban string="Synchronizations" edit="0" create="0" delete="0">
+        <kanban string="Synchronizations" create="0" delete="0">
             <field name="name"/>
+            <field name="name_short"/>
+            <field name="color"/>
             <field name="state"/>
-            <field name="res_id"/>
+            <field name="filename_short"/>
             <field name="synchronization_date"/>
             <templates>
                 <t t-name="kanban-box">
-                    <div class="oe_kanban_card oe_kanban_global_click">
-                        <div class="o_dropdown_kanban dropdown" groups="base.group_user">
-                            <a class="dropdown-toggle btn" data-toggle="dropdown" href="#" >
-                                <span class="fa fa-bars fa-lg">#</span>
-                            </a>
-                            <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
-                                <li>
-                                    <a type="object" name="open_integration">Open integration</a>
-                                </li>
-                                <li >
-                                    <a type="object" name="open_resource_records">Open record(s)</a>
-                                </li>
-                                <t t-if="widget.editable">
-                                    <li groups="base.group_system">
-                                        <a type="edit">Edit Task</a>
-                                    </li>
-                                </t>
-                                <t t-if="widget.deletable">
-                                    <li groups="base.group_system">
-                                        <a type="object" data="action_cancel">Cancel</a>
-                                    </li>
-                                </t>
-                            </ul>
-                        </div>
-                        <div class="row">
-                            <h4 class="text-center">
-                                <strong>
-                                    <field name="name"/>
-                                    <t t-if="record.state.raw_value == 'fail'">
-                                        <i class="fa fa-exclamation-circle" aria-label="Failed"/>
-                                    </t>
-                                </strong>
-                            </h4>
-                            <div t-if="record.filename.raw_value" class="text-center">
-                                <i><field name="filename"/></i>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-xs-6">
-                                <div class="col-xs-2">
-                                    <i class="fa fa-calendar-plus-o" aria-label="Synchronization date"/>
-                                </div>
-                                <div class="col-xs-8">
-                                    <field name="create_date"/>
+                    <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon oe_kanban_global_click">
+                        <div class="o_project_kanban_main">
+                            <div class="o_dropdown_kanban dropdown" groups="base.group_user">
+                                <a role="button" class="dropdown-toggle o-no-caret btn" data-toggle="dropdown" href="#"
+                                    aria-label="Dropdown menu" title="Dropdown menu" >
+                                    <span class="fa fa-ellipsis-v"/>
+                                </a>
+                                <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
+                                    <a role="menuitem" type="object" name="open_integration" class="dropdown-item">Open Integration</a>
                                 </div>
                             </div>
-                            <t t-if="record.synchronization_date.raw_value">
-                                <div class="col-xs-6">
-                                    <div class="col-xs-2">
-                                        <i class="fa fa-calendar-check-o" aria-label="Synchronization date"/>
-                                    </div>
-                                    <div class="col-xs-8">
-                                        <field name="synchronization_date"/>
+                            <div class="o_kanban_card_content">
+                                <div class="o_kanban_primary_left">
+                                    <div class="o_primary">
+                                        <h5>
+                                            <t t-esc="record.name_short.value"/>
+                                        </h5>
+                                        <div t-if="record.filename_short.raw_value">
+                                            <i><field name="filename_short"/></i>
+                                        </div>
                                     </div>
                                 </div>
-                            </t>
-                        </div>
-                        <div class="row">
-                            <div class="col-xs-6">
-                                <div class="col-xs-2">
-                                    <i class="fa fa-database"/>
+                                <div>
+                                    <strong>Status: <t t-esc="record.state.value"/></strong>
                                 </div>
-                                <div class="col-xs-8">
+                                <div>
+                                    <span><i class="fa fa-calendar-plus-o" aria-label="Synchronization Date"/> <field name="create_date"/></span>
                                 </div>
-
-                            </div>
-                            <div class="col-xs-6">
-                                <div class="col-xs-2">
-                                    <i class="fa fa-file-o"/>
+                                <div>
+                                    <span><i class="fa fa-calendar-check-o" aria-label="Synchronization Date"/> <field name="synchronization_date"/></span>
                                 </div>
-                                <div class="col-xs-8">
-                                    <field name="content_type"/>
+                                <div>
+                                    <span><i class="fa fa-file-o" aria-label="Content Type"/> <field name="content_type"/></span>
                                 </div>
                             </div>
                         </div>
@@ -218,7 +181,7 @@
             </templates>
         </kanban>
     </field>
-</record> -->
+</record>
 
 <record id="synchronization_search_view" model="ir.ui.view">
     <field name="name">edi.syncrhonization.search.view</field>
@@ -253,7 +216,7 @@
 <record id="synchronizations_act_window" model="ir.actions.act_window">
     <field name="name">Synchronizations</field>
     <field name="res_model">edi.synchronization</field>
-    <field name="view_mode">tree,form</field>
+    <field name="view_mode">tree,kanban,form</field>
     <field name="search_view_id" ref="edi_base.synchronization_search_view"/>
     <field name="help" type="html">
         <p class="oe_view_nocontent">Here you will find the files created to be synchronized with the remote servers configured on your integrations.</p>

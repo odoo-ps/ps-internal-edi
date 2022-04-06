@@ -8,6 +8,9 @@ from odoo.exceptions import UserError
 
 
 class Connection(models.Model):
+    """
+        Object used by the integration performing the gateway between odoo and the third party component
+    """
 
     _name = 'edi.connection'
     _description = 'EDI Connection'
@@ -24,31 +27,51 @@ class Connection(models.Model):
 
     def _send_synchronization(self, filename, content, *args, **kwargs):
         """
+            Send the content to the third party component
+
+            :param filename: str
+            :param content: str
         """
         raise NotImplementedError("No send_synchronization method implemented for this type of connection")
 
     def _fetch_synchronizations(self, *args, **kwargs):
         """
-            Return list of dict or a dict
-            the dict should be {
-                'filename': FILENAME (str),
-                'content': str or dict: will be handle by in edi.integration._process_data
-            }
+            :return: list of dict
+                the dict should be {
+                    'filename': FILENAME (str),
+                    'content': str or dict: will be handle by in edi.integration._process_content & will be write in edi.synchronization.content field
+                }
         """
         raise NotImplementedError("No fetch_synchronizations method implemented for this type of connection")
 
-    def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
+    def _clean_synchronization_in(self, data, status, *args, **kwargs):
         """
-            Status: done if everything went well
-                    error if there is something that went wrong
+            :param data: dict (returned from _fetch_synchronizations)
+            :param status: str
+                - done if everything went well
+                - error if there is something that went wrong
+
+            Default behavior: Do Nothing
+        """
+        return
+
+    def _clean_synchronization_out(self, filename, status, *args, **kwargs):
+        """
+            :param filename: str
+            :param status: str
+                - done if everything went well
+                - error if there is something that went wrong
+
             Default behavior: Do Nothing
         """
         return
 
     def _get_default_configuration(self):
         """
-            Return a dictionnary 
-            with the template configuration for this type of connection
+            Return a dictionnary with the template configuration for
+            this type of connection
+
+            :return: dict
         """
         return {}
 
@@ -64,6 +87,9 @@ class Connection(models.Model):
             self.configuration = json.dumps(self._get_default_configuration(), indent=4, sort_keys=True)
 
     def _read_configuration(self):
+        """
+            :return: dict
+        """
         self.ensure_one()
         return json.loads(self.configuration)
 

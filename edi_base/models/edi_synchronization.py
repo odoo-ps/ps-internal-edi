@@ -5,6 +5,9 @@ from odoo import fields, models
 
 
 class SynchronizationError(models.Model):
+    """
+        Object added on the synchronization to alert that an error occurred during the synchronization processing
+    """
 
     _name = 'edi.synchronization.error'
     _description = 'Synchronization Error'
@@ -38,11 +41,14 @@ class Synchronization(models.Model):
     _order = 'create_date desc'
 
     name = fields.Char(readonly=True, required=True)
+    name_short = fields.Char(compute='_get_name_short')
     filename = fields.Char(readonly=True)
-    state = fields.Selection([
-            ('new', 'New'), 
-            ('fail', 'Fail'), 
-            ('done', 'Done'), 
+    filename_short = fields.Char(compute='_get_filename_short')
+    state = fields.Selection(
+        [
+            ('new', 'New'),
+            ('fail', 'Fail'),
+            ('done', 'Done'),
             ('cancelled', 'Cancelled')
         ], 
         default="new",
@@ -62,6 +68,33 @@ class Synchronization(models.Model):
     content = fields.Text(readonly=True)
     error_ids = fields.One2many('edi.synchronization.error', 'synchronization_id', string='synchronization_id')
     user_id = fields.Many2one('res.users', string='Trigger User', help="User that trigger the synchronization or call the API")
+    color = fields.Integer(compute='_compute_color')
+
+    def _compute_color(self):
+        mapping = {
+            'new': 4,
+            'fail': 1,
+            'done': 10,
+            'cancelled': 0,
+        }
+        for rec in self:
+            rec.color = mapping.get(rec.state, 0)
+
+    def _get_name_short(self):
+        max_size = 80
+        for rec in self:
+            if not rec.name or len(rec.name) < max_size:
+                rec.name_short = rec.name
+            else:
+                rec.name_short = "%s..." % rec.name[:max_size]
+
+    def _get_filename_short(self):
+        max_size = 150
+        for rec in self:
+            if not rec.filename or len(rec.filename) < max_size:
+                rec.filename_short = rec.filename
+            else:
+                rec.filename_short = "%s..." % rec.filename[:max_size]
 
     def open_integration(self):
         self.ensure_one()
@@ -74,21 +107,16 @@ class Synchronization(models.Model):
             'view_mode': 'form'
         }
 
-    def open_resource_records(self):
-        self.ensure_one()
-
-        return {
-            'type': 'ir.actions.act_window',
-            'name': 'Open records',
-            'res_model': self.res_model,
-            'res_id': self.res_id,
-            'view_mode': 'form'
-        }
-
     ##################
     #      API       #
     ##################
     def _report_error(self, activity, exception=None, message=None):
+        """ Add an error on the synchronization
+
+            :param activity: str
+            :param exception: exception
+            :param message: str
+        """
         description = "Unkown Error"
         if exception:
             tb = traceback.format_exc()
@@ -106,6 +134,9 @@ class Synchronization(models.Model):
         self.flush(fnames=['state', 'error_ids', 'content_type'], records=self)
 
     def _write_content(self, content):
+        """
+            :param content: str
+        """
         self.write({'content': content})
         self.flush(fnames=['content'], records=self)
 
