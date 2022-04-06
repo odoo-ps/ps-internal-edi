@@ -27,12 +27,6 @@ class ResPartner(models.Model):
 
         return self.create([data]).id
 
-    def sync_real_time(self, raise_error=False):
-        self.write({'country_id': self.env.ref("base.be").id})
-        edi = self.env.ref('test_edi_base.export_partner_filter_integration')
-        edi._process_out_realtime(self, raise_error=raise_error)
-
-
 class TestIntegration(models.Model):
 
     _inherit = 'edi.integration'
@@ -49,7 +43,7 @@ class TestIntegration(models.Model):
 
     def _get_content(self, records):
         if self.type != 'partner_folder_out':
-            return super()._get_record_to_send()
+            return super()._get_content(records)
 
         if len(records) == 1 and 'error' in records.name:
             self._report_error("Export Partner", message="Cannot export the partner")
@@ -60,7 +54,7 @@ class TestIntegration(models.Model):
             time.sleep(30)
 
         if len(records) == 1 and 'raise' in records.name:
-            #Generate an error that break an sql constraint
+            # Generate an error that break an sql constraint
             self.env['res.partner'].create({'name': False})
 
         content = StringIO()
@@ -73,33 +67,36 @@ class TestIntegration(models.Model):
         writer.writerows(rows)
         return content.getvalue()
 
-    def _process_content(self, filename, content):
+    def _process_content(self, data):
         if self.type != 'partner_folder_in':
-            return super()._get_record_to_send()
+            return super()._process_content(data)
 
-        #Code to test when something go wrong
-        if content == 'raise':
-            self.env['res.partner'].create({'name': False})
+        for d in data:
 
-        if content.strip() == 'time':
-            import time
-            time.sleep(30)
+            content = d.get('content')
+            # Code to test when something go wrong
+            if content == 'raise':
+                self.env['res.partner'].create({'name': False})
 
-        csv_file = StringIO(content)
-        reader = csv.reader(csv_file, delimiter=',')
-        header = reader.__next__()
+            if content.strip() == 'time':
+                import time
+                time.sleep(30)
 
-        data = []
-        for line in reader:
-            if not line[0]:
-                self._report_error(
-                    "Import Partner",
-                    message=f"No value for field name, name is required \n {line}"
-                )
-                continue
+            csv_file = StringIO(content)
+            reader = csv.reader(csv_file, delimiter=',')
+            header = reader.__next__()
 
-            data.append(line)
+            vals_list = []
+            for line in reader:
+                if not line[0]:
+                    self._report_error(
+                        "Import Partner",
+                        message=f"No value for field name, name is required \n {line}"
+                    )
+                    continue
 
-        self.env['res.partner'].load(header, data)
+                vals_list.append(line)
+
+            self.env['res.partner'].load(header, vals_list)
 
         return "done"

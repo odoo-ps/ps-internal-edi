@@ -138,15 +138,35 @@ class TestEDICommon(TransactionCase):
     def _clean_synchronizations(self):
 
         with registry(self.env.cr.dbname).cursor() as cr:
-            api.Environment(
+            env = api.Environment(
                 cr,
                 self.env.user.id,
                 self.env.context
-            )['edi.synchronization'].search([]).unlink()
+            )
+            imds = env['ir.model.data'].search([
+                ('model', '=', 'edi.integration')
+            ])
+            integrations = env['edi.integration'].with_context(active_test=False).search([
+                ('id', 'not in', imds.mapped('res_id'))
+            ])
+            synchronizations = env['edi.synchronization'].with_context(active_test=False).search([('integration_id', 'in', integrations.ids)])
+            synchronizations.unlink()
 
     def _reset_integrations(self):
-        self.Integration.with_context(active_test=False).search([]).write({
-            'last_sync_status': 'No Sync Yet',
-            'last_success_date': False,
-            'last_failure_date': False
-        })
+
+        with registry(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(
+                cr,
+                self.env.user.id,
+                self.env.context
+            )
+            imds = env['ir.model.data'].search([
+                ('model', '=', 'edi.integration')
+            ])
+            env['edi.integration'].with_context(active_test=False).search([
+                ('id', 'not in', imds.mapped('res_id'))
+            ]).write({
+                'last_sync_status': 'No Sync Yet',
+                'last_success_date': False,
+                'last_failure_date': False
+            })

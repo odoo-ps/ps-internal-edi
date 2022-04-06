@@ -14,10 +14,10 @@ class ConnectionFolder(models.Model):
             return super()._get_default_configuration()
 
         return {
-            'in_folder' : '<PATH HERE>',
+            'in_folder': '<PATH HERE>',
             'in_folder_done': '<PATH HERE>',
             'in_folder_error': '<PATH HERE>',
-            'out_folder' : '<PATH HERE>',
+            'out_folder': '<PATH HERE>',
         }
 
     def test(self):
@@ -62,10 +62,22 @@ class ConnectionFolder(models.Model):
                     })
         return data
 
+    def _clean_synchronization_in(self, data, status, *args, **kwargs):
+        if self.type != 'folder':
+            return super()._clean_synchronization_in(data, status, *args, **kwargs)
+
+        return self._clean_synchronization(data.get('filename'), status, 'in', *args, **kwargs)
+
+    def _clean_synchronization_out(self, filename, status, *args, **kwargs):
+        if self.type != 'folder':
+            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
+
+        return self._clean_synchronization(filename, status, 'out', *args, **kwargs)
+
     def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
         self.ensure_one()
         if not self.type == 'folder':
-            return super()._clean_synchronization()
+            return super()._clean_synchronization(filename, status, flow_type, *args, **kwargs)
 
         config = self._read_configuration()
         if flow_type == 'out':
