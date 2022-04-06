@@ -3,7 +3,10 @@
 import pysftp
 import logging
 import os
+
 from odoo import api, fields, models
+
+
 _logger = logging.getLogger(__name__)
 
 
@@ -31,7 +34,7 @@ class SFTPConnection(models.Model):
         if not self.type == 'sftp':
             return super()._send_synchronization(filename, content, *args, **kwargs)
 
-        return self._ftp_send_file(filename, content, args, kwargs)
+        return self._ftp_send_file(filename, content, *args, **kwargs)
 
     def _fetch_synchronizations(self, *args, **kwargs):
         """ Override to download the file from the FTP server """
@@ -41,12 +44,18 @@ class SFTPConnection(models.Model):
 
         return self._ftp_fetch_files(*args, **kwargs)
 
-    def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
-        self.ensure_one()
+    def _clean_synchronization_in(self, data, status, *args, **kwargs):
         if not self.type == 'sftp':
-            return super()._clean_synchronization(filename, status, flow_type, kwargs)
+            return super()._clean_synchronization_in(data, status, *args, **kwargs)
 
-        self._clean(filename, status, flow_type, *args, **kwargs)
+        self._clean_local_file(data, *args, **kwargs)
+        self._clean(data.get('filename'), status, 'in', *args, **kwargs)
+
+    def _clean_synchronization_out(self, filename, status, *args, **kwargs):
+        if not self.type == 'sftp':
+            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
+
+        self._clean(filename, status, 'out', *args, **kwargs)
 
     def _get_default_configuration(self):
         """ Provide a configuration template for this type of connection """
