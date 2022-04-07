@@ -52,7 +52,7 @@
     <field name="name">edi.synchronization.form</field>
     <field name="model">edi.synchronization</field>
     <field name="arch" type="xml">
-        <form string="Synchronization" edit="1" create="1" delete="0">
+        <form string="Synchronization" edit="0" create="0" delete="0">
             <field name="integration_id" invisible="1"/>
             <field name="res_id" invisible="1"/>
             <header>
@@ -115,7 +115,7 @@
     <field name="name">edi.synchronization.tree</field>
     <field name="model">edi.synchronization</field>
     <field name="arch" type="xml">
-        <tree string="Synchronizations" edit="1" create="1" delete="0"
+        <tree string="Synchronizations" edit="0" create="0" delete="0"
               decoration-success="state=='done'"
               decoration-info="state=='new'"
               decoration-muted="state=='cancel'"

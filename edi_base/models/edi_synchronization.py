@@ -17,10 +17,10 @@ class SynchronizationError(models.Model):
     synchronization_id = fields.Many2one(
         comodel_name='edi.synchronization',
         ondelete='cascade',
-        string='Synchronization'
+        readonly=True
     )
-    activity = fields.Char()
-    description = fields.Text()
+    activity = fields.Char(readonly=True)
+    description = fields.Text(readonly=True)
     description_short = fields.Text(compute='_get_short_desc')
     company_id = fields.Many2one(related='synchronization_id.company_id', store=True)
 
@@ -51,7 +51,7 @@ class Synchronization(models.Model):
             ('fail', 'Fail'),
             ('done', 'Done'),
             ('cancelled', 'Cancelled')
-        ], 
+        ],
         default="new",
         string='Status'
     )
@@ -128,7 +128,7 @@ class Synchronization(models.Model):
 
         self.write({
             'state': 'fail',
-            'error_ids' : [(0, 0, {
+            'error_ids': [(0, 0, {
                 'activity': activity,
                 'description': description,
             })]

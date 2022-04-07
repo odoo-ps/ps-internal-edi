@@ -64,7 +64,7 @@ class Integration(models.Model):
                                               required=True,
                                               default=1)
     connection_id = fields.Many2one('edi.connection', required=True, string='Connection')
-    type = fields.Selection(selection=[('multi', 'Call Sub Integration'),('api', 'RPC Api')],
+    type = fields.Selection(selection=[('multi', 'Call Sub Integration'), ('api', 'RPC Api')],
                             required=True,
                             string='Type')  # Add selection for your integration
     parameter = fields.Text(string="Parameter")
@@ -75,14 +75,14 @@ class Integration(models.Model):
         ('xml', 'XML'),
         ('json', 'JSON'),
         ('pdf', 'PDF')
-    ], default='text', required=True, string='Content type')
+    ], default='text', required=True, string='Content Type')
 
     # Cron inheritance
     cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron Job')
 
     # Multiple Integration at once
     has_sub_integration = fields.Boolean(string="Has sub Integration", default=False,
-                                         help="if you need to run many integration in a specific order in the same CRON execution")
+                                         help="If you need to run many integration in a specific order in the same CRON execution")
     sequence = fields.Integer()
     sub_integration_ids = fields.Many2many('edi.integration',
                                            'edi_integration_sub_integration_rel',
@@ -96,9 +96,9 @@ class Integration(models.Model):
     synchronization_ids = fields.One2many('edi.synchronization', 'integration_id')
     error_ids = fields.One2many('edi.synchronization.error', 'integration_id')
     last_execution_date = fields.Datetime(string="Last Trigger Date", readonly=True, help='Last time the integration has been triggered')
-    last_success_date = fields.Datetime()
-    last_failure_date = fields.Datetime()
-    last_sync_status = fields.Char(default='No Sync Yet')
+    last_success_date = fields.Datetime(readonly=True)
+    last_failure_date = fields.Datetime(readonly=True)
+    last_sync_status = fields.Char(default='No Sync Yet', readonly=True)
     color = fields.Integer()
 
     @api.model
