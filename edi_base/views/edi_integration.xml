@@ -16,7 +16,7 @@
                         name="process_integration"
                         string="Synchronize"
                         class="oe_highlight"
-                        context="{'raise_error': True}"
+                        context="{'edi_raise_error': True}"
                     />
                 </header>
                 <sheet>
@@ -140,7 +140,7 @@
                                     <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
                                         <a role="menuitem" type="object" name="open_synchronizations" class="dropdown-item">Open Synchronizations</a>
                                         <a role="menuitem" type="object" name="test_connection" class="dropdown-item" attrs="{'invisible': [('has_sub_integration', '=', True)]}">Test Connection</a>
-                                        <a role="menuitem" type="object" name="process_integration" class="dropdown-item" context="{'raise_error': True}">Synchronize</a>
+                                        <a role="menuitem" type="object" name="process_integration" class="dropdown-item" context="{'edi_raise_error': True}">Synchronize</a>
                                         <a role="menuitem" type="object" name="toggle_active" class="dropdown-item">
                                             <t t-if="!record.active.raw_value">Unarchive</t>
                                             <t t-if="record.active.raw_value">Archive</t>

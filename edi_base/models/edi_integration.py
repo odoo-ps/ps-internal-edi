@@ -397,14 +397,15 @@ class Integration(models.Model):
     @api.model
     def _process(self, integration_id):
         """
-            Entry point for cron, don't raise error (no context key raise_error)
+            Entry point for cron, don't raise error (no context key edi_raise_error)
         """
         return self.browse(integration_id).process_integration()
 
     def process_integration(self):
         """
-            Default context key raise_error=True if call from button for testing purpose
+            Default context key edi_raise_error=True if call from button for testing purpose
         """
+        raise_error = self.env.context.get('edi_raise_error', False)
         for integration in self:
 
             # Force to execute with the scheduled user (if we execute it from the interface)
@@ -416,16 +417,17 @@ class Integration(models.Model):
                 if integration.integration_flow == 'out_real':
                     _logger.warning(_('Do not call process_integration for real_time integration, call _process_realtime'))
                 else:
-                    integration._process_in_out()
+                    integration._process_in_out(raise_error=raise_error)
         return True
 
-    def _process_in_out(self, data=None):
+    def _process_in_out(self, data=None, raise_error=False):
         """
             :param data:
                 - in: list of dict
                 - out: recordset
+            :param raise_error: boolean, set True to get the traceback and
+                                stop the iteration in case of error during the processing
 
-            Add raise_error=True as context key if you want to get the traceback and stop the iteration
             Add no_exception_log=True as context key if you don't want to get error log at the end of the integration
         """
         self.ensure_one()
@@ -455,7 +457,7 @@ class Integration(models.Model):
         try:
             # processing
             self.env.activity = "Process"
-            exceptions.extend(self._process_data(data))
+            exceptions.extend(self._process_data(data=data, raise_error=raise_error))
         except Exception as e:
             self._create_error_sync(e)
             self._safe_commit()
@@ -473,24 +475,28 @@ class Integration(models.Model):
                 for e in exceptions:
                     _logger.exception(str(e))
 
-            if exceptions and self.env.context.get('raise_error'):
+            if exceptions and raise_error:
                 raise UserError('\n'.join(map(str, exceptions)))
 
-    def _process_data(self, data=None):
+    def _process_data(self, data=None, raise_error=False):
         """ Get and Process data (in/out)
 
             :param data:
                 - in: list of dict
                 - out: recordset
+                if None:
+                    data will be automatically fetched
+            :param raise_error: boolean, set True to get the traceback and
+                                stop the iteration in case of error during the processing
             :return: list of exceptions
         """
         self.ensure_one()
 
         # get data to synchronize
-        data = self._get_data(data)
+        data = self._get_data(data=data)
 
         # process all the data to synchronize
-        return self._process_synchronizations(data)
+        return self._process_synchronizations(data=data, raise_error=raise_error)
 
     def _get_data(self, data=None):
         """ Get the data to synchronize
@@ -522,26 +528,26 @@ class Integration(models.Model):
             _logger.info('No data found to synchronize for %s [%s]', self.name, self.id)
         return data
 
-    def _process_synchronizations(self, data):
+    def _process_synchronizations(self, data, raise_error=False):
         """ Process all synchronizations
             Each piece of data inside data will be part of its own synchronization
 
             :param data:
                 - in: list of dict
                 - out: recordset
+            :param raise_error: boolean, set True to get the traceback and
+                                stop the iteration in case of error during the processing
             :return: list of exceptions
-
-            If raise_error=True in the context, then stop the iterations as soon as an error occurs
         """
         exceptions = []
         data_by_sync = self._prepare_data_for_sync(data)
         for d in data_by_sync:
             try:
-                self._process_synchronization(d)
+                self._process_synchronization(d, raise_error=raise_error)
             except Exception as e:
                 exceptions.append(e)
 
-                if self.env.context.get('raise_error'):
+                if raise_error:
                     # stop the iterations
                     return exceptions
         return exceptions
@@ -571,12 +577,14 @@ class Integration(models.Model):
         # chunk type is preserved (list -> list of lists, recordset -> list of recordsets)
         return _chunks(data, self.synchronization_creation)
 
-    def _process_synchronization(self, data):
+    def _process_synchronization(self, data, raise_error=False):
         """ Process one synchronization (the data will be part of one synchronization)
 
             :param data:
                 - in: list of dict
                 - out: recordset
+            :param raise_error: boolean, set True to raise the error if one is raised
+                                during the processing
         """
         self.ensure_one()
 
@@ -598,7 +606,7 @@ class Integration(models.Model):
                 self.env.sync._report_error(self.env.activity, e2)
                 raise ProcessIntegrationException('Fail to handle the exception (%s) due to %s' % (str(e), str(e2)))
 
-            if self.env.context.get('raise_error'):
+            if raise_error:
                 raise
         else:
             self.env.sync._done()
@@ -643,7 +651,7 @@ class Integration(models.Model):
     #####################################################################
     #===================================================================#
 
-    def _process_realtime(self, data=None):
+    def _process_realtime(self, data=None, raise_error=False):
         """
             Same as process but we assume the trigger does not come from a cron
             but any method in odoo and that method is already aware of the data
@@ -665,9 +673,6 @@ class Integration(models.Model):
             So that the processing which is executed on another cursor is aware of your
             current cursor changes.
 
-            Set raise_error=True in the context if you don't want to have the processing
-            to fail silently.
-
             Set autocommit=False in the context if you don't want the processing is
             executed on a different cursor (in that case, no commit is performed)
 
@@ -679,6 +684,8 @@ class Integration(models.Model):
                 - out: recordset
                 if None: will fetch data to synchronize
                 if not None: process the given data
+            :param raise_error: boolean, set True if you don't want to have the processing
+                                to fail silently
         """
         self.ensure_one()
 
@@ -692,7 +699,7 @@ class Integration(models.Model):
             data.env.cr.postrollback.data.setdefault('edi.integration.postrollback.integration_ids', []).append(self.id)
 
         self.flush()
-        self._process_in_out(data=data)
+        self._process_in_out(data=data, raise_error=raise_error)
 
     def _post_rollback_handler(self):
         """ Method called after the rollback on the data cursor (only for realtime).

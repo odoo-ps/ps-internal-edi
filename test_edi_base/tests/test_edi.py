@@ -659,7 +659,7 @@ class TestEdiOUTCases(TestEDICommon):
         self.new_env.cr.commit()
 
         partners.write({'country_id': self.env.ref("base.be").id})
-        self.edi.with_context(autocommit=True)._process_realtime(partners)
+        self.edi.with_context(autocommit=True)._process_realtime(data=partners)
 
         # Check value has been properly written by business Code
         self.assertEqual(partners.mapped('country_id').id, self.country.id)
@@ -701,7 +701,7 @@ class TestEdiOUTCases(TestEDICommon):
         self.new_env.cr.commit()
 
         partner.write({'country_id': self.env.ref("base.be").id})
-        self.edi.with_context(autocommit=True)._process_realtime(partner)
+        self.edi.with_context(autocommit=True)._process_realtime(data=partner)
 
         self.assertEqual(partner.mapped('country_id').id, self.country.id)
 
@@ -810,7 +810,7 @@ class TestEdiOUTCases(TestEDICommon):
                     partner.name = partner.name + ' UPDATED'
 
                 integration = new_env['edi.integration'].browse(self.edi_one.id)
-                integration.with_context(autocommit=True)._process_realtime(partners)
+                integration.with_context(autocommit=True)._process_realtime(data=partners)
 
                 # simulate an error after the realtime
                 raise ValueError("Error after the real time integration")
@@ -878,7 +878,7 @@ class TestEdiOUTCases(TestEDICommon):
                     partner.name = partner.name + ' UPDATED'
 
                 integration = new_env['edi.integration'].browse(self.edi_one.id)
-                integration.with_context(autocommit=True)._process_realtime(partners)
+                integration.with_context(autocommit=True)._process_realtime(data=partners)
 
                 new_env.cr.commit()  # data are committed
 
