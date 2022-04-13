@@ -76,6 +76,8 @@ class Integration(models.Model):
         ('json', 'JSON'),
         ('pdf', 'PDF')
     ], default='text', required=True, string='Content Type')
+    write_content_on_sync = fields.Boolean(string="Write Content On Synchronizations", default=True,
+                                           help="Allows you to decide if the content should be written on the synchronizations.")
 
     # Cron inheritance
     cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron Job')
@@ -773,7 +775,8 @@ class Integration(models.Model):
         with self.env.cr.savepoint():
             self.env.activity = "Get Content"
             content = self._get_content(records)
-            self.env.sync._write_content(content)
+            if self.write_content_on_sync:
+                self.env.sync._write_content(content)
 
             self.env.activity = "Send Synchro"
             res = self._send_content(content, records)
@@ -887,13 +890,17 @@ class Integration(models.Model):
             :param data: list of dict
             :return: edi.synchronization
         """
-        return self.env['edi.synchronization'].create({
+        vals = {
             'integration_id': self.id,
             'name': self._get_synchronization_name_in(data),
             'filename': ' '.join([d.get('filename') for d in data]),
             'synchronization_date': fields.Datetime.now(),
-            'content': '\n\n'.join([d.get('content', '') for d in data]),
-        })
+        }
+
+        if self.write_content_on_sync:
+            vals['content'] = '\n\n'.join([d.get('content', '') for d in data])
+
+        return self.env['edi.synchronization'].create(vals)
 
     def _process_in(self, data):
         """ Process the given data for in flow (with the current synchronization)

@@ -15,3 +15,7 @@ def migrate(cr, version):
         dates = [integration.last_success_date, integration.last_failure_date]
         valid_dates = [d for d in dates if d]
         integration.last_execution_date = max(valid_dates) if valid_dates else False
+
+    # fill-in default value for edi.integration.write_content_on_sync
+    logger.info('Set-Up default value for new field edi.integration.write_content_on_sync')
+    integrations.write_content_on_sync = True
