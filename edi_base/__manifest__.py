@@ -18,5 +18,5 @@ Odoo PS EDI Framework
         'data/connection.xml',
     ],
     'auto_install': False,
-    'installable': True,
+    'installable': False,
 }
