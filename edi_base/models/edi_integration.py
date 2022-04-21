@@ -599,19 +599,9 @@ class Integration(models.Model):
         try:
             self._execute_synchronization(data)
         except Exception as e:
-            self.env.sync._report_error(self.env.activity, e)
-            # handle error
-            try:
-                with self.env.cr.savepoint():
-                    self._handle_error(data, e)
-            except Exception as e2:
-                self.env.sync._report_error(self.env.activity, e2)
-                raise ProcessIntegrationException('Fail to handle the exception (%s) due to %s' % (str(e), str(e2)))
-
-            if raise_error:
-                raise
+            self._handle_error_execute_synchronization(data, e, raise_error=raise_error)
         else:
-            self.env.sync._done()
+            self._handle_success_execute_synchronization(data)
         finally:
             self._safe_commit()
 
@@ -632,6 +622,38 @@ class Integration(models.Model):
             self._process_out(data)
         else:
             raise ValidationError(_('Invalid integration flow type %s', self.integration_flow))
+
+    def _handle_error_execute_synchronization(self, data, exc, raise_error=False):
+        """ Handle the error that occurred during the execution of a synchronization
+            :param data:
+                - in: list of dict
+                - out: recordset
+            :param exc: exception that occurred during the execution of the synchronization
+            :param raise_error: boolean, set True to raise the error if one is raised
+                                during the processing
+        """
+        # report error on the sync
+        self.env.sync._report_error(self.env.activity, exc)
+
+        # handle error
+        try:
+            with self.env.cr.savepoint():
+                self._handle_error(data, exc)
+        except Exception as exc_2:
+            self.env.sync._report_error(self.env.activity, exc_2)
+            raise ProcessIntegrationException('Fail to handle the exception (%s) due to %s' % (str(exc), str(exc_2)))
+
+        if raise_error:
+            raise
+
+    def _handle_success_execute_synchronization(self, data):
+        """ Handle the success of the synchronization execution
+            :param data:
+                - in: list of dict
+                - out: recordset
+        """
+        # mark sync as done
+        self.env.sync._done()
 
     def _clean_synchronization(self, data, status):
         """
