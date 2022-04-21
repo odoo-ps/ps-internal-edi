@@ -772,17 +772,32 @@ class Integration(models.Model):
 
             :param records: recordset
         """
-        with self.env.cr.savepoint():
-            self.env.activity = "Get Content"
-            content = self._get_content(records)
-            if self.write_content_on_sync:
-                self.env.sync._write_content(content)
+        content = False
+        try:
+            # all operations must be executed in the same savepoint
+            # because they should be atomic
+            with self.env.cr.savepoint():
+                self.env.activity = "Get Content"
+                content = self._get_content(records)
+                if self.write_content_on_sync:
+                    self.env.sync._write_content(content)
 
-            self.env.activity = "Send Synchro"
-            res = self._send_content(content, records)
+                self.env.activity = "Send Synchro"
+                res = self._send_content(content, records)
 
-            self.env.activity = "Postprocess"
-            self._postprocess(res, content, records)
+                self.env.activity = "Postprocess"
+                self._postprocess(res, content, records)
+
+                # at the exit, the savepoint will flush (force to reveal concurrent updates)
+                # thus, no need of explicit flush
+
+        except Exception:
+            if content:
+                # force the write of the content on the synchronization
+                if self.write_content_on_sync:
+                    self.env.sync._write_content(content)
+
+            raise
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
@@ -907,18 +922,24 @@ class Integration(models.Model):
 
             :param data: list of dict
         """
-        # _process_content must be executed in its own savepoint
-        # why: when the content of the savepoint has been correctly executed, the savepoint flush the cursor,
-        # if an update has been applied on a locked record, the flush will wait until the locks is released
-        # when it is released, the concurrent update exception is revealed
+        # all operations must be executed in the same savepoint
+        # because they should be atomic
         with self.env.cr.savepoint():
             self.env.activity = "Process Content"
             status = self._process_content(data)
 
-        # clean sync should be executed only if no concurrent updates happened
-        with self.env.cr.savepoint():
+            # flush before calling _clean, because concurrent updates are revealed with the flush
+            # if an update has been applied on a locked record, the flush will wait until the lock is released
+            # when it is released, the concurrent update exception is revealed
+            # we don't want to call the _clean if a concurrent update happened
+            self.env.activity = "Flush Content"
+            self.flush()
+
             self.env.activity = "Clean Synchro"
             self._clean(data, status)
+
+            # at the exit, the savepoint will still flush (force to reveal concurrent updates)
+            # thus, no need of explicit flush
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
