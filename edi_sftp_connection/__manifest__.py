@@ -13,5 +13,6 @@ SFTP Connection for Odoo PS EDI Framework
         'views/edi_connection.xml',
     ],
     'hidden': True,
-    'auto_install': False
+    'auto_install': False,
+    'installable': True,
 }

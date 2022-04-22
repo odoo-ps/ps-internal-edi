@@ -22,5 +22,5 @@ Gateway between odoo and third party components
         'views/edi_synchronization.xml',
     ],
     'auto_install': False,
-    'installable': False,
+    'installable': True,
 }
