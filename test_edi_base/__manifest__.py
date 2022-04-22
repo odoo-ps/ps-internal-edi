@@ -1,6 +1,6 @@
 {
     'name': 'Odoo PS EDI Framework Tests',
-    'version': '0.1',
+    'version': '15.0.1.0.0',
     'license': 'Other proprietary',
     'summary': '',
     'category': 'Tools',
