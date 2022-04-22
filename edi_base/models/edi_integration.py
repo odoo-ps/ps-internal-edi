@@ -545,7 +545,7 @@ class Integration(models.Model):
         data_by_sync = self._prepare_data_for_sync(data)
         for d in data_by_sync:
             try:
-                self._process_synchronization(d, raise_error=raise_error)
+                self._process_synchronization(d)
             except Exception as e:
                 exceptions.append(e)
 
@@ -579,14 +579,12 @@ class Integration(models.Model):
         # chunk type is preserved (list -> list of lists, recordset -> list of recordsets)
         return _chunks(data, self.synchronization_creation)
 
-    def _process_synchronization(self, data, raise_error=False):
+    def _process_synchronization(self, data):
         """ Process one synchronization (the data will be part of one synchronization)
 
             :param data:
                 - in: list of dict
                 - out: recordset
-            :param raise_error: boolean, set True to raise the error if one is raised
-                                during the processing
         """
         self.ensure_one()
 
@@ -599,7 +597,8 @@ class Integration(models.Model):
         try:
             self._execute_synchronization(data)
         except Exception as e:
-            self._handle_error_execute_synchronization(data, e, raise_error=raise_error)
+            self._handle_error_execute_synchronization(data, e)
+            raise
         else:
             self._handle_success_execute_synchronization(data)
         finally:
@@ -623,14 +622,12 @@ class Integration(models.Model):
         else:
             raise ValidationError(_('Invalid integration flow type %s', self.integration_flow))
 
-    def _handle_error_execute_synchronization(self, data, exc, raise_error=False):
+    def _handle_error_execute_synchronization(self, data, exc):
         """ Handle the error that occurred during the execution of a synchronization
             :param data:
                 - in: list of dict
                 - out: recordset
             :param exc: exception that occurred during the execution of the synchronization
-            :param raise_error: boolean, set True to raise the error if one is raised
-                                during the processing
         """
         # report error on the sync
         self.env.sync._report_error(self.env.activity, exc)
@@ -638,13 +635,11 @@ class Integration(models.Model):
         # handle error
         try:
             with self.env.cr.savepoint():
+                self.env.activity = 'Handle Error'
                 self._handle_error(data, exc)
         except Exception as exc_2:
             self.env.sync._report_error(self.env.activity, exc_2)
             raise ProcessIntegrationException('Fail to handle the exception (%s) due to %s' % (str(exc), str(exc_2)))
-
-        if raise_error:
-            raise
 
     def _handle_success_execute_synchronization(self, data):
         """ Handle the success of the synchronization execution
