@@ -10,6 +10,7 @@ from datetime import datetime
 
 from odoo.addons.edi_base.tools.util import _chunks
 from odoo import api, fields, models, registry, _
+from odoo.tools import ustr
 from odoo.tools.safe_eval import safe_eval
 from odoo.exceptions import UserError, ValidationError
 
@@ -394,7 +395,7 @@ class Integration(models.Model):
             self.env.sync._report_error(self.env.activity, exception=exception, message=message)
             return
 
-        _logger.error("Cannot log error on sync object, sync object is not created yet")
+        _logger.error(_("Cannot log error on sync object, sync object is not created yet"))
 
     @api.model
     def _process(self, integration_id):
@@ -475,7 +476,7 @@ class Integration(models.Model):
             # logging + traceback
             if not self.env.context.get('no_exception_log'):
                 for e in exceptions:
-                    _logger.exception(str(e))
+                    _logger.exception(ustr(e))
 
             if exceptions and raise_error:
                 raise UserError('\n'.join(map(str, exceptions)))
@@ -527,7 +528,7 @@ class Integration(models.Model):
                     raise ValidationError(_('Invalid integration flow type %s', self.integration_flow))
 
         if not data:
-            _logger.info('No data found to synchronize for %s [%s]', self.name, self.id)
+            _logger.info(_('No data found to synchronize for %s [%s]', self.name, self.id))
         return data
 
     def _process_synchronizations(self, data, raise_error=False):
@@ -821,7 +822,13 @@ class Integration(models.Model):
     ##################################################
 
     def _get_synchronization_name_out(self, records):
-        """
+        """ Return the name of the synchronization (out flow)
+
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._get_synchronization_name_out(records)
+            ....
+
             :param records: recordset
             :return: str
         """
@@ -832,7 +839,8 @@ class Integration(models.Model):
         )
 
     def _get_record_to_send(self):
-        """
+        """ Return the records that should be synchronized
+
             To implement in each integration
             if not self.type == 'My type':
                 return super()._get_record_to_send()
@@ -852,6 +860,11 @@ class Integration(models.Model):
             Can use self._report_error
             Filename can be accessed by self.env.sync.filename
 
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._send_content(content, records)
+            ....
+
             :param content: str
             :param records: recordset
             :return: any (return of self.connection_id._send_synchronization)
@@ -864,9 +877,14 @@ class Integration(models.Model):
         """
             Standard behavior can be overwritte if needed
             Called at the end of each synchronization
-            Do nothing
+            By default, do nothing
 
             Filename can be accessed by self.env.sync.filename
+
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._postprocess(send_result, content, records)
+            ....
 
             :param send_result: any (value returned by self.connection_id._send_synchronization)
             :param content: str
@@ -879,7 +897,8 @@ class Integration(models.Model):
     ################################
 
     def _get_content(self, records):
-        """
+        """ Return the content that should be sent
+
             To implement in each integration
             if not self.type == 'My type':
                 return super()._get_content(records)
@@ -963,7 +982,13 @@ class Integration(models.Model):
     ##################################################
 
     def _get_synchronization_name_in(self, data):
-        """
+        """ Return the name of the synchronization (in flow)
+
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._get_synchronization_name_in(data)
+            ....
+
             :param data: list of dict
             :return: str
         """
@@ -974,7 +999,15 @@ class Integration(models.Model):
         )
 
     def _get_in_content(self):
-        """
+        """ Return the data to process
+
+            Can be overrided if needed
+
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._get_in_content()
+            ....
+
             :return: list of dict
                 the dict should be {
                     'filename': FILENAME (str),
@@ -986,7 +1019,13 @@ class Integration(models.Model):
         return self.connection_id._fetch_synchronizations()
 
     def _clean(self, data, status):
-        """
+        """ Called after the processing of each synchronization
+
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._clean(data, status)
+            ....
+
             :param data: list of dict
             :param status: str (status returned by _process_content)
         """
@@ -1021,6 +1060,11 @@ class Integration(models.Model):
 
     def _handle_error(self, data, exc):
         """ Can be use to handle an error at the end of each synchronization
+
+            To implement in each integration
+            if not self.type == 'My type':
+                return super()._handle_error(data, exc)
+            ....
 
             :param data:
                 - in: list of dict

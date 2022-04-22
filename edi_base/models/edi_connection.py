@@ -25,12 +25,24 @@ class Connection(models.Model):
     def test(self):
         """
             Test the connection is successful with the third party component
+
+            Should raise an exception with Success or Failed message
+
+            To implement in each connection
+            if not self.type == 'My type':
+                return super().test()
+            ....
         """
         raise NotImplementedError("No test method implemented for this type of connection")
 
     def _send_synchronization(self, filename, content, *args, **kwargs):
         """
-            Send the content to the third party component
+            Send the content to the third party component (out flows)
+
+            To implement in each connection
+            if not self.type == 'My type':
+                return super()._send_synchronization(filename, content, *args, **kwargs)
+            ....
 
             :param filename: str
             :param content: str
@@ -38,7 +50,13 @@ class Connection(models.Model):
         raise NotImplementedError("No send_synchronization method implemented for this type of connection")
 
     def _fetch_synchronizations(self, *args, **kwargs):
-        """
+        """ Fetch the content to process (in flows)
+
+            To implement in each connection
+            if not self.type == 'My type':
+                return super()._fetch_synchronizations(*args, **kwargs)
+            ....
+
             :return: list of dict
                 the dict should be {
                     'filename': FILENAME (str),
@@ -48,7 +66,13 @@ class Connection(models.Model):
         raise NotImplementedError("No fetch_synchronizations method implemented for this type of connection")
 
     def _clean_synchronization_in(self, data, status, *args, **kwargs):
-        """
+        """ Clean the synchronization (in flows)
+
+            To implement in each connection
+            if not self.type == 'My type':
+                return super()._clean_synchronization_in(data, status, *args, **kwargs)
+            ....
+
             :param data: dict (returned from _fetch_synchronizations)
             :param status: str
                 - done if everything went well
@@ -59,7 +83,13 @@ class Connection(models.Model):
         return
 
     def _clean_synchronization_out(self, filename, status, *args, **kwargs):
-        """
+        """ Clean the synchronization (out flows)
+
+            To implement in each connection
+            if not self.type == 'My type':
+                return super()._clean_synchronization_out(filename, status, *args, **kwargs)
+            ....
+
             :param filename: str
             :param status: str
                 - done if everything went well
@@ -73,6 +103,11 @@ class Connection(models.Model):
         """
             Return a dictionnary with the template configuration for
             this type of connection
+
+            To implement in each connection
+            if not self.type == 'My type':
+                return super()._get_default_configuration()
+            ....
 
             :return: dict
         """
