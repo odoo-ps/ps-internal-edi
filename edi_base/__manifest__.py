@@ -1,6 +1,6 @@
 {
     'name': 'Odoo PS EDI Framework',
-    'version': '2.0',
+    'version': '15.0.1.0.0',
     'license': 'Other proprietary',
     'summary': 'Gateway between odoo and third party components',
     'category': 'Tools',
