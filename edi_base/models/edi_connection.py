@@ -22,6 +22,19 @@ class Connection(models.Model):
     integration_ids = fields.One2many('edi.integration', 'connection_id',
                                       readonly=True, context={'active_test': False})
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+
+        for rec in records:
+            # set-default config if not given
+            rec._set_default_configuration()
+
+        return records
+
+    def reset_config(self):
+        self.configuration = json.dumps(self._get_default_configuration(), indent=4, sort_keys=True)
+
     def test(self):
         """
             Test the connection is successful with the third party component

@@ -11,6 +11,10 @@
                     name="test"
                     string="Test"
                 />
+                <button type="object"
+                    name="reset_config"
+                    string="Reset Configuration"
+                />
             </header>
             <sheet>
                 <div class="oe_title">
