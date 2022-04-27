@@ -160,7 +160,7 @@
                                 <div class="o_kanban_primary_left">
                                     <div class="o_primary">
                                         <h5>
-                                            <t t-esc="record.name_short.value"/>
+                                            <t t-out="record.name_short.value"/>
                                         </h5>
                                         <div t-if="record.filename_short.raw_value">
                                             <i><field name="filename_short"/></i>
@@ -168,7 +168,7 @@
                                     </div>
                                 </div>
                                 <div>
-                                    <strong>Status: <t t-esc="record.state.value"/></strong>
+                                    <strong>Status: <t t-out="record.state.value"/></strong>
                                 </div>
                                 <div>
                                     <span><i class="fa fa-calendar-plus-o" aria-label="Synchronization Date"/> <field name="create_date"/></span>
@@ -181,7 +181,7 @@
                                 </div>
                                 <t t-if="record.company_id.value">
                                     <div>
-                                        <strong>Company: <t t-esc="record.company_id.value"/></strong>
+                                        <strong>Company: <t t-out="record.company_id.value"/></strong>
                                     </div>
                                 </t>
                             </div>

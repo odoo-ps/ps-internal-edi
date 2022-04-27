@@ -151,7 +151,7 @@
                                 <div class="o_kanban_card_content">
                                     <div class="o_kanban_primary_left">
                                         <div>
-                                            <h3><t t-esc="record.name.value"/></h3>
+                                            <h3><t t-out="record.name.value"/></h3>
                                         </div>
                                         <div>
                                             <strong>
@@ -165,16 +165,16 @@
                                             </strong>
                                         </div>
                                         <div>
-                                            <strong>Last Status: <t t-esc="record.last_sync_status.value"/></strong>
+                                            <strong>Last Status: <t t-out="record.last_sync_status.value"/></strong>
                                         </div>
                                         <div>
-                                            <span>Last Sync Sucess: <t t-esc="record.last_success_date.value"/></span>
+                                            <span>Last Sync Sucess: <t t-out="record.last_success_date.value"/></span>
                                         </div>
                                         <div>
-                                            <span>Last Sync Fail: <t t-esc="record.last_failure_date.value"/></span>
+                                            <span>Last Sync Fail: <t t-out="record.last_failure_date.value"/></span>
                                         </div>
                                         <t t-if="record.company_id.value">
-                                            <strong>Company: <t t-esc="record.company_id.value"/></strong>
+                                            <strong>Company: <t t-out="record.company_id.value"/></strong>
                                         </t>
                                     </div>
                                 </div>
