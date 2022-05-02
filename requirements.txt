@@ -1,3 +1,5 @@
-pysftp==0.2.9
-google-cloud-storage
 azure-storage-blob==12.10.0
+cryptography==3.4.7
+google-cloud-storage
+pyjwt==2.1.0
+pysftp==0.2.9
