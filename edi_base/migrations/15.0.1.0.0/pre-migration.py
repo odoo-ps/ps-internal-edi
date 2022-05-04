@@ -34,11 +34,11 @@ def migrate(cr, version):
     # fill-in default value for last execution_date
     logger.info('Set-Up default value for new field edi.integration.last_execution_date')
 
-    create_column(cr, 'edi.integration', 'last_execution_date', 'timestamp')
+    create_column(cr, 'edi_integration', 'last_execution_date', 'timestamp')
     cr.execute("UPDATE edi_integration SET last_execution_date = GREATEST(last_success_date, last_failure_date);")
 
     # fill-in default value for write_content_on_sync
     logger.info('Set-Up default value for new field edi.integration.write_content_on_sync')
 
-    create_column(cr, 'edi.integration', 'write_content_on_sync', 'boolean')
+    create_column(cr, 'edi_integration', 'write_content_on_sync', 'boolean')
     cr.execute("UPDATE edi_integration SET write_content_on_sync = True;")
