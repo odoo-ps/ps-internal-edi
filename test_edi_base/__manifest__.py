@@ -1,14 +1,14 @@
 {
-    'name': 'Odoo PS EDI Framework Tests',
-    'version': '15.0.1.0.0',
-    'license': 'Other proprietary',
-    'summary': '',
-    'category': 'Tools',
-    'description': """
+    "name": "Odoo PS EDI Framework Tests",
+    "version": "15.0.1.0.0",
+    "license": "Other proprietary",
+    "summary": "",
+    "category": "Tools",
+    "description": """
 Odoo PS EDI Framework Tests
 ===========================
     """,
-    'depends': ['edi_base'],
-    'auto_install': False,
-    'installable': True
+    "depends": ["edi_base"],
+    "auto_install": False,
+    "installable": True,
 }

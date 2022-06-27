@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import json
@@ -9,18 +8,17 @@ from odoo.exceptions import UserError
 
 class Connection(models.Model):
     """
-        Object used by the integration performing the gateway between odoo and the third party component
+    Object used by the integration performing the gateway between odoo and the third party component
     """
 
-    _name = 'edi.connection'
-    _description = 'EDI Connection'
+    _name = "edi.connection"
+    _description = "EDI Connection"
 
     name = fields.Char(required=True)
-    type = fields.Selection(selection=[], required=True, string='Type')
+    type = fields.Selection(selection=[], required=True, string="Type")
     configuration = fields.Text()
-    company_id = fields.Many2one('res.company')
-    integration_ids = fields.One2many('edi.integration', 'connection_id',
-                                      readonly=True, context={'active_test': False})
+    company_id = fields.Many2one("res.company")
+    integration_ids = fields.One2many("edi.integration", "connection_id", readonly=True, context={"active_test": False})
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -37,109 +35,108 @@ class Connection(models.Model):
 
     def test(self):
         """
-            Test the connection is successful with the third party component
+        Test the connection is successful with the third party component
 
-            Should raise an exception with Success or Failed message
+        Should raise an exception with Success or Failed message
 
-            To implement in each connection
-            if not self.type == 'My type':
-                return super().test()
-            ....
+        To implement in each connection
+        if not self.type == 'My type':
+            return super().test()
+        ....
         """
         raise NotImplementedError("No test method implemented for this type of connection")
 
     def _send_synchronization(self, filename, content, *args, **kwargs):
         """
-            Send the content to the third party component (out flows)
+        Send the content to the third party component (out flows)
 
-            To implement in each connection
-            if not self.type == 'My type':
-                return super()._send_synchronization(filename, content, *args, **kwargs)
-            ....
+        To implement in each connection
+        if not self.type == 'My type':
+            return super()._send_synchronization(filename, content, *args, **kwargs)
+        ....
 
-            :param filename: str
-            :param content: str
+        :param filename: str
+        :param content: str
         """
         raise NotImplementedError("No send_synchronization method implemented for this type of connection")
 
     def _fetch_synchronizations(self, *args, **kwargs):
-        """ Fetch the content to process (in flows)
+        """Fetch the content to process (in flows)
 
-            To implement in each connection
-            if not self.type == 'My type':
-                return super()._fetch_synchronizations(*args, **kwargs)
-            ....
+        To implement in each connection
+        if not self.type == 'My type':
+            return super()._fetch_synchronizations(*args, **kwargs)
+        ....
 
-            :return: list of dict
-                the dict should be {
-                    'filename': FILENAME (str),
-                    'content': str or dict: will be handle by in edi.integration._process_content & will be write in edi.synchronization.content field
-                }
+        :return: list of dict
+            the dict should be {
+                'filename': FILENAME (str),
+                'content': str or dict: will be handle by in edi.integration._process_content & will be write in edi.synchronization.content field
+            }
         """
         raise NotImplementedError("No fetch_synchronizations method implemented for this type of connection")
 
     def _clean_synchronization_in(self, data, status, *args, **kwargs):
-        """ Clean the synchronization (in flows)
+        """Clean the synchronization (in flows)
 
-            To implement in each connection
-            if not self.type == 'My type':
-                return super()._clean_synchronization_in(data, status, *args, **kwargs)
-            ....
+        To implement in each connection
+        if not self.type == 'My type':
+            return super()._clean_synchronization_in(data, status, *args, **kwargs)
+        ....
 
-            :param data: dict (returned from _fetch_synchronizations)
-            :param status: str
-                - done if everything went well
-                - error if there is something that went wrong
+        :param data: dict (returned from _fetch_synchronizations)
+        :param status: str
+            - done if everything went well
+            - error if there is something that went wrong
 
-            Default behavior: Do Nothing
+        Default behavior: Do Nothing
         """
         return
 
     def _clean_synchronization_out(self, filename, status, *args, **kwargs):
-        """ Clean the synchronization (out flows)
+        """Clean the synchronization (out flows)
 
-            To implement in each connection
-            if not self.type == 'My type':
-                return super()._clean_synchronization_out(filename, status, *args, **kwargs)
-            ....
+        To implement in each connection
+        if not self.type == 'My type':
+            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
+        ....
 
-            :param filename: str
-            :param status: str
-                - done if everything went well
-                - error if there is something that went wrong
+        :param filename: str
+        :param status: str
+            - done if everything went well
+            - error if there is something that went wrong
 
-            Default behavior: Do Nothing
+        Default behavior: Do Nothing
         """
         return
 
     def _get_default_configuration(self):
         """
-            Return a dictionnary with the template configuration for
-            this type of connection
+        Return a dictionnary with the template configuration for
+        this type of connection
 
-            To implement in each connection
-            if not self.type == 'My type':
-                return super()._get_default_configuration()
-            ....
+        To implement in each connection
+        if not self.type == 'My type':
+            return super()._get_default_configuration()
+        ....
 
-            :return: dict
+        :return: dict
         """
         return {}
-
 
     ###################################
     #    End of abstract interface    #
     #  don't override these methods   #
     ###################################
 
-    @api.onchange('type')
+    @api.onchange("type")
     def _set_default_configuration(self):
-        if not self.configuration or self.configuration == '{}':
+        if not self.configuration or self.configuration == "{}":
             self.configuration = json.dumps(self._get_default_configuration(), indent=4, sort_keys=True)
 
     def _read_configuration(self):
         """
-            :return: dict
+        :return: dict
         """
         self.ensure_one()
         return json.loads(self.configuration)
@@ -147,14 +144,14 @@ class Connection(models.Model):
 
 class ConnectionApi(models.Model):
 
-    _inherit = 'edi.connection'
-    _description = 'EDI Connection'
+    _inherit = "edi.connection"
+    _description = "EDI Connection"
 
-    type = fields.Selection(selection_add=[('api', 'Rpc Api')], ondelete={'api': 'cascade'})
+    type = fields.Selection(selection_add=[("api", "Rpc Api")], ondelete={"api": "cascade"})
 
     def test(self):
         self.ensure_one()
-        if not self.type == 'api':
+        if not self.type == "api":
             return super().test()
 
         raise UserError("Not applicable for this type of connection")

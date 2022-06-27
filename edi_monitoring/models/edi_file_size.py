@@ -11,22 +11,22 @@ Add the file size on the synchronizations
 
 
 class Integration(models.Model):
-    _inherit = 'edi.integration'
+    _inherit = "edi.integration"
 
     def _create_synchronization_in(self, data):
-        """ Override to add the file size on the synchronization
+        """Override to add the file size on the synchronization
 
-            Assume the file path has been added by the connection
-            under the 'file' key.
+        Assume the file path has been added by the connection
+        under the 'file' key.
 
-            If the 'file' key is given, it will try to automatically
-            compute the file size and add it on the synchronization
+        If the 'file' key is given, it will try to automatically
+        compute the file size and add it on the synchronization
         """
         sync = super()._create_synchronization_in(data)
         size = 0
         one = False
         for d in data:
-            filename = d.get('file')
+            filename = d.get("file")
             if filename:
                 try:
                     size += os.path.getsize(filename)
@@ -39,6 +39,6 @@ class Integration(models.Model):
 
 
 class Synchronization(models.Model):
-    _inherit = 'edi.synchronization'
+    _inherit = "edi.synchronization"
 
-    file_size = fields.Integer(readonly=True, help='File size (bytes)')
+    file_size = fields.Integer(readonly=True, help="File size (bytes)")

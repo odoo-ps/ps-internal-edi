@@ -1,12 +1,9 @@
-# -*- encoding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-import time
 import logging
-
+import time
 from inspect import signature
 
-from odoo import api, fields, registry, SUPERUSER_ID
-
+from odoo import SUPERUSER_ID, api, fields, registry
 
 _logger = logging.getLogger(__name__)
 
@@ -22,7 +19,6 @@ def integration(name):
     """
 
     def decorator(fct):
-
         def wrapper(*args, **kwargs):
 
             self = args[0]
@@ -30,30 +26,25 @@ def integration(name):
             self.flush()
 
             new_cr = registry(self.env.cr.dbname).cursor()
-            new_env = api.Environment(
-                new_cr,
-                SUPERUSER_ID,
-                self.env.context
-            )
+            new_env = api.Environment(new_cr, SUPERUSER_ID, self.env.context)
             self = self.with_env(new_env)
 
-            edi = self.env['edi.integration'].search([
-                ('name', '=', name),
-                '|',
-                ('active', '=', False),
-                ('active', '=', True)
-            ], limit=1)
+            edi = self.env["edi.integration"].search(
+                [("name", "=", name), "|", ("active", "=", False), ("active", "=", True)], limit=1
+            )
 
             if not edi:
 
-                edi = edi.create({
-                    'integration_flow': 'in',
-                    'connection_id': self.env.ref('edi_base.api_connection').id,
-                    'type': 'api',
-                    'name': name,
-                    'synchronization_content_type': 'json',
-                    'active': False,
-                })
+                edi = edi.create(
+                    {
+                        "integration_flow": "in",
+                        "connection_id": self.env.ref("edi_base.api_connection").id,
+                        "type": "api",
+                        "name": name,
+                        "synchronization_content_type": "json",
+                        "active": False,
+                    }
+                )
 
                 new_cr.commit()
 
@@ -63,11 +54,12 @@ def integration(name):
             # create a default synchronization,
             # commit it, so that the synchronization is created
             # even in case of timeout during the prosess
-            sync = edi.env['edi.synchronization'].create({
-                'name': '%s @%s' % (edi.name, time.time()),
-                'integration_id': edi.id,
-                'synchronization_date': fields.Datetime.now(),
-                'content': """
+            sync = edi.env["edi.synchronization"].create(
+                {
+                    "name": "%s @%s" % (edi.name, time.time()),
+                    "integration_id": edi.id,
+                    "synchronization_date": fields.Datetime.now(),
+                    "content": """
                     Function
                     \t%s.%s
                     Args
@@ -76,9 +68,11 @@ def integration(name):
                     \t%s
                     Context
                     \t%s
-                """ % (self._name, fct.__name__, args, kwargs, self._context),
-                'user_id': self.env.user.id,
-            })
+                """
+                    % (self._name, fct.__name__, args, kwargs, self._context),
+                    "user_id": self.env.user.id,
+                }
+            )
 
             new_cr.commit()
 
