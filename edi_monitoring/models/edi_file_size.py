@@ -1,13 +1,10 @@
+""" Add the file size on the synchronizations """
 import logging
 import os
 
 from odoo import fields, models
 
 _logger = logging.getLogger(__name__)
-
-"""
-Add the file size on the synchronizations
-"""
 
 
 class Integration(models.Model):

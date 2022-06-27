@@ -1,8 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
 import json
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -71,7 +70,8 @@ class Connection(models.Model):
         :return: list of dict
             the dict should be {
                 'filename': FILENAME (str),
-                'content': str or dict: will be handle by in edi.integration._process_content & will be write in edi.synchronization.content field
+                'content': str or dict: will be handled by in edi.integration._process_content & will be written
+                in edi.synchronization.content field
             }
         """
         raise NotImplementedError("No fetch_synchronizations method implemented for this type of connection")
@@ -154,4 +154,4 @@ class ConnectionApi(models.Model):
         if not self.type == "api":
             return super().test()
 
-        raise UserError("Not applicable for this type of connection")
+        raise UserError(_("Not applicable for this type of connection"))

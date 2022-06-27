@@ -170,21 +170,6 @@ class MonitoringReport(models.Model):
         template = self.env.ref("edi_monitoring.report_mail")
         sendable_ids = self.filtered(lambda x: x.email and x.line_ids)
         for rec in sendable_ids:
-            """extra_values = {
-                'sources': [
-                    {
-                        'name': 'tests',
-                        'flow': 'out',
-                        'states': [
-                            {
-                                'name': 'fail',
-                                'number': 5,
-                            }
-                        ]
-                    }
-                ]
-            }"""
-
             template.with_context(monitoring=rec._prepare_email()).send_mail(
                 rec.id, notif_layout="mail.mail_notification_light"
             )

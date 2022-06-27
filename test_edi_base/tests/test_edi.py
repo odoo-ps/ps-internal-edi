@@ -6,7 +6,7 @@ from unittest import mock
 
 from psycopg2 import IntegrityError
 
-from odoo import SUPERUSER_ID, api, fields, registry
+from odoo import api, fields, registry
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 from odoo.tools import mute_logger
@@ -409,16 +409,16 @@ class TestEdiOUTCases(TestEDICommon):
         cls.addClassCleanup(cls._clean_filters, cls)
 
     @mute_logger("odoo.models.unlink")
-    def _clean_filters(cls):
+    def _clean_filters(self):
 
-        with registry(cls.env.cr.dbname).cursor() as cr:
-            env = api.Environment(cr, cls.env.user.id, cls.env.context)
+        with registry(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, self.env.user.id, self.env.context)
             # NOTE: We need to unset the filter on the integrations since the `ondelete`
             #       policy is defined as `restrict`, thus raising an error.
-            (cls.edi | cls.edi_one | cls.edi_multi).with_env(env).write({"record_filter_id": False})
+            (self.edi | self.edi_one | self.edi_multi).with_env(env).write({"record_filter_id": False})
             env["ir.filters"].with_context(active_test=False).search([("name", "=", "Export Partner")]).unlink()
 
-    def _clean_fs(cls):
+    def _clean_fs(self):
         FOLDER_OUT.rmdir()
         FOLDER_EDI.rmdir()
 
@@ -489,7 +489,7 @@ class TestEdiOUTCases(TestEDICommon):
         for fname in filenames:
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()
-            for i, line in enumerate(reader):
+            for line in reader:
                 data = dict(zip(header, line))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
@@ -528,14 +528,14 @@ class TestEdiOUTCases(TestEDICommon):
             2: 1,
             3: 6,
         }
-        for i, fname in enumerate(filenames):
+        for fname in filenames:
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()
             lines = list(reader)
             remaining_files = result.get(len(lines), 0)
             self.assertGreaterEqual(remaining_files, 1)
             result[len(lines)] -= 1
-            for j, line in enumerate(lines):
+            for line in lines:
                 data = dict(zip(header, line))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
@@ -803,7 +803,7 @@ class TestEdiOUTCases(TestEDICommon):
         for fname in filenames:
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()
-            for i, line in enumerate(reader):
+            for line in reader:
                 data = dict(zip(header, line))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
@@ -870,7 +870,7 @@ class TestEdiOUTCases(TestEDICommon):
         for fname in filenames:
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()
-            for i, line in enumerate(reader):
+            for line in reader:
                 data = dict(zip(header, line))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
