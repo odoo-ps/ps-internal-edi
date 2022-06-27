@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 
@@ -8,18 +7,17 @@ import logging
 import threading
 from datetime import datetime
 
-from odoo.addons.edi_base.tools.util import _chunks
-from odoo import api, fields, models, registry, _
+from odoo import _, api, fields, models, registry
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools import ustr
 from odoo.tools.safe_eval import safe_eval
-from odoo.exceptions import UserError, ValidationError
 
+from odoo.addons.edi_base.tools.util import _chunks
 
 _logger = logging.getLogger(__name__)
 
 
 class ProcessIntegrationException(Exception):
-
     def __init__(self, name, value=None):
         self.name = name
         self.value = value
@@ -28,130 +26,151 @@ class ProcessIntegrationException(Exception):
 
 class Integration(models.Model):
     """
-        Object modeling an integration and playing the role of orchestrator
-        between the edi.connection, data to be synchronized and the edi.synchronization
+    Object modeling an integration and playing the role of orchestrator
+    between the edi.connection, data to be synchronized and the edi.synchronization
 
-        Common methods for in/out flows manipulate the data to be synchronized
-        independently of the integration flow type (in/out):
+    Common methods for in/out flows manipulate the data to be synchronized
+    independently of the integration flow type (in/out):
 
-            Data has a different meaning based on the integration flow type:
-            - in: list of dict (required key 'filename' & 'content')
-                  'content' will be write on the edi.synchronization
-            - out: recordset
+        Data has a different meaning based on the integration flow type:
+        - in: list of dict (required key 'filename' & 'content')
+              'content' will be write on the edi.synchronization
+        - out: recordset
 
-        Data processing and synchronization status are performed on the same cursor
-        and committed at the same time (to be fully consistent)
-            By default:
-                - outside unittests: a new cursor is created and a commit is performed between each synchronization
-                - inside unittest: the current cursor is used (no cursor created) and no commits is performed
+    Data processing and synchronization status are performed on the same cursor
+    and committed at the same time (to be fully consistent)
+        By default:
+            - outside unittests: a new cursor is created and a commit is performed between each synchronization
+            - inside unittest: the current cursor is used (no cursor created) and no commits is performed
     """
 
-    _name = 'edi.integration'
-    _description = 'Integration to process by Odoo instance'
-    _inherits = {'ir.cron': 'cron_id'}
-    _order = 'sequence'
+    _name = "edi.integration"
+    _description = "Integration to process by Odoo instance"
+    _inherits = {"ir.cron": "cron_id"}
+    _order = "sequence"
 
     # Common for in/out flows
-    company_id = fields.Many2one('res.company')
-    integration_flow = fields.Selection([
-        ('in', 'From provider to Odoo'),
-        ('out', 'From Odoo to provider'),
-        ('out_real', 'From Odoo to provider (Realtime)')
-    ], required=True, string='Flow of data')
-    synchronization_creation = fields.Integer(help="""Number of data to process by synchronization.\n"""
-                                                   """1: one data by synchronization (one)\n"""
-                                                   """0: all data inside the same synchronization (multi)\n"""
-                                                   """n: max n data in the same synchronization""",
-                                              required=True,
-                                              default=1)
-    connection_id = fields.Many2one('edi.connection', required=True, string='Connection')
-    type = fields.Selection(selection=[('multi', 'Call Sub Integration'), ('api', 'RPC Api')],
-                            required=True,
-                            string='Type')  # Add selection for your integration
+    company_id = fields.Many2one("res.company")
+    integration_flow = fields.Selection(
+        [
+            ("in", "From provider to Odoo"),
+            ("out", "From Odoo to provider"),
+            ("out_real", "From Odoo to provider (Realtime)"),
+        ],
+        required=True,
+        string="Flow of data",
+    )
+    synchronization_creation = fields.Integer(
+        help="""Number of data to process by synchronization.\n"""
+        """1: one data by synchronization (one)\n"""
+        """0: all data inside the same synchronization (multi)\n"""
+        """n: max n data in the same synchronization""",
+        required=True,
+        default=1,
+    )
+    connection_id = fields.Many2one("edi.connection", required=True, string="Connection")
+    type = fields.Selection(
+        selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")], required=True, string="Type"
+    )  # Add selection for your integration
     parameter = fields.Text(string="Parameter")
 
-    synchronization_content_type = fields.Selection(selection=[
-        ('text', 'Text'),
-        ('csv', 'CSV'),
-        ('xml', 'XML'),
-        ('json', 'JSON'),
-        ('pdf', 'PDF')
-    ], default='text', required=True, string='Content Type')
-    write_content_on_sync = fields.Boolean(string="Write Content On Synchronizations", default=True,
-                                           help="Allows you to decide if the content should be written on the synchronizations.")
+    synchronization_content_type = fields.Selection(
+        selection=[("text", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON"), ("pdf", "PDF")],
+        default="text",
+        required=True,
+        string="Content Type",
+    )
+    write_content_on_sync = fields.Boolean(
+        string="Write Content On Synchronizations",
+        default=True,
+        help="Allows you to decide if the content should be written on the synchronizations.",
+    )
 
     # Cron inheritance
-    cron_id = fields.Many2one('ir.cron', ondelete='restrict', required=True, string='Cron Job')
+    cron_id = fields.Many2one("ir.cron", ondelete="restrict", required=True, string="Cron Job")
 
     # Multiple Integration at once
-    has_sub_integration = fields.Boolean(string="Has sub Integration", default=False,
-                                         help="If you need to run many integration in a specific order in the same CRON execution")
+    has_sub_integration = fields.Boolean(
+        string="Has sub Integration",
+        default=False,
+        help="If you need to run many integration in a specific order in the same CRON execution",
+    )
     sequence = fields.Integer()
-    sub_integration_ids = fields.Many2many('edi.integration',
-                                           'edi_integration_sub_integration_rel',
-                                           'integration_id', 'sub_integration_id',
-                                           domain=[('has_sub_integration', '!=', True)],
-                                           context={'active_test': False})
-    record_filter_id = fields.Many2one('ir.filters', string="Record Filter", ondelete='restrict',
-                                       help="Filter for default behavior of _get_record_to_send")
+    sub_integration_ids = fields.Many2many(
+        "edi.integration",
+        "edi_integration_sub_integration_rel",
+        "integration_id",
+        "sub_integration_id",
+        domain=[("has_sub_integration", "!=", True)],
+        context={"active_test": False},
+    )
+    record_filter_id = fields.Many2one(
+        "ir.filters",
+        string="Record Filter",
+        ondelete="restrict",
+        help="Filter for default behavior of _get_record_to_send",
+    )
 
     # Status
-    synchronization_ids = fields.One2many('edi.synchronization', 'integration_id')
-    error_ids = fields.One2many('edi.synchronization.error', 'integration_id')
-    last_execution_date = fields.Datetime(string="Last Trigger Date", readonly=True, help='Last time the integration has been triggered')
+    synchronization_ids = fields.One2many("edi.synchronization", "integration_id")
+    error_ids = fields.One2many("edi.synchronization.error", "integration_id")
+    last_execution_date = fields.Datetime(
+        string="Last Trigger Date", readonly=True, help="Last time the integration has been triggered"
+    )
     last_success_date = fields.Datetime(readonly=True)
     last_failure_date = fields.Datetime(readonly=True)
-    last_sync_status = fields.Char(default='No Sync Yet', readonly=True)
+    last_sync_status = fields.Char(default="No Sync Yet", readonly=True)
     color = fields.Integer()
 
     @api.model
     def _get_in_flow_type(self):
-        """ Return integration_flow of type in
-            Method used to perform the integration with the correct behavior
-            Can be extended to add new integration_flow of type in
+        """Return integration_flow of type in
+        Method used to perform the integration with the correct behavior
+        Can be extended to add new integration_flow of type in
         """
-        return ['in']
+        return ["in"]
 
     @api.model
     def _get_out_flow_type(self):
-        """ Return integration_flow of type out
-            Method used to perform the integration with the correct behavior
-            Can be extended to add new integration_flow of type out
+        """Return integration_flow of type out
+        Method used to perform the integration with the correct behavior
+        Can be extended to add new integration_flow of type out
         """
-        return ['out', 'out_real']
+        return ["out", "out_real"]
 
     @api.model
     def _should_commit(self):
         """
-            Check if the integration should commit
-            By default:
-                - if not in unittest: True
-                - if in unittest: False
+        Check if the integration should commit
+        By default:
+            - if not in unittest: True
+            - if in unittest: False
 
-            Can force commit with the 'autocommit' context key
-                - if autocommit=True: True
-                - if autocommit=False: False
+        Can force commit with the 'autocommit' context key
+            - if autocommit=True: True
+            - if autocommit=False: False
 
-            :return: True if should commit else False
+        :return: True if should commit else False
         """
-        autocommit = not getattr(threading.currentThread(), 'testing', False)
-        if 'autocommit' in self._context:
+        autocommit = not getattr(threading.currentThread(), "testing", False)
+        if "autocommit" in self._context:
             # Context key as priority to decide
-            return bool(self._context.get('autocommit'))
+            return bool(self._context.get("autocommit"))
         return autocommit
 
     @api.model
     def _safe_commit(self):
-        """ Commit if should commit else flush """
+        """Commit if should commit else flush"""
         cr = self.env.cr
         cr.commit() if self._should_commit() else cr.flush()
 
     def _set_status(self):
-        """ Set the status of the integration based on the last synchronization """
+        """Set the status of the integration based on the last synchronization"""
 
         sync_datas = []
 
-        self.env.cr.execute("""
+        self.env.cr.execute(
+            """
             SELECT DISTINCT ON (integration_id, state)
                     integration_id,
                     synchronization_date,
@@ -160,7 +179,9 @@ class Integration(models.Model):
             WHERE integration_id in %s
                 AND synchronization_date IS NOT NULL
             ORDER BY integration_id, state, synchronization_date DESC
-            """, (tuple(self.ids),))
+            """,
+            (tuple(self.ids),),
+        )
         sync_datas = self.env.cr.dictfetchall()
 
         done_sync = {}
@@ -168,69 +189,53 @@ class Integration(models.Model):
 
         for sync_data in sync_datas:
 
-            state = sync_data['state']
+            state = sync_data["state"]
 
-            if state not in ('done', 'fail'):
+            if state not in ("done", "fail"):
                 continue
 
-            dest = fail_sync if state == 'fail' else done_sync
-            opp = done_sync if state == 'fail' else fail_sync
+            dest = fail_sync if state == "fail" else done_sync
+            opp = done_sync if state == "fail" else fail_sync
 
-            integration_id = sync_data['integration_id']
-            sync_date = fields.Datetime.from_string(sync_data['synchronization_date'])
+            integration_id = sync_data["integration_id"]
+            sync_date = fields.Datetime.from_string(sync_data["synchronization_date"])
 
             # NOTE: Due to the SQL query, `done` state synchronization is always
             #       before a possible failed one, so if the already succeeded
             #       synchronization is older, we empty the dict.
-            if (
-                state == 'fail' and
-                integration_id in opp and
-                opp[integration_id] <= sync_date
-            ):
+            if state == "fail" and integration_id in opp and opp[integration_id] <= sync_date:
                 opp[integration_id] = False
 
             dest[integration_id] = sync_date
 
         for record in self:
 
-            vals = {
-                'last_sync_status': 'No Sync Yet',
-                'color': 4
-            }
+            vals = {"last_sync_status": "No Sync Yet", "color": 4}
 
             last_success_date = done_sync.get(record.id, False)
             last_failure_date = fail_sync.get(record.id, False)
 
             if last_success_date:
-                vals['last_success_date'] = last_success_date
+                vals["last_success_date"] = last_success_date
 
             if last_failure_date:
-                vals['last_failure_date'] = last_failure_date
+                vals["last_failure_date"] = last_failure_date
 
             if last_success_date or last_failure_date:
 
                 # NOTE: If the last synchronization is a success, we consider the
                 #       integration as succeeded
                 if last_success_date and (last_failure_date or datetime(1970, 1, 1)) <= last_success_date:
-                    vals.update({
-                        'last_sync_status': 'Success',
-                        'color': 10
-                    })
+                    vals.update({"last_sync_status": "Success", "color": 10})
 
                 # NOTE: If the last synchronization is a failure, we consider the
                 #       integration as failed
                 elif last_failure_date and (last_success_date or datetime(1970, 1, 1)) <= last_failure_date:
-                    vals.update({
-                        'last_sync_status': 'Fail',
-                        'color': 1
-                    })
+                    vals.update({"last_sync_status": "Fail", "color": 1})
 
             # NOTE: Reset values
             else:
-                vals.update({
-                    'last_success_date': False,
-                    'last_failure_date': False
-                })
+                vals.update({"last_success_date": False, "last_failure_date": False})
 
             record.write(vals)
 
@@ -238,20 +243,18 @@ class Integration(models.Model):
     def create(self, values):
 
         for vals in values:
-            vals.update({
-                'model_id': self.env.ref('edi_base.model_edi_integration').id,
-                'state': 'code',
-                'numbercall': -1
-            })
+            vals.update(
+                {"model_id": self.env.ref("edi_base.model_edi_integration").id, "state": "code", "numbercall": -1}
+            )
 
         integrations = super().create(values)
 
         for integration, vals in zip(integrations, values):
 
-            if 'code' in vals:
+            if "code" in vals:
                 continue
 
-            integration.code = 'model._process(%i)' % integration.id
+            integration.code = "model._process(%i)" % integration.id
 
         return integrations
 
@@ -259,7 +262,7 @@ class Integration(models.Model):
 
         result = super()._load_records(data_list, update=update)
 
-        if self._name != 'edi.integration':
+        if self._name != "edi.integration":
             return result
 
         # NOTE: Since https://github.com/odoo/odoo/commit/47ae24081, a new test
@@ -273,24 +276,18 @@ class Integration(models.Model):
         #       Thus, we need to manually create the external identifier for the SA to
         #       avoid the test to fail.
 
-        IMD = self.env['ir.model.data']
+        IMD = self.env["ir.model.data"]
 
-        crons = result.mapped('cron_id')
-        server_actions = crons.mapped('ir_actions_server_id')
+        crons = result.mapped("cron_id")
+        server_actions = crons.mapped("ir_actions_server_id")
 
-        server_action_imds = IMD.search([
-            ('model', '=', 'ir.actions.server'),
-            ('res_id', 'in', server_actions.ids)
-        ])
+        server_action_imds = IMD.search([("model", "=", "ir.actions.server"), ("res_id", "in", server_actions.ids)])
         if len(server_action_imds) == len(result):
             return result
 
-        server_action_imds_res_ids = server_action_imds.mapped('res_id')
+        server_action_imds_res_ids = server_action_imds.mapped("res_id")
 
-        cron_imds = IMD.search([
-            ('model', '=', 'ir.cron'),
-            ('res_id', 'in', crons.ids)
-        ])
+        cron_imds = IMD.search([("model", "=", "ir.cron"), ("res_id", "in", crons.ids)])
 
         imd_data_list = []
         for server_action in server_actions:
@@ -299,11 +296,9 @@ class Integration(models.Model):
 
             cron = crons.filtered(lambda c: c.ir_actions_server_id == server_action)
             imd = cron_imds.filtered(lambda imd: imd.res_id == cron.id)
-            imd_data_list.append({
-                'xml_id': f'{imd.module}.{imd.name}_ir_actions_server',
-                'record': server_action,
-                'noupdate': True
-            })
+            imd_data_list.append(
+                {"xml_id": f"{imd.module}.{imd.name}_ir_actions_server", "record": server_action, "noupdate": True}
+            )
 
         IMD._update_xmlids(imd_data_list, update=update)
 
@@ -317,38 +312,38 @@ class Integration(models.Model):
         return json.loads(self.parameter)
 
     def test_connection(self):
-        """ Should raise a UserError with status 'Success' or 'Fail' """
+        """Should raise a UserError with status 'Success' or 'Fail'"""
         for integration in self:
             integration.connection_id.test()
 
     def open_synchronizations(self):
         self.ensure_one()
 
-        action_dict = self.env.ref('edi_base.synchronizations_act_window').read([])[0]
-        ctx = safe_eval(action_dict.pop('context', '{}'))
-        ctx.update({
-            'default_integration_id': self.id
-        })
+        action_dict = self.env.ref("edi_base.synchronizations_act_window").read([])[0]
+        ctx = safe_eval(action_dict.pop("context", "{}"))
+        ctx.update({"default_integration_id": self.id})
 
-        action_dict.update({
-            'name': _('%s\'s synchronizations') % self.name,
-            'domain': [('integration_id', 'in', [self.id] + self.sub_integration_ids.ids)],
-            'context': ctx
-        })
+        action_dict.update(
+            {
+                "name": _("%s's synchronizations") % self.name,
+                "domain": [("integration_id", "in", [self.id] + self.sub_integration_ids.ids)],
+                "context": ctx,
+            }
+        )
 
         return action_dict
 
     ###########################################
     #             Generic API                 #
     ###########################################
-    #=========================================#
+    # =========================================#
 
     def _create_synchronization(self, data):
         """
-            :param data:
-                    - in: list of dict
-                    - out: recordset
-            :return: edi.synchronization
+        :param data:
+                - in: list of dict
+                - out: recordset
+        :return: edi.synchronization
         """
         self.ensure_one()
 
@@ -357,38 +352,42 @@ class Integration(models.Model):
         elif self.integration_flow in self._get_out_flow_type():
             sync = self._create_synchronization_out(data)
         else:
-            raise ValidationError(_('Invalid integration flow type %s', self.integration_flow))
+            raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
 
         # add the synchronization in the postrollback dict (only for realtime)
-        data_cursor = self.env.context.get('edi_data_cursor')
+        data_cursor = self.env.context.get("edi_data_cursor")
         if data_cursor:
-            data_cursor.postrollback.data.setdefault('edi.integration.postrollback.synchronization_ids', []).append(sync.id)
+            data_cursor.postrollback.data.setdefault("edi.integration.postrollback.synchronization_ids", []).append(
+                sync.id
+            )
 
         return sync
 
     def _create_error_sync(self, exception):
         """
-            :param exception: exception
-            :return: edi.synchronization
+        :param exception: exception
+        :return: edi.synchronization
         """
-        name = '%s - %s: %s' % (self.name, fields.Datetime.now(), "No Sync Error")
-        synchronization = self.env['edi.synchronization'].create({
-            'integration_id': self.id,
-            'name': name,
-            'filename': '%s.%s' % (name, self.synchronization_content_type),
-            'synchronization_date': fields.Datetime.now(),
-        })
+        name = "%s - %s: %s" % (self.name, fields.Datetime.now(), "No Sync Error")
+        synchronization = self.env["edi.synchronization"].create(
+            {
+                "integration_id": self.id,
+                "name": name,
+                "filename": "%s.%s" % (name, self.synchronization_content_type),
+                "synchronization_date": fields.Datetime.now(),
+            }
+        )
         synchronization._report_error(self.env.activity, exception=exception)
         return synchronization
 
     def _report_error(self, exception=None, message=None):
         """
-            Method to use to report error that should not block the process but needs to be reported
-            pass exception if you have catch an exception, otherwise pass a message
-            If the error should block the process simply raise an error
+        Method to use to report error that should not block the process but needs to be reported
+        pass exception if you have catch an exception, otherwise pass a message
+        If the error should block the process simply raise an error
 
-            :param exception: exception
-            :param message: str
+        :param exception: exception
+        :param message: str
         """
 
         if self.env.sync:
@@ -400,15 +399,15 @@ class Integration(models.Model):
     @api.model
     def _process(self, integration_id):
         """
-            Entry point for cron, don't raise error (no context key edi_raise_error)
+        Entry point for cron, don't raise error (no context key edi_raise_error)
         """
         return self.browse(integration_id).process_integration()
 
     def process_integration(self):
         """
-            Default context key edi_raise_error=True if call from button for testing purpose
+        Default context key edi_raise_error=True if call from button for testing purpose
         """
-        raise_error = self.env.context.get('edi_raise_error', False)
+        raise_error = self.env.context.get("edi_raise_error", False)
         for integration in self:
 
             # Force to execute with the scheduled user (if we execute it from the interface)
@@ -417,21 +416,23 @@ class Integration(models.Model):
             if integration.sub_integration_ids:
                 integration.sub_integration_ids.process_integration()
             else:
-                if integration.integration_flow == 'out_real':
-                    _logger.warning(_('Do not call process_integration for real_time integration, call _process_realtime'))
+                if integration.integration_flow == "out_real":
+                    _logger.warning(
+                        _("Do not call process_integration for real_time integration, call _process_realtime")
+                    )
                 else:
                     integration._process_in_out(raise_error=raise_error)
         return True
 
     def _process_in_out(self, data=None, raise_error=False):
         """
-            :param data:
-                - in: list of dict
-                - out: recordset
-            :param raise_error: boolean, set True to get the traceback and
-                                stop the iteration in case of error during the processing
+        :param data:
+            - in: list of dict
+            - out: recordset
+        :param raise_error: boolean, set True to get the traceback and
+                            stop the iteration in case of error during the processing
 
-            Add no_exception_log=True as context key if you don't want to get error log at the end of the integration
+        Add no_exception_log=True as context key if you don't want to get error log at the end of the integration
         """
         self.ensure_one()
 
@@ -440,11 +441,7 @@ class Integration(models.Model):
             # new cursor is used for the complete process
             # so that everything is committed simultaneously
             new_cr = registry(self.env.cr.dbname).cursor()
-            new_env = api.Environment(
-                new_cr,
-                self.env.user.id,
-                self.env.context
-            )
+            new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             self = self.with_env(new_env)
 
         # integration is executed in priority in the context of its company
@@ -474,24 +471,24 @@ class Integration(models.Model):
                 new_cr.close()
 
             # logging + traceback
-            if not self.env.context.get('no_exception_log'):
+            if not self.env.context.get("no_exception_log"):
                 for e in exceptions:
                     _logger.exception(ustr(e))
 
             if exceptions and raise_error:
-                raise UserError('\n'.join(map(str, exceptions)))
+                raise UserError("\n".join(map(str, exceptions)))
 
     def _process_data(self, data=None, raise_error=False):
-        """ Get and Process data (in/out)
+        """Get and Process data (in/out)
 
-            :param data:
-                - in: list of dict
-                - out: recordset
-                if None:
-                    data will be automatically fetched
-            :param raise_error: boolean, set True to get the traceback and
-                                stop the iteration in case of error during the processing
-            :return: list of exceptions
+        :param data:
+            - in: list of dict
+            - out: recordset
+            if None:
+                data will be automatically fetched
+        :param raise_error: boolean, set True to get the traceback and
+                            stop the iteration in case of error during the processing
+        :return: list of exceptions
         """
         self.ensure_one()
 
@@ -502,19 +499,19 @@ class Integration(models.Model):
         return self._process_synchronizations(data=data, raise_error=raise_error)
 
     def _get_data(self, data=None):
-        """ Get the data to synchronize
+        """Get the data to synchronize
 
-            :param data:
-                - in: list of dict
-                - out: recordset
-                if None:
-                    - in flow: call _get_in_content
-                    - out flow: call _get_record_to_send
-                if not None:  return param data
+        :param data:
+            - in: list of dict
+            - out: recordset
+            if None:
+                - in flow: call _get_in_content
+                - out flow: call _get_record_to_send
+            if not None:  return param data
 
-            :return:
-                - in: list of dict
-                - out: recordset
+        :return:
+            - in: list of dict
+            - out: recordset
         """
         self.ensure_one()
 
@@ -525,22 +522,22 @@ class Integration(models.Model):
                 elif self.integration_flow in self._get_out_flow_type():
                     data = self._get_record_to_send()
                 else:
-                    raise ValidationError(_('Invalid integration flow type %s', self.integration_flow))
+                    raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
 
         if not data:
-            _logger.info(_('No data found to synchronize for %s [%s]', self.name, self.id))
+            _logger.info(_("No data found to synchronize for %s [%s]", self.name, self.id))
         return data
 
     def _process_synchronizations(self, data, raise_error=False):
-        """ Process all synchronizations
-            Each piece of data inside data will be part of its own synchronization
+        """Process all synchronizations
+        Each piece of data inside data will be part of its own synchronization
 
-            :param data:
-                - in: list of dict
-                - out: recordset
-            :param raise_error: boolean, set True to get the traceback and
-                                stop the iteration in case of error during the processing
-            :return: list of exceptions
+        :param data:
+            - in: list of dict
+            - out: recordset
+        :param raise_error: boolean, set True to get the traceback and
+                            stop the iteration in case of error during the processing
+        :return: list of exceptions
         """
         exceptions = []
         data_by_sync = self._prepare_data_for_sync(data)
@@ -556,20 +553,20 @@ class Integration(models.Model):
         return exceptions
 
     def _prepare_data_for_sync(self, data):
-        """ Prepare the data to be process
-            Data are grouped by synchronization based on the synchronization_creation integer.
+        """Prepare the data to be process
+        Data are grouped by synchronization based on the synchronization_creation integer.
 
-            If synchronization_creation = 1 (one): each data will be processed in its own synchronization
-            If synchronization_creation = 0 (multi): all data will be processed in the same synchronization
-            If synchronization_creation = n: each batch of n data will be processed in its own synchronization
+        If synchronization_creation = 1 (one): each data will be processed in its own synchronization
+        If synchronization_creation = 0 (multi): all data will be processed in the same synchronization
+        If synchronization_creation = n: each batch of n data will be processed in its own synchronization
 
-            :param data:
-                - in: list of dict
-                - out: recordset
-            :return:
-                - in: list of list of dict
-                - out: list of recordset
-                (each element will be processed in its own synchronization)
+        :param data:
+            - in: list of dict
+            - out: recordset
+        :return:
+            - in: list of list of dict
+            - out: list of recordset
+            (each element will be processed in its own synchronization)
         """
         if not data:
             return []
@@ -581,11 +578,11 @@ class Integration(models.Model):
         return _chunks(data, self.synchronization_creation)
 
     def _process_synchronization(self, data):
-        """ Process one synchronization (the data will be part of one synchronization)
+        """Process one synchronization (the data will be part of one synchronization)
 
-            :param data:
-                - in: list of dict
-                - out: recordset
+        :param data:
+            - in: list of dict
+            - out: recordset
         """
         self.ensure_one()
 
@@ -606,13 +603,13 @@ class Integration(models.Model):
             self._safe_commit()
 
     def _execute_synchronization(self, data):
-        """ Process the data inside the synchronization
-            - in flow: call _process_in
-            - out flow: call _process_out
+        """Process the data inside the synchronization
+        - in flow: call _process_in
+        - out flow: call _process_out
 
-            :param data:
-                - in: list of dict
-                - out: recordset
+        :param data:
+            - in: list of dict
+            - out: recordset
         """
         self.ensure_one()
 
@@ -621,14 +618,14 @@ class Integration(models.Model):
         elif self.integration_flow in self._get_out_flow_type():
             self._process_out(data)
         else:
-            raise ValidationError(_('Invalid integration flow type %s', self.integration_flow))
+            raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
 
     def _handle_error_execute_synchronization(self, data, exc):
-        """ Handle the error that occurred during the execution of a synchronization
-            :param data:
-                - in: list of dict
-                - out: recordset
-            :param exc: exception that occurred during the execution of the synchronization
+        """Handle the error that occurred during the execution of a synchronization
+        :param data:
+            - in: list of dict
+            - out: recordset
+        :param exc: exception that occurred during the execution of the synchronization
         """
         # report error on the sync
         self.env.sync._report_error(self.env.activity, exc)
@@ -636,27 +633,27 @@ class Integration(models.Model):
         # handle error
         try:
             with self.env.cr.savepoint():
-                self.env.activity = 'Handle Error'
+                self.env.activity = "Handle Error"
                 self._handle_error(data, exc)
         except Exception as exc_2:
             self.env.sync._report_error(self.env.activity, exc_2)
-            raise ProcessIntegrationException('Fail to handle the exception (%s) due to %s' % (str(exc), str(exc_2)))
+            raise ProcessIntegrationException("Fail to handle the exception (%s) due to %s" % (str(exc), str(exc_2)))
 
     def _handle_success_execute_synchronization(self, data):
-        """ Handle the success of the synchronization execution
-            :param data:
-                - in: list of dict
-                - out: recordset
+        """Handle the success of the synchronization execution
+        :param data:
+            - in: list of dict
+            - out: recordset
         """
         # mark sync as done
         self.env.sync._done()
 
     def _clean_synchronization(self, data, status):
         """
-            :param data:
-                - in: list of dict
-                - out: recordset
-            :param status: str
+        :param data:
+            - in: list of dict
+            - out: recordset
+        :param status: str
         """
         if self.integration_flow in self._get_in_flow_type():
             for d in data:
@@ -664,94 +661,97 @@ class Integration(models.Model):
         elif self.integration_flow in self._get_out_flow_type():
             self.connection_id._clean_synchronization_out(self.env.sync.filename, status)
         else:
-            raise ValidationError(_('Invalid integration flow type %s', self.integration_flow))
+            raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
 
     #####################################################################
     #                Implementation of process Realtime             #
     #####################################################################
-    #===================================================================#
+    # ===================================================================#
 
     def _process_realtime(self, data=None, raise_error=False):
         """
-            Same as process but we assume the trigger does not come from a cron
-            but any method in odoo and that method is already aware of the data
-            to synchronize (or if no data is provided, the process will automatically
-            fetch the needed data to synchronize).
+        Same as process but we assume the trigger does not come from a cron
+        but any method in odoo and that method is already aware of the data
+        to synchronize (or if no data is provided, the process will automatically
+        fetch the needed data to synchronize).
 
-            Pay attention that:
-            the integration is performed on a different cursor than the current cursor.
-            For out flows, data is a recordset and its cursor is different from the cursor
-            of the integration.
-            So it can lead to inconsistency if an error occurs after the _process_realtime method
-            since the integration will commit the status but the recorset cursor will be rolledback.
-            Hence, the information sent could not be the one on the Odoo database.
-            This is why an error is logged on the created synchronizations if a rollback occurs on the
-            data cursor to alert of a potential data inconsistency.
+        Pay attention that:
+        the integration is performed on a different cursor than the current cursor.
+        For out flows, data is a recordset and its cursor is different from the cursor
+        of the integration.
+        So it can lead to inconsistency if an error occurs after the _process_realtime method
+        since the integration will commit the status but the recorset cursor will be rolledback.
+        Hence, the information sent could not be the one on the Odoo database.
+        This is why an error is logged on the created synchronizations if a rollback occurs on the
+        data cursor to alert of a potential data inconsistency.
 
-            It is better to call this method instead _process_in_out because a flush
-            is performed on the current cursor before starting the processing.
-            So that the processing which is executed on another cursor is aware of your
-            current cursor changes.
+        It is better to call this method instead _process_in_out because a flush
+        is performed on the current cursor before starting the processing.
+        So that the processing which is executed on another cursor is aware of your
+        current cursor changes.
 
-            Set autocommit=False in the context if you don't want the processing is
-            executed on a different cursor (in that case, no commit is performed)
+        Set autocommit=False in the context if you don't want the processing is
+        executed on a different cursor (in that case, no commit is performed)
 
-            Set skip_inconsistency_test=True to bypass the inconsistency check when the data
-            cursor is rollback
+        Set skip_inconsistency_test=True to bypass the inconsistency check when the data
+        cursor is rollback
 
-            :param data:
-                - in: list of dict
-                - out: recordset
-                if None: will fetch data to synchronize
-                if not None: process the given data
-            :param raise_error: boolean, set True if you don't want to have the processing
-                                to fail silently
+        :param data:
+            - in: list of dict
+            - out: recordset
+            if None: will fetch data to synchronize
+            if not None: process the given data
+        :param raise_error: boolean, set True if you don't want to have the processing
+                            to fail silently
         """
         self.ensure_one()
 
-        if data and isinstance(data, models.BaseModel) and self._should_commit() and not self.env.context.get('skip_inconsistency_test'):
+        if (
+            data
+            and isinstance(data, models.BaseModel)
+            and self._should_commit()
+            and not self.env.context.get("skip_inconsistency_test")
+        ):
             # if data is a recordset and autocommit, integration will be executed on a different cursor than data
             # if the data cursor rollback, an error will be logged on the synchronizations to alert of an
             # enventual data inconsistency between the odoo database and the third party system
             self = self.with_context(edi_data_cursor=data.env.cr)
 
             data.env.cr.postrollback.add(self._post_rollback_handler)
-            data.env.cr.postrollback.data.setdefault('edi.integration.postrollback.integration_ids', []).append(self.id)
+            data.env.cr.postrollback.data.setdefault("edi.integration.postrollback.integration_ids", []).append(self.id)
 
         self.flush()
         self._process_in_out(data=data, raise_error=raise_error)
 
     def _post_rollback_handler(self):
-        """ Method called after the rollback on the data cursor (only for realtime).
+        """Method called after the rollback on the data cursor (only for realtime).
         Log an error on synchronizations to prevent of an eventual data inconsistency
         between what has been synchronized and the odoo database.
         This possible inconsitency can occur when an error is raised after the realtime
         has been executed.
         """
-        data_cursor = self.env.context.get('edi_data_cursor')
+        data_cursor = self.env.context.get("edi_data_cursor")
         if data_cursor:
             with registry(self.env.cr.dbname).cursor() as cr:
-                env = api.Environment(
-                    cr,
-                    self.env.user.id,
-                    self.env.context
-                )
-                sync_ids = data_cursor.postrollback.data.pop('edi.integration.postrollback.synchronization_ids', [])
-                integration_ids = data_cursor.postrollback.data.pop('edi.integration.postrollback.integration_ids', [])
+                env = api.Environment(cr, self.env.user.id, self.env.context)
+                sync_ids = data_cursor.postrollback.data.pop("edi.integration.postrollback.synchronization_ids", [])
+                integration_ids = data_cursor.postrollback.data.pop("edi.integration.postrollback.integration_ids", [])
 
                 # report an error on created synchronizations
-                syncs = env['edi.synchronization'].browse(sync_ids).exists()
-                error_message = _('An error occurred after the _process_realtime operation. The validity of the data is not guaranteed.')
-                syncs._report_error('Post Integration', message=error_message)
+                syncs = env["edi.synchronization"].browse(sync_ids).exists()
+                error_message = _(
+                    "An error occurred after the _process_realtime operation. The validity of the data is not guaranteed."
+                )
+                syncs._report_error("Post Integration", message=error_message)
 
                 # update status of integrations
-                integration_ids = env['edi.integration'].browse(integration_ids).exists()
+                integration_ids = env["edi.integration"].browse(integration_ids).exists()
                 integration_ids._set_status()
 
     #####################################################################
     #                   Implementation of process out                   #
     #####################################################################
-    #===================================================================#
+    # ===================================================================#
 
     """
     FLOW OUT
@@ -774,21 +774,23 @@ class Integration(models.Model):
 
     def _create_synchronization_out(self, records):
         """
-            :param records: recordset
-            :return: edi.synchronization
+        :param records: recordset
+        :return: edi.synchronization
         """
         name = self._get_synchronization_name_out(records)
-        return self.env['edi.synchronization'].create({
-            'integration_id': self.id,
-            'name': name,
-            'filename': '%s.%s' % (name[:100], self.synchronization_content_type),
-            'synchronization_date': fields.Datetime.now(),
-        })
+        return self.env["edi.synchronization"].create(
+            {
+                "integration_id": self.id,
+                "name": name,
+                "filename": "%s.%s" % (name[:100], self.synchronization_content_type),
+                "synchronization_date": fields.Datetime.now(),
+            }
+        )
 
     def _process_out(self, records):
-        """ Process the given records for out flow (with the current synchronization)
+        """Process the given records for out flow (with the current synchronization)
 
-            :param records: recordset
+        :param records: recordset
         """
         content = False
         try:
@@ -822,31 +824,27 @@ class Integration(models.Model):
     ##################################################
 
     def _get_synchronization_name_out(self, records):
-        """ Return the name of the synchronization (out flow)
+        """Return the name of the synchronization (out flow)
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._get_synchronization_name_out(records)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._get_synchronization_name_out(records)
+        ....
 
-            :param records: recordset
-            :return: str
+        :param records: recordset
+        :return: str
         """
-        return '%s - %s: %s' % (
-            self.name,
-            fields.Datetime.now(),
-            records.ids
-        )
+        return "%s - %s: %s" % (self.name, fields.Datetime.now(), records.ids)
 
     def _get_record_to_send(self):
-        """ Return the records that should be synchronized
+        """Return the records that should be synchronized
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._get_record_to_send()
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._get_record_to_send()
+        ....
 
-            :return: recordset to synchronize (use to generate the content)
+        :return: recordset to synchronize (use to generate the content)
         """
         if self.record_filter_id:
             domain = ast.literal_eval(self.record_filter_id.domain)
@@ -855,40 +853,40 @@ class Integration(models.Model):
 
     def _send_content(self, content, records):
         """
-            Standard behavior can be overwritte if needed
+        Standard behavior can be overwritte if needed
 
-            Can use self._report_error
-            Filename can be accessed by self.env.sync.filename
+        Can use self._report_error
+        Filename can be accessed by self.env.sync.filename
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._send_content(content, records)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._send_content(content, records)
+        ....
 
-            :param content: str
-            :param records: recordset
-            :return: any (return of self.connection_id._send_synchronization)
+        :param content: str
+        :param records: recordset
+        :return: any (return of self.connection_id._send_synchronization)
         """
         res = self.connection_id._send_synchronization(self.env.sync.filename, content)
-        self._clean_synchronization(records, 'done')
+        self._clean_synchronization(records, "done")
         return res
 
     def _postprocess(self, send_result, content, records):
         """
-            Standard behavior can be overwritte if needed
-            Called at the end of each synchronization
-            By default, do nothing
+        Standard behavior can be overwritte if needed
+        Called at the end of each synchronization
+        By default, do nothing
 
-            Filename can be accessed by self.env.sync.filename
+        Filename can be accessed by self.env.sync.filename
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._postprocess(send_result, content, records)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._postprocess(send_result, content, records)
+        ....
 
-            :param send_result: any (value returned by self.connection_id._send_synchronization)
-            :param content: str
-            :param records: recordset
+        :param send_result: any (value returned by self.connection_id._send_synchronization)
+        :param content: str
+        :param records: recordset
         """
         return
 
@@ -897,24 +895,24 @@ class Integration(models.Model):
     ################################
 
     def _get_content(self, records):
-        """ Return the content that should be sent
+        """Return the content that should be sent
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._get_content(records)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._get_content(records)
+        ....
 
-            Can use self._report_error
+        Can use self._report_error
 
-            :param records: recordset
-            :return: str
+        :param records: recordset
+        :return: str
         """
         return ""
 
     #####################################################################
     #                   Implementation of process in                    #
     #####################################################################
-    #===================================================================#
+    # ===================================================================#
 
     """
     FLOW IN
@@ -938,25 +936,25 @@ class Integration(models.Model):
 
     def _create_synchronization_in(self, data):
         """
-            :param data: list of dict
-            :return: edi.synchronization
+        :param data: list of dict
+        :return: edi.synchronization
         """
         vals = {
-            'integration_id': self.id,
-            'name': self._get_synchronization_name_in(data),
-            'filename': ' '.join([d.get('filename') for d in data]),
-            'synchronization_date': fields.Datetime.now(),
+            "integration_id": self.id,
+            "name": self._get_synchronization_name_in(data),
+            "filename": " ".join([d.get("filename") for d in data]),
+            "synchronization_date": fields.Datetime.now(),
         }
 
         if self.write_content_on_sync:
-            vals['content'] = '\n\n'.join([d.get('content', '') for d in data])
+            vals["content"] = "\n\n".join([d.get("content", "") for d in data])
 
-        return self.env['edi.synchronization'].create(vals)
+        return self.env["edi.synchronization"].create(vals)
 
     def _process_in(self, data):
-        """ Process the given data for in flow (with the current synchronization)
+        """Process the given data for in flow (with the current synchronization)
 
-            :param data: list of dict
+        :param data: list of dict
         """
         # all operations must be executed in the same savepoint
         # because they should be atomic
@@ -982,52 +980,48 @@ class Integration(models.Model):
     ##################################################
 
     def _get_synchronization_name_in(self, data):
-        """ Return the name of the synchronization (in flow)
+        """Return the name of the synchronization (in flow)
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._get_synchronization_name_in(data)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._get_synchronization_name_in(data)
+        ....
 
-            :param data: list of dict
-            :return: str
+        :param data: list of dict
+        :return: str
         """
-        return '%s - %s: %s' % (
-            self.name,
-            fields.Datetime.now(),
-            ' '.join([d.get('filename') for d in data])
-        )
+        return "%s - %s: %s" % (self.name, fields.Datetime.now(), " ".join([d.get("filename") for d in data]))
 
     def _get_in_content(self):
-        """ Return the data to process
+        """Return the data to process
 
-            Can be overrided if needed
+        Can be overrided if needed
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._get_in_content()
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._get_in_content()
+        ....
 
-            :return: list of dict
-                the dict should be {
-                    'filename': FILENAME (str),
-                    'content': str
-                        will be handle by in edi.integration._process_content
-                        and will be write on the synchronization
-                }
+        :return: list of dict
+            the dict should be {
+                'filename': FILENAME (str),
+                'content': str
+                    will be handle by in edi.integration._process_content
+                    and will be write on the synchronization
+            }
         """
         return self.connection_id._fetch_synchronizations()
 
     def _clean(self, data, status):
-        """ Called after the processing of each synchronization
+        """Called after the processing of each synchronization
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._clean(data, status)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._clean(data, status)
+        ....
 
-            :param data: list of dict
-            :param status: str (status returned by _process_content)
+        :param data: list of dict
+        :param status: str (status returned by _process_content)
         """
         self._clean_synchronization(data, status)
 
@@ -1035,40 +1029,40 @@ class Integration(models.Model):
     # To implement for process in  #
     ################################
     def _process_content(self, data):
-        """ Allow the integration to redefine the processing of the content
+        """Allow the integration to redefine the processing of the content
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._process_content(data)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._process_content(data)
+        ....
 
 
-            :param data: list of dict
-                each dict contains key
-                - filename
-                - content
-            :return: status use by _clean
+        :param data: list of dict
+            each dict contains key
+            - filename
+            - content
+        :return: status use by _clean
 
-            Can use self._report_error
+        Can use self._report_error
         """
         return "done"
 
     ##########################################################
     # Common default Behavior: Probably need to reimplement  #
     ##########################################################
-    #========================================================#
+    # ========================================================#
 
     def _handle_error(self, data, exc):
-        """ Can be use to handle an error at the end of each synchronization
+        """Can be use to handle an error at the end of each synchronization
 
-            To implement in each integration
-            if not self.type == 'My type':
-                return super()._handle_error(data, exc)
-            ....
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._handle_error(data, exc)
+        ....
 
-            :param data:
-                - in: list of dict
-                - out: recordset
-            :param: exception
+        :param data:
+            - in: list of dict
+            - out: recordset
+        :param: exception
         """
-        self._clean_synchronization(data, 'error')
+        self._clean_synchronization(data, "error")

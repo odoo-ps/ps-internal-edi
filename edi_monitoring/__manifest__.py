@@ -1,27 +1,25 @@
 {
-    'name': 'Odoo PS EDI Monitoring',
-    'version': '15.0.1.0.0',
-    'license': 'OEEL-1',
-    'summary': 'Monitoring integrations & sending reports by email',
-    'category': 'Tools',
-    'website': 'https://www.odoo.com',
-    'author': 'Odoo PS',
-    'depends': [
-        'edi_base',
-        'mail',
+    "name": "Odoo PS EDI Monitoring",
+    "version": "15.0.1.0.0",
+    "license": "OEEL-1",
+    "summary": "Monitoring integrations & sending reports by email",
+    "category": "Tools",
+    "website": "https://www.odoo.com",
+    "author": "Odoo PS",
+    "depends": [
+        "edi_base",
+        "mail",
     ],
-    'data': [
-        'security/ir.model.access.csv',
-
-        'data/edi_monitoring.xml',
-        'data/send_report_template.xml',
-
-        'views/edi_execution_time_views.xml',
-        'views/edi_file_size_views.xml',
-        'views/edi_logging_views.xml',
-        'views/edi_monitoring_views.xml',
-        'views/edi_tracking_views.xml',
+    "data": [
+        "security/ir.model.access.csv",
+        "data/edi_monitoring.xml",
+        "data/send_report_template.xml",
+        "views/edi_execution_time_views.xml",
+        "views/edi_file_size_views.xml",
+        "views/edi_logging_views.xml",
+        "views/edi_monitoring_views.xml",
+        "views/edi_tracking_views.xml",
     ],
-    'auto_install': False,
-    'installable': True,
+    "auto_install": False,
+    "installable": True,
 }

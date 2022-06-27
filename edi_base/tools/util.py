@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 """ Util methods for edi_base """
 
+
 def _chunks(iterable, n):
-    """ Split an iterable into successive n-sized chunks from iterable
+    """Split an iterable into successive n-sized chunks from iterable
     Chunk type is preserved:
         - list -> list of lists
         - recordset -> list of recordsets
@@ -19,5 +19,5 @@ def _chunks(iterable, n):
         return []
     res = []
     for i in range(0, len(iterable), n):
-        res.append(iterable[i:i + n])
+        res.append(iterable[i : i + n])
     return res
