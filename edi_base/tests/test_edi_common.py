@@ -85,19 +85,19 @@ class TestEDICommon(TransactionCase):
         cls.addClassCleanup(cls._clean_integrations, cls)
 
     @mute_logger("odoo.models.unlink")
-    def _clean_connections(cls):
+    def _clean_connections(self):
 
-        with registry(cls.env.cr.dbname).cursor() as cr:
+        with registry(self.env.cr.dbname).cursor() as cr:
 
-            env = api.Environment(cr, cls.env.user.id, cls.env.context)
+            env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.connection")])
             env["edi.connection"].search([("id", "not in", imds.mapped("res_id"))]).unlink()
 
     @mute_logger("odoo.models.unlink")
-    def _clean_integrations(cls):
+    def _clean_integrations(self):
 
-        with registry(cls.env.cr.dbname).cursor() as cr:
-            env = api.Environment(cr, cls.env.user.id, cls.env.context)
+        with registry(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             env["edi.integration"].with_context(active_test=False).search(
                 [("id", "not in", imds.mapped("res_id"))]

@@ -17,10 +17,10 @@ class SynchronizationError(models.Model):
     synchronization_id = fields.Many2one(comodel_name="edi.synchronization", ondelete="cascade", readonly=True)
     activity = fields.Char(readonly=True)
     description = fields.Text(readonly=True)
-    description_short = fields.Text(compute="_get_short_desc")
+    description_short = fields.Text(compute="_compute_short_desc")
     company_id = fields.Many2one(related="synchronization_id.company_id", store=True)
 
-    def _get_short_desc(self):
+    def _compute_short_desc(self):
         for rec in self:
             if not rec.description or len(rec.description) < 650:
                 rec.description_short = rec.description
@@ -38,9 +38,9 @@ class Synchronization(models.Model):
     _order = "create_date desc"
 
     name = fields.Char(readonly=True, required=True)
-    name_short = fields.Char(compute="_get_name_short")
+    name_short = fields.Char(compute="_compute_name_short")
     filename = fields.Char(readonly=True)
-    filename_short = fields.Char(compute="_get_filename_short")
+    filename_short = fields.Char(compute="_compute_filename_short")
     state = fields.Selection(
         [("new", "New"), ("fail", "Fail"), ("done", "Done"), ("cancelled", "Cancelled")], default="new", string="Status"
     )
@@ -71,7 +71,7 @@ class Synchronization(models.Model):
         for rec in self:
             rec.color = mapping.get(rec.state, 0)
 
-    def _get_name_short(self):
+    def _compute_name_short(self):
         max_size = 80
         for rec in self:
             if not rec.name or len(rec.name) < max_size:
@@ -79,7 +79,7 @@ class Synchronization(models.Model):
             else:
                 rec.name_short = "%s..." % rec.name[:max_size]
 
-    def _get_filename_short(self):
+    def _compute_filename_short(self):
         max_size = 150
         for rec in self:
             if not rec.filename or len(rec.filename) < max_size:

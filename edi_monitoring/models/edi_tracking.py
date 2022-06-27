@@ -1,12 +1,9 @@
+""" Add tracked fields on integration model + chatter """
 import logging
 
 from odoo import fields, models
 
 _logger = logging.getLogger(__name__)
-
-"""
-    Add tracked fields on integration model + chatter
-"""
 
 
 class Integration(models.Model):

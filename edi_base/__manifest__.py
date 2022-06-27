@@ -1,15 +1,11 @@
 {
     "name": "Odoo PS EDI Framework",
     "version": "15.0.1.0.0",
-    "license": "Other proprietary",
+    "license": "OEEL-1",
     "summary": "Gateway between odoo and third party components",
     "category": "Tools",
-    "description": """
-Odoo PS EDI Framework
-=====================
-
-Gateway between odoo and third party components
-    """,
+    "website": "https://www.odoo.com",
+    "author": "Odoo PS",
     "depends": ["mail"],
     "data": [
         "security/edi_base.xml",

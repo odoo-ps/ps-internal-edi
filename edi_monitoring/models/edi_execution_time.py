@@ -1,8 +1,5 @@
+""" Add the execution time on synchronizations """
 from odoo import api, fields, models
-
-"""
-Add the the execution time on synchronizations
-"""
 
 
 class Integration(models.Model):

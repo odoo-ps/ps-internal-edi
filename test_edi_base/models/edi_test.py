@@ -17,7 +17,10 @@ class ResPartner(models.Model):
     def create_partner(self, data):
         """
         import odoolib
-        odoolib.get_connection(database='edi_test', login='admin', password='admin', hostname="localhost").get_model("res.partner").create_partner({'name': 'Hello', 'time': 10})
+        odoolib.get_connection(
+            database='edi_test',
+            login='admin', password='admin',
+            hostname="localhost").get_model("res.partner").create_partner({'name': 'Hello', 'time': 10})
         """
         if "time" in data:
             import time

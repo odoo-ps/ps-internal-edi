@@ -1,13 +1,11 @@
 {
     "name": "SFTP Connection for Odoo PS EDI Framework",
     "version": "15.0.1.0.0",
-    "license": "Other proprietary",
+    "license": "OEEL-1",
     "summary": "",
     "category": "Tools",
-    "description": """
-SFTP Connection for Odoo PS EDI Framework
-=========================================
-    """,
+    "website": "https://www.odoo.com",
+    "author": "Odoo PS",
     "depends": ["edi_ftp_connection"],
     "data": [
         "views/edi_connection.xml",
@@ -15,4 +13,9 @@ SFTP Connection for Odoo PS EDI Framework
     "hidden": True,
     "auto_install": False,
     "installable": True,
+    "external_dependencies": {
+        "python": [
+            "pysftp",
+        ],
+    },
 }

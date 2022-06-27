@@ -1,13 +1,11 @@
 {
     "name": "Odoo PS EDI Framework Tests",
     "version": "15.0.1.0.0",
-    "license": "Other proprietary",
+    "license": "OEEL-1",
     "summary": "",
     "category": "Tools",
-    "description": """
-Odoo PS EDI Framework Tests
-===========================
-    """,
+    "website": "https://www.odoo.com",
+    "author": "Odoo PS",
     "depends": ["edi_base"],
     "auto_install": False,
     "installable": True,

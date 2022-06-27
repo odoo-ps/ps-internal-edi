@@ -1,7 +1,7 @@
 import os
 import os.path
 
-from odoo import models
+from odoo import _, models
 from odoo.exceptions import UserError
 
 
@@ -27,11 +27,11 @@ class ConnectionFolder(models.Model):
 
         config = self._read_configuration()
         for fname in [config["in_folder"], config["out_folder"], config["in_folder_done"], config["in_folder_error"]]:
-            path = "%s/test" % config["in_folder"]
+            path = "%s/test" % fname
             with open(path, "w") as in_f:
                 in_f.write("Test")
             os.remove(path)
-        raise UserError("Connection Successful")
+        raise UserError(_("Connection Successful"))
 
     def _send_synchronization(self, filename, content, *args, **kwargs):
         self.ensure_one()
@@ -103,10 +103,10 @@ class ConnectionFolder(models.Model):
         current_cwd = os.getcwd()
         folder_list = folder.split("/")
         os.chdir("/")
-        for dir in folder_list:
-            if not dir:
+        for path in folder_list:
+            if not path:
                 continue
-            if not os.path.isdir(dir):
-                os.makedirs(dir)
-            os.chdir(dir)
+            if not os.path.isdir(path):
+                os.makedirs(path)
+            os.chdir(path)
         os.chdir(current_cwd)

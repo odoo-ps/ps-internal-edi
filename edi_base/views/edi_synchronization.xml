@@ -44,7 +44,9 @@
     <field name="inherit_id" ref="edi_base.synchronization_error_tree_view"/>
     <field name="mode">primary</field>
     <field name="arch" type="xml">
-        <xpath expr="//field[@name='synchronization_id']" position="replace"/>
+        <field name="synchronization_id" position="attributes">
+            <attribute name="invisible">1</attribute>
+        </field>
     </field>
 </record>
 
