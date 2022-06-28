@@ -1,0 +1,139 @@
+<?xml version="1.0" ?>
+<odoo>
+    <record id="report" model="ir.actions.report">
+        <field name="name">EDI Monitoring PDF Report</field>
+        <field name="model">edi.monitoring.report</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">edi_monitoring.report_template</field>
+        <field name="print_report_name">'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name, object.create_date)</field>
+        <field name="binding_model_id" ref="model_edi_monitoring_report"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_template">
+        <t t-set="data_report_landscape" t-value="True"/>
+        <t t-call="web.html_container">
+            <t t-set="data_report_margin_top" t-value="0"/>
+            <t t-set="data_report_header_spacing" t-value="0"/>
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.internal_layout">
+                    <div class="page" style="font-size:70%">
+                        <h2><span t-field="o.monitoring_id.name"/> - <span t-field="o.create_date"/></h2>
+
+                        <t t-if="o.limit_reached">
+                            <div class="alert alert-warning" role="alert">
+                                <span t-field="o.related_lines_count"/> items are related to this report, only the lasts are detailed here
+                            </div>
+                        </t>
+
+                        <table class="table table-sm o_main_table">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Date</th>
+                                    <th>State</th>
+                                    <th>Name</th>
+                                    <th>Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="o.line_ids" t-as="line">
+                                    <t t-set="state_color" t-value="'text-danger' if line.state == 'fail' else 'text-warning' if line.state == 'warning' else 'text-success' if line.state == 'done' else 'text-info' if line.state == 'new' else ''"/>
+                                    <tr t-att-class="state_color">
+                                        <td class="text-nowrap"><span t-field="line.source"/></td>
+                                        <td><span t-field="line.date"/></td>
+                                        <td><span t-field="line.state"/></td>
+                                        <td><span t-field="line.name"/></td>
+                                        <td><span t-field="line.detail"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- Body of the mail with a recap of all integrations monitored & number of synchronizations of each state
+
+    Please not that I didn't want to create specific data model to have an aggregated view,
+    so I added a little bit of logic here (yeah I know it's evil...)
+    And since jinja is quite limited about update variables inside loops,
+    I had to use some workarounds with dict.update, so nice...
+
+    And note that I displayed the table with div instead of just <table>. Great Scott !, why would I do that ?
+    Because of the same issue than here : https://github.com/odoo/odoo/issues/2166
+    -->
+    <record id="report_mail" model="mail.template">
+        <field name="name">EDI Monitoring report</field>
+        <field name="model_id" ref="model_edi_monitoring_report"/>
+        <field name="auto_delete" eval="False"/>
+        <field name="subject">Monitoring ${object.env['res.company'].search([], limit=1).name} : ${object.monitoring_id.name}</field>
+        <field name="email_from"></field>
+        <field name="email_to">${object.email}</field>
+        <field name="partner_to"></field>
+        <field name="report_template" ref="report"/>
+        <field name="report_name">${'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name, object.create_date)}</field>
+        <field name="body_html" type="html">
+            <div>
+            % if object.limit_reached:
+                <div style="color: #7d5a29; background-color: #fcefdc; border: 1px solid #fbe8cd; padding: .75rem 1.25rem; margin-bottom: 1rem;">
+                    ${object.related_lines_count} items are related to this report, only the lasts are detailed here
+                </div>
+            % endif
+            </div>
+
+            <div>
+                % set sources = {}
+                % for line in object.line_ids:
+                    % if line.source not in sources.keys():
+                        % set whatever = sources.update({line.source: {line.state: (line.state_val, 1)}})
+                    % else:
+                        % set count = 1 if line.state not in sources[line.source].keys() else (sources[line.source][line.state][1] + 1)
+                        % set whatever = sources[line.source].update({line.state: (line.state_val, count)})
+                    % endif
+                % endfor
+            </div>
+            <div style="display:table; border-collapse: collapse;">
+                <div style="display:table-header-group; font-weight:bold;">
+                    <div style="display:table-row;">
+                        <div style="display:table-cell; padding:0 10px 10px 10px; white-space:no-wrap;">Source</div>
+                        <div style="display:table-cell; padding:0 10px 10px 10px;">State</div>
+                        <div style="display:table-cell; padding:0 10px 10px 10px;">#</div>
+                    </div>
+                </div>
+                <div style="display:table-row-group;">
+                % for source, states in sources.items():
+                    % set vars = {'i': 0}
+                    % set count_states = len(states)
+                    % for state, state_data in states.items():
+                        % set whatever = vars.update({'i': vars['i'] + 1})
+                        % set state_color = '#dc3545' if state == 'fail' else '#ffc107' if state == 'warning' else '#28a745' if state == 'done' else '#17a2b8' if state == 'new' else '#000'
+                        % set padding_top = '10px' if vars['i'] == 1 else '0'
+                        % set padding_bottom = '10px' if vars['i'] == count_states else '0'
+                        <div style="display:table-row; ${'border-top:1px solid #000;' if vars['i'] == 1 else ''}">
+                            <div style="display:table-cell; padding:${padding_top} 10px ${padding_bottom} 10px;">${source if vars['i'] == 1 else ''}</div>
+                            <div style="display:table-cell; padding:${padding_top} 10px ${padding_bottom} 10px; color:${state_color};">${state_data[0]}</div>
+                            <div style="display:table-cell; padding:${padding_top} 10px ${padding_bottom} 10px; color:${state_color}; text-align:right;">${state_data[1]}</div>
+                        </div>
+                    % endfor
+                % endfor
+                </div>
+            </div>
+        </field>
+    </record>
+
+    <record id="report_cron" model="ir.cron">
+        <field name="name">Send Mail EDI Monitoring Report</field>
+        <field name="model_id" ref="model_edi_monitoring"/>
+        <field name="state">code</field>
+        <field name="code">model.action_create_report()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall" eval="(DateTime.now().replace(hour=7, minute=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')" />
+        <field name="priority">99</field>
+        <field name="numbercall">-1</field>
+        <field name="active" eval="False"/>
+    </record>
+</odoo>

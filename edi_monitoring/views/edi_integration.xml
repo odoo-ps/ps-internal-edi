@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="integration_form_view_monitoring" model="ir.ui.view">
+        <field name="name">edi.integration.form.monitoring</field>
+        <field name="model">edi.integration</field>
+        <field name="inherit_id" ref="edi_base.integration_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form/sheet" position="after">
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </xpath>
+            <xpath expr="//form/sheet/notebook/page[@name='configuration']/group/group" position="inside">
+                <field name="logging_verbosity"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
