@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="integration_form_view_logging" model="ir.ui.view">
+        <field name="name">edi.integration.form.logging</field>
+        <field name="model">edi.integration</field>
+        <field name="inherit_id" ref="edi_base.integration_form_view"/>
+        <field name="arch" type="xml">
+            <field name="connection_id" position="after">
+                <field name="logging_verbosity"/>
+            </field>
+        </field>
+    </record>
+</odoo>

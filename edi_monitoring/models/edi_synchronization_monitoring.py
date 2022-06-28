@@ -1,11 +1,9 @@
-# -*- coding: utf-8 -*-
 from odoo import api, fields, models
 
 
 class Synchronization(models.Model):
     _inherit = 'edi.synchronization'
 
-    file_size = fields.Integer(help='File size (bytes)')
     monitoring_report_id = fields.Many2one('edi.monitoring.report')
     last_issue = fields.Text(compute='_compute_last_issue')
 

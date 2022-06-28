@@ -1,0 +1,5 @@
+- Add the file size on the synchronizations
+- Add the the execution time on synchronizations
+- Add tracked fields on integration model + chatter
+- Add the ability to select different level of verbosity for logging (during processing, ...)
+- Add the ability to generate regularly an EDI monitoring report containing a summary of synchronizations (and ability to send it automatically by mail)
