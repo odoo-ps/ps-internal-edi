@@ -6,7 +6,7 @@
         <field name="inherit_id" ref="edi_base.synchronization_form_view"/>
         <field name="arch" type="xml">
             <field name="content_type" position="after">
-                <field name="file_size" attrs="{'invisible': [('file_size', '=', 0)]}"/>
+                <field name="file_size" attrs="{'invisible': [('file_size', 'in', [0, False])]}"/>
             </field>
         </field>
     </record>
@@ -17,7 +17,7 @@
         <field name="inherit_id" ref="edi_base.synchronization_list_view"/>
         <field name="arch" type="xml">
             <field name="content_type" position="after">
-                <field name="file_size" attrs="{'invisible': [('file_size', '=', 0)]}"/>
+                <field name="file_size" attrs="{'invisible': [('file_size', 'in', [0, False])]}"/>
             </field>
         </field>
     </record>

@@ -10,6 +10,7 @@
         <field name="binding_type">report</field>
     </record>
 
+    <!-- Report added as an attached file to the email -->
     <template id="report_template">
         <t t-set="data_report_landscape" t-value="True"/>
         <t t-call="web.html_container">
@@ -55,71 +56,71 @@
         </t>
     </template>
 
-    <!-- Body of the mail with a recap of all integrations monitored & number of synchronizations of each state
-
-    Please not that I didn't want to create specific data model to have an aggregated view,
-    so I added a little bit of logic here (yeah I know it's evil...)
-    And since jinja is quite limited about update variables inside loops,
-    I had to use some workarounds with dict.update, so nice...
-
-    And note that I displayed the table with div instead of just <table>. Great Scott !, why would I do that ?
-    Because of the same issue than here : https://github.com/odoo/odoo/issues/2166
-    -->
+    <!-- Body of the mail with a recap of all integrations monitored & number of synchronizations of each state -->
     <record id="report_mail" model="mail.template">
         <field name="name">EDI Monitoring report</field>
         <field name="model_id" ref="model_edi_monitoring_report"/>
         <field name="auto_delete" eval="False"/>
-        <field name="subject">Monitoring ${object.env['res.company'].search([], limit=1).name} : ${object.monitoring_id.name}</field>
+        <field name="subject">Monitoring {{object.env['res.company'].search([], limit=1).name}} : {{object.monitoring_id.name}}</field>
         <field name="email_from"></field>
-        <field name="email_to">${object.email}</field>
+        <field name="email_to">{{object.email}}</field>
         <field name="partner_to"></field>
         <field name="report_template" ref="report"/>
-        <field name="report_name">${'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name, object.create_date)}</field>
+        <field name="report_name">{{'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name, object.create_date)}}</field>
         <field name="body_html" type="html">
-            <div>
-            % if object.limit_reached:
+            <div t-if="object.limit_reached">
                 <div style="color: #7d5a29; background-color: #fcefdc; border: 1px solid #fbe8cd; padding: .75rem 1.25rem; margin-bottom: 1rem;">
-                    ${object.related_lines_count} items are related to this report, only the lasts are detailed here
+                    <t t-out="object.related_lines_count">25</t> items are related to this report, only the lasts are detailed here
                 </div>
-            % endif
             </div>
 
             <div>
-                % set sources = {}
-                % for line in object.line_ids:
-                    % if line.source not in sources.keys():
-                        % set whatever = sources.update({line.source: {line.state: (line.state_val, 1)}})
-                    % else:
-                        % set count = 1 if line.state not in sources[line.source].keys() else (sources[line.source][line.state][1] + 1)
-                        % set whatever = sources[line.source].update({line.state: (line.state_val, count)})
-                    % endif
-                % endfor
-            </div>
-            <div style="display:table; border-collapse: collapse;">
-                <div style="display:table-header-group; font-weight:bold;">
-                    <div style="display:table-row;">
-                        <div style="display:table-cell; padding:0 10px 10px 10px; white-space:no-wrap;">Source</div>
-                        <div style="display:table-cell; padding:0 10px 10px 10px;">State</div>
-                        <div style="display:table-cell; padding:0 10px 10px 10px;">#</div>
-                    </div>
-                </div>
-                <div style="display:table-row-group;">
-                % for source, states in sources.items():
-                    % set vars = {'i': 0}
-                    % set count_states = len(states)
-                    % for state, state_data in states.items():
-                        % set whatever = vars.update({'i': vars['i'] + 1})
-                        % set state_color = '#dc3545' if state == 'fail' else '#ffc107' if state == 'warning' else '#28a745' if state == 'done' else '#17a2b8' if state == 'new' else '#000'
-                        % set padding_top = '10px' if vars['i'] == 1 else '0'
-                        % set padding_bottom = '10px' if vars['i'] == count_states else '0'
-                        <div style="display:table-row; ${'border-top:1px solid #000;' if vars['i'] == 1 else ''}">
-                            <div style="display:table-cell; padding:${padding_top} 10px ${padding_bottom} 10px;">${source if vars['i'] == 1 else ''}</div>
-                            <div style="display:table-cell; padding:${padding_top} 10px ${padding_bottom} 10px; color:${state_color};">${state_data[0]}</div>
-                            <div style="display:table-cell; padding:${padding_top} 10px ${padding_bottom} 10px; color:${state_color}; text-align:right;">${state_data[1]}</div>
-                        </div>
-                    % endfor
-                % endfor
-                </div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Source</th>
+                            <th scope="col">State</th>
+                            <th scope="col">#</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-set="monitoring" t-value="ctx.get('monitoring')"/>
+                        <t t-if="monitoring">
+                            <t t-set="sources" t-value="monitoring['sources']"/>
+
+                            <!-- Add sources -->
+                            <t t-foreach="sources" t-as="source">
+                                <tr>
+                                    <th scope="row" t-out="source['name']">BizTalk Send Purchase Orders : Get the response</th>
+
+                                    <!-- Add states of the source -->
+                                    <t t-foreach="enumerate(source['states'])" t-as="i_state">
+                                        <!-- Variable values -->
+                                        <t t-set="index" t-value="i_state[0]"/>
+                                        <t t-set="state" t-value="i_state[1]"/>
+                                        <t t-set="state_name" t-value="state['name']"/>
+
+                                        <!-- Attribute values -->
+                                        <t t-set="line_style" t-value="'border-top: none !important;'"/>
+                                        <t t-set="line_class" t-value="'text-danger' if state_name == 'fail' else 'text-warning' if state_name == 'warning' else 'text-success' if state_name == 'done' else 'text-info' if state_name == 'new' else 'text-secondary'"/>
+
+                                        <t t-if="index == 0">
+                                            <span t-att-class="line_class">
+                                                <td t-att-style="line_style" t-att-class="line_class" t-out="state['name_display']">Fail</td>
+                                                <td t-att-style="line_style" t-att-class="line_class" t-out="state['number']">10</td>
+                                            </span>
+                                        </t>
+                                        <tr t-else="" t-att-class="line_class">
+                                            <td t-att-style="line_style"/>
+                                            <td t-att-style="line_style" t-out="state['name_display']">Success</td>
+                                            <td t-att-style="line_style" t-out="state['number']">15</td>
+                                        </tr>
+                                    </t>
+                                </tr>
+                            </t>
+                        </t>
+                    </tbody>
+                </table>
             </div>
         </field>
     </record>

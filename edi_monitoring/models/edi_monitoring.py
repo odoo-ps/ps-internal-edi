@@ -1,8 +1,10 @@
-# -*- coding: utf-8 -*-
-from odoo import api, fields, models
 import ast
+import operator
 
-MSG_NEW = "Either report was created during the execution, or has been killed by odoo.sh because of too 15' execution timeout"
+from odoo import api, fields, models, tools
+
+MSG_NEW = "Either report was created during the execution, "\
+          "or has been killed by odoo.sh because of too 15' execution timeout"
 MAX_SYNCHROS_BY_REPORT = 1000
 
 
@@ -158,11 +160,52 @@ class MonitoringReport(models.Model):
         template = self.env.ref('edi_monitoring.report_mail')
         sendable_ids = self.filtered(lambda x: x.email and x.line_ids)
         for rec in sendable_ids:
-            template.send_mail(
+            """extra_values = {
+                'sources': [
+                    {
+                        'name': 'tests',
+                        'flow': 'out',
+                        'states': [
+                            {
+                                'name': 'fail',
+                                'number': 5,
+                            }
+                        ]
+                    }
+                ]
+            }"""
+
+            template.with_context(monitoring=rec._prepare_email()).send_mail(
                 rec.id,
                 notif_layout='mail.mail_notification_light')
         sendable_ids.write({'sent': fields.Datetime.now()})
         return True
+
+    def _prepare_email(self):
+        self.ensure_one()
+        extra_values = {
+            'sources': [],
+        }
+
+        for source, source_lines in tools.groupby(self.line_ids, operator.itemgetter('source')):
+            source_lines = self.env['edi.monitoring.report.line'].concat(*source_lines)
+            source = {
+                'name': source,
+                'states': [],
+            }
+
+            for state, state_lines in tools.groupby(source_lines, operator.itemgetter('state')):
+                state_lines = self.env['edi.monitoring.report.line'].concat(*state_lines)
+                state = {
+                    'name': state,
+                    'name_display': state_lines[0].state_val,
+                    'number': len(state_lines)
+                }
+                source['states'].append(state)
+
+            extra_values['sources'].append(source)
+
+        return extra_values
 
 
 class MonitoringReportLine(models.Model):
@@ -185,7 +228,6 @@ class MonitoringReportLine(models.Model):
 
     @api.depends('state')
     def _compute_state_val(self):
-        """ Ugly workaround to allow jinja mail template to display the label of the selection """
         for rec in self:
             rec.state_val = [x[1] for x in rec._fields.get('state').selection if x[0] == rec.state][0]
 
