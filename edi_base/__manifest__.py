@@ -1,6 +1,6 @@
 {
     "name": "Odoo PS EDI Framework",
-    "version": "15.0.1.0.0",
+    "version": "15.0.1.1.0",
     "license": "OEEL-1",
     "summary": "Gateway between odoo and third party components",
     "category": "Tools",
@@ -13,6 +13,7 @@
         "data/connection.xml",
         "views/edi_connection.xml",
         "views/edi_integration.xml",
+        "views/res_config_settings_views.xml",
         "views/edi_synchronization.xml",
     ],
     "auto_install": False,
