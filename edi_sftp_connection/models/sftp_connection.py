@@ -107,7 +107,7 @@ class SFTPConnection(models.Model):
         if not self.type == "sftp":
             return super().pwd(server)
 
-        return server.pwd()
+        return server.pwd
 
     @api.model
     def dir_exists(self, server, path):
