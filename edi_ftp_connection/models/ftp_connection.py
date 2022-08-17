@@ -202,6 +202,10 @@ class FTPConnection(models.Model):
     @api.model
     def ftp_load_config(self, server, config):
         paths = {}
+        current_folder = self.pwd(server)
+        if not current_folder.endswith("/"):
+            current_folder += "/"
+
         for folder, fallback_folder in [
             ("out_folder", "/"),
             ("in_folder", "/"),
@@ -216,7 +220,7 @@ class FTPConnection(models.Model):
 
             # Handle relative path
             if not path.startswith("/"):
-                path = self.pwd(server) + path
+                path = current_folder + path
 
             # Handle non existing path
             if not self.dir_exists(server, path):
