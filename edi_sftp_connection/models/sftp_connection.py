@@ -1,7 +1,10 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+import io
 import logging
 import os
+from base64 import decodebytes
 
+import paramiko
 import pysftp
 
 from odoo import api, fields, models
@@ -78,24 +81,23 @@ class SFTPConnection(models.Model):
         config = self._read_configuration()
 
         cnopts = pysftp.CnOpts()
-        cnopts.hostkeys = None
-        # TODO Improve by allowing to verify the host
-        #  For now we just ignore that by setting "cnopts.hostkeys = None", but it raise security issue
-        #  (no protection against man-in-the-middle attacks)
-        #  How to solve that ?
-        #  One solution is to add the remote key of the server (the one we have to accept at the first connection)
-        #  on a known_hosts file.
-        #  See for ex. https://stackoverflow.com/questions/38939454/verify-host-key-with-pysftp
-        #  This should be improved when it will be needed for an integration.
+
+        host_key_str = config.get("host_key")
+        if host_key_str:
+            host_key = paramiko.RSAKey(data=decodebytes(host_key_str.encode()))
+            cnopts.hostkeys.add(config.get("host"), "ssh-rsa", host_key)
+        else:
+            cnopts.hostkeys = None
+
+        key_str = config.get("key", None)
+        key = paramiko.RSAKey.from_private_key(io.StringIO(key_str)) if key_str else None
 
         server = pysftp.Connection(
-            host=config["host"],
-            username=config["user"],
-            password=config["password"],
-            cnopts=cnopts
-            # TODO Allow to connect with RSA key instead of a password
-            #  private_key=paramiko.RSAKey.from_private_key_file(privatekeyfile)
-            #  This should be improved when it will be needed for an integration.
+            host=config.get("host"),
+            username=config.get("user"),
+            password=None if key else config.get("password"),
+            private_key=key,
+            cnopts=cnopts,
         )
 
         self.ftp_load_config(server, config)
@@ -188,8 +190,10 @@ class SFTPConnection(models.Model):
     def _sftp_default_configuration(self):
         return {
             "host": "host",
+            "host_key": "",
             "user": "user",
-            "password": "password",
+            "password": "password (ignored if key supplied)",
+            "key": "",
             "on_conflict": "choose one from : raise, rename, replace",
             "on_conflict_rename_extension": "old",
             "in_folder": "<PATH HERE>",
