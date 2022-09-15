@@ -408,7 +408,7 @@ class Integration(models.Model):
         for integration in self:
 
             # Force to execute with the scheduled user (if we execute it from the interface)
-            integration = integration.with_user(integration.user_id)
+            integration = integration.with_user(integration.sudo().user_id)
 
             if integration.sub_integration_ids:
                 integration.sub_integration_ids.process_integration()
@@ -702,6 +702,9 @@ class Integration(models.Model):
                             to fail silently
         """
         self.ensure_one()
+
+        # Force to execute with the scheduled user (if we execute it from the interface)
+        self = self.with_user(self.sudo().user_id)
 
         if (
             data
