@@ -29,6 +29,8 @@ class IntegrationOut(models.Model):
         :param records: recordset
         :return: edi.synchronization
         """
+        self.ensure_one()
+
         name = self._get_synchronization_name_out(records)
         return self.env["edi.synchronization"].create(
             {
@@ -44,6 +46,8 @@ class IntegrationOut(models.Model):
 
         :param records: recordset
         """
+        self.ensure_one()
+
         content = False
         try:
             # all operations must be executed in the same savepoint
@@ -86,6 +90,7 @@ class IntegrationOut(models.Model):
         :param records: recordset
         :return: str
         """
+        self.ensure_one()
         return "%s - %s: %s" % (self.name, fields.Datetime.now(), records.ids)
 
     def _get_record_to_send(self):
@@ -98,6 +103,8 @@ class IntegrationOut(models.Model):
 
         :return: recordset to synchronize (use to generate the content)
         """
+        self.ensure_one()
+
         if self.record_filter_id:
             domain = ast.literal_eval(self.record_filter_id.domain)
             return self.env[self.record_filter_id.model_id].search(domain)
@@ -105,7 +112,7 @@ class IntegrationOut(models.Model):
 
     def _send_content(self, content, records):
         """
-        Standard behavior can be overwritte if needed
+        Standard behavior can be overwrite if needed
 
         Can use self._report_error
         Filename can be accessed by self.env.sync.filename
@@ -119,13 +126,23 @@ class IntegrationOut(models.Model):
         :param records: recordset
         :return: any (return of self.connection_id._send_synchronization)
         """
+        self.ensure_one()
+
         res = self.connection_id._send_synchronization(self.env.sync.filename, content)
         self._clean_synchronization(records, "done")
         return res
 
+    def _clean_out_sync(self, records, status):
+        """
+        :param records: recordset
+        :param status: str
+        """
+        self.ensure_one()
+        self.connection_id._clean_synchronization_out(self.env.sync.filename, status)
+
     def _postprocess(self, send_result, content, records):
         """
-        Standard behavior can be overwritte if needed
+        Standard behavior can be overwrite if needed
         Called at the end of each synchronization
         By default, do nothing
 
@@ -140,6 +157,7 @@ class IntegrationOut(models.Model):
         :param content: str
         :param records: recordset
         """
+        self.ensure_one()
         return
 
     ################################
@@ -159,4 +177,5 @@ class IntegrationOut(models.Model):
         :param records: recordset
         :return: str
         """
+        self.ensure_one()
         return ""

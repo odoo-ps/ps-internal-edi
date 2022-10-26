@@ -7,7 +7,7 @@ from odoo.exceptions import ValidationError
 class Integration(models.Model):
     _inherit = "edi.integration"
 
-    @api.constrains("integration_flow_type", "synchronization_creation", "connection_id")
+    @api.constrains("integration_flow", "synchronization_creation", "connection_id")
     def _check_let_in_folder_and_synchronization_creation(self):
         for rec in self:
             if (
