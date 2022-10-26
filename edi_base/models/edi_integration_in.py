@@ -28,6 +28,8 @@ class IntegrationIn(models.Model):
         :param data: list of dict
         :return: edi.synchronization
         """
+        self.ensure_one()
+
         vals = {
             "integration_id": self.id,
             "name": self._get_synchronization_name_in(data),
@@ -45,6 +47,8 @@ class IntegrationIn(models.Model):
 
         :param data: list of dict
         """
+        self.ensure_one()
+
         # all operations must be executed in the same savepoint
         # because they should be atomic
         with self.env.cr.savepoint():
@@ -79,6 +83,7 @@ class IntegrationIn(models.Model):
         :param data: list of dict
         :return: str
         """
+        self.ensure_one()
         return "%s - %s: %s" % (self.name, fields.Datetime.now(), " ".join([d.get("filename") for d in data]))
 
     def _get_in_content(self):
@@ -99,6 +104,7 @@ class IntegrationIn(models.Model):
                     and will be write on the synchronization
             }
         """
+        self.ensure_one()
         return self.connection_id._fetch_synchronizations()
 
     def _clean(self, data, status):
@@ -112,7 +118,17 @@ class IntegrationIn(models.Model):
         :param data: list of dict
         :param status: str (status returned by _process_content)
         """
+        self.ensure_one()
         self._clean_synchronization(data, status)
+
+    def _clean_in_sync(self, data, status):
+        """
+        :param data: list of dict
+        :param status: str
+        """
+        self.ensure_one()
+        for d in data:
+            self.connection_id._clean_synchronization_in(d, status)
 
     ################################
     # To implement for process in  #
@@ -134,6 +150,7 @@ class IntegrationIn(models.Model):
 
         Can use self._report_error
         """
+        self.ensure_one()
         return "done"
 
     ##########################################################
@@ -154,4 +171,5 @@ class IntegrationIn(models.Model):
             - out: recordset
         :param: exception
         """
+        self.ensure_one()
         self._clean_synchronization(data, "error")

@@ -57,6 +57,11 @@ class Integration(models.Model):
         required=True,
         string="Flow of data",
     )
+    integration_flow_type = fields.Selection(
+        [("in", "In"), ("out", "Out"), ("unknown", "Unknown")],
+        compute="_compute_integration_flow_type",
+        string="Type of flow of data",
+    )
     synchronization_creation = fields.Integer(
         help="""Number of data to process by synchronization.\n"""
         """1: one data by synchronization (one)\n"""
@@ -118,6 +123,37 @@ class Integration(models.Model):
     last_failure_date = fields.Datetime(readonly=True)
     last_sync_status = fields.Char(default="No Sync Yet", readonly=True)
     color = fields.Integer()
+
+    @api.depends("integration_flow")
+    def _compute_integration_flow_type(self):
+        for integration in self:
+            if integration.integration_flow in integration._get_in_flow_type():
+                flow_type = "in"
+            elif integration.integration_flow in integration._get_out_flow_type():
+                flow_type = "out"
+            else:
+                flow_type = "unknown"
+            integration.integration_flow_type = flow_type
+
+    def _exec_method_based_on_flow(self, in_method, out_method, *args, **kwargs):
+        """
+        Execute the method based on the flow type
+        :in_method: method to execute if the flow is in
+        :out_method: method to execute if the flow is out
+        :return: result of the method executed
+        """
+        self.ensure_one()
+
+        if self.integration_flow_type == "in":
+            return in_method(*args, **kwargs)
+        elif self.integration_flow_type == "out":
+            return out_method(*args, **kwargs)
+        raise ValidationError(
+            _(
+                "Invalid integration flow type %s." "\nYou have to specify if this flow type is an 'in' or 'out' flow.",
+                self.integration_flow,
+            )
+        )
 
     @api.model
     def _get_in_flow_type(self):
@@ -344,12 +380,7 @@ class Integration(models.Model):
         """
         self.ensure_one()
 
-        if self.integration_flow in self._get_in_flow_type():
-            sync = self._create_synchronization_in(data)
-        elif self.integration_flow in self._get_out_flow_type():
-            sync = self._create_synchronization_out(data)
-        else:
-            raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
+        sync = self._exec_method_based_on_flow(self._create_synchronization_in, self._create_synchronization_out, data)
 
         # add the synchronization in the postrollback dict (only for realtime)
         data_cursor = self.env.context.get("edi_data_cursor")
@@ -365,6 +396,7 @@ class Integration(models.Model):
         :param exception: exception
         :return: edi.synchronization
         """
+        self.ensure_one()
         name = "%s - %s: %s" % (self.name, fields.Datetime.now(), "No Sync Error")
         synchronization = self.env["edi.synchronization"].create(
             {
@@ -514,12 +546,7 @@ class Integration(models.Model):
 
         if data is None:
             with self.env.cr.savepoint():
-                if self.integration_flow in self._get_in_flow_type():
-                    data = self._get_in_content()
-                elif self.integration_flow in self._get_out_flow_type():
-                    data = self._get_record_to_send()
-                else:
-                    raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
+                data = self._exec_method_based_on_flow(self._get_in_content, self._get_record_to_send)
 
         if not data:
             _logger.info(_("No data found to synchronize for %s [%s]", self.name, self.id))
@@ -536,6 +563,8 @@ class Integration(models.Model):
                             stop the iteration in case of error during the processing
         :return: list of exceptions
         """
+        self.ensure_one()
+
         exceptions = []
         data_by_sync = self._prepare_data_for_sync(data)
         for d in data_by_sync:
@@ -565,6 +594,8 @@ class Integration(models.Model):
             - out: list of recordset
             (each element will be processed in its own synchronization)
         """
+        self.ensure_one()
+
         if not data:
             return []
 
@@ -609,13 +640,7 @@ class Integration(models.Model):
             - out: recordset
         """
         self.ensure_one()
-
-        if self.integration_flow in self._get_in_flow_type():
-            self._process_in(data)
-        elif self.integration_flow in self._get_out_flow_type():
-            self._process_out(data)
-        else:
-            raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
+        self._exec_method_based_on_flow(self._process_in, self._process_out, data)
 
     def _handle_error_execute_synchronization(self, data, exc):
         """Handle the error that occurred during the execution of a synchronization
@@ -624,6 +649,8 @@ class Integration(models.Model):
             - out: recordset
         :param exc: exception that occurred during the execution of the synchronization
         """
+        self.ensure_one()
+
         # report error on the sync
         self.env.sync._report_error(self.env.activity, exc)
 
@@ -642,6 +669,7 @@ class Integration(models.Model):
             - in: list of dict
             - out: recordset
         """
+        self.ensure_one()
         # mark sync as done
         self.env.sync._done()
 
@@ -652,13 +680,8 @@ class Integration(models.Model):
             - out: recordset
         :param status: str
         """
-        if self.integration_flow in self._get_in_flow_type():
-            for d in data:
-                self.connection_id._clean_synchronization_in(d, status)
-        elif self.integration_flow in self._get_out_flow_type():
-            self.connection_id._clean_synchronization_out(self.env.sync.filename, status)
-        else:
-            raise ValidationError(_("Invalid integration flow type %s", self.integration_flow))
+        self.ensure_one()
+        self._exec_method_based_on_flow(self._clean_in_sync, self._clean_out_sync, data, status)
 
     #####################################################################
     #                Implementation of process Realtime             #
