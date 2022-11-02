@@ -130,15 +130,15 @@ class Synchronization(models.Model):
                 ],
             }
         )
-        self.flush(fnames=["state", "error_ids", "content_type"], records=self)
+        self.flush_recordset(fnames=["state", "error_ids", "content_type"])
 
     def _write_content(self, content):
         """
         :param content: str
         """
         self.write({"content": content})
-        self.flush(fnames=["content"], records=self)
+        self.flush_recordset(fnames=["content"])
 
     def _done(self):
         self.write({"state": "done"})
-        self.flush(fnames=["state", "content_type", "synchronization_flow"], records=self)
+        self.flush_recordset(fnames=["state", "content_type", "synchronization_flow"])

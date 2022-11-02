@@ -185,7 +185,7 @@ class Integration(models.Model):
 
         :return: True if should commit else False
         """
-        autocommit = not getattr(threading.currentThread(), "testing", False)
+        autocommit = not getattr(threading.current_thread(), "testing", False)
         if "autocommit" in self._context:
             # Context key as priority to decide
             return bool(self._context.get("autocommit"))
@@ -743,7 +743,7 @@ class Integration(models.Model):
             data.env.cr.postrollback.add(self._post_rollback_handler)
             data.env.cr.postrollback.data.setdefault("edi.integration.postrollback.integration_ids", []).append(self.id)
 
-        self.flush()
+        self.env.flush_all()
         self._process_in_out(data=data, raise_error=raise_error)
 
     def _post_rollback_handler(self):
