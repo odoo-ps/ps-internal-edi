@@ -23,7 +23,7 @@ def integration(name):
 
             self = args[0]
 
-            self.flush()
+            self.env.flush_all()
 
             new_cr = registry(self.env.cr.dbname).cursor()
             new_env = api.Environment(new_cr, SUPERUSER_ID, self.env.context)
