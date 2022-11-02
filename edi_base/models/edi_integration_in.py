@@ -56,7 +56,7 @@ class IntegrationIn(models.Model):
             # when it is released, the concurrent update exception is revealed
             # we don't want to call the _clean if a concurrent update happened
             self.env.activity = "Flush Content"
-            self.flush()
+            self.flush_model()
 
             self.env.activity = "Clean Synchro"
             self._clean(data, status)

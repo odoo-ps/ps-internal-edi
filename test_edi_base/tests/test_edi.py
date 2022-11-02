@@ -948,7 +948,7 @@ class TestEdiBase(TestEDICommon):
 
             sync.write({"state": "done", "synchronization_date": now})
 
-            sync.flush(fnames=["state", "synchronization_date"], records=sync)
+            sync.flush_recordset(fnames=["state", "synchronization_date"])
 
             integration = new_env["edi.integration"].browse(self.integration.id)
             integration._set_status()
@@ -974,7 +974,7 @@ class TestEdiBase(TestEDICommon):
 
             sync.write({"state": "fail", "synchronization_date": now})
 
-            sync.flush(records=sync)
+            sync.flush_recordset()
 
             integration = new_env["edi.integration"].browse(self.integration.id)
             integration._set_status()
@@ -1020,7 +1020,7 @@ class TestEdiBase(TestEDICommon):
 
             sync.write({"state": "done", "synchronization_date": now + timedelta(days=1)})
 
-            sync.flush(records=sync)
+            sync.flush_recordset()
 
             integration._set_status()
 
@@ -1063,7 +1063,7 @@ class TestEdiBase(TestEDICommon):
 
             sync.write({"state": "fail", "synchronization_date": now + timedelta(days=1)})
 
-            sync.flush(records=sync)
+            sync.flush_recordset()
 
             integration = new_env["edi.integration"].browse(self.integration.id)
             integration._set_status()
