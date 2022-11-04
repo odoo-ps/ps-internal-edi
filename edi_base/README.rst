@@ -2,16 +2,16 @@
 Framework edi_base
 ==================
 
+--------------
+The 3 concepts
+--------------
+
 This module provides a framework for integrations between Odoo and other information systems. 3 main concepts are
 represented, corresponding to 3 questions I have to answer when developing a data exchange between systems :
 
 -   **What** data to exchange : an integration
 -   **How** exchange the data : a connection
 -   **When** the data are sent : a synchronization
-
---------------
-The 3 concepts
---------------
 
 Connection
 ==========
