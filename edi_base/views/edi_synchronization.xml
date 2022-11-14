@@ -80,8 +80,15 @@
                         <field name="synchronization_date"/>
                     </group>
                 </group>
-                <notebook>
-                    <page string="Content">
+                <notebook attrs="{
+                    'invisible': [
+                        ('error_ids', '=', []),
+                        ('content', '=', False)
+                    ]
+                }">
+                    <page string="Content" attrs="{
+                        'invisible': [('content', '=', False)]
+                    }">
                         <group>
                             <field name="content_type"/>
                             <field name="content"
@@ -90,6 +97,15 @@
                                 }"
                             />
                         </group>
+                    </page>
+                    <page string="Failures" attrs="{
+                        'invisible': [('error_ids', '=', [])]
+                    }">
+                        <field name="error_ids" context="{
+                                'tree_view_ref': 'edi_base.synchronization_error_embedded_tree_view',
+                                'sync_id': active_id
+                            }"
+                        />
                     </page>
                 </notebook>
             </sheet>
