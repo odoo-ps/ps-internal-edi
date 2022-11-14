@@ -90,9 +90,6 @@
                                 </group>
                             </group>
                         </page>
-                        <page name="error" string="Error" attrs="{'invisible': [('has_sub_integration', '=', True)]}">
-                            <field name="error_ids" />
-                        </page>
                     </notebook>
                 </sheet>
             </form>
