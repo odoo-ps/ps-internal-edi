@@ -7,10 +7,7 @@
     "website": "https://www.odoo.com",
     "author": "Odoo PS",
     "depends": ["edi_base"],
-    "data": [
-        "data/cron.xml",
-        "views/res_config_settings_views.xml",
-    ],
+    "data": ["data/cron.xml", "views/res_config_settings_views.xml"],
     "auto_install": False,
     "installable": True,
 }

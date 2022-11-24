@@ -62,12 +62,7 @@ class Synchronization(models.Model):
     color = fields.Integer(compute="_compute_color")
 
     def _compute_color(self):
-        mapping = {
-            "new": 4,
-            "fail": 1,
-            "done": 10,
-            "cancelled": 0,
-        }
+        mapping = {"new": 4, "fail": 1, "done": 10, "cancelled": 0}
         for rec in self:
             rec.color = mapping.get(rec.state, 0)
 
@@ -115,21 +110,7 @@ class Synchronization(models.Model):
         if message:
             description = message
 
-        self.write(
-            {
-                "state": "fail",
-                "error_ids": [
-                    (
-                        0,
-                        0,
-                        {
-                            "activity": activity,
-                            "description": description,
-                        },
-                    )
-                ],
-            }
-        )
+        self.write({"state": "fail", "error_ids": [(0, 0, {"activity": activity, "description": description})]})
         self.flush_recordset(fnames=["state", "error_ids", "content_type"])
 
     def _write_content(self, content):

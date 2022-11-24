@@ -7,15 +7,9 @@
     "website": "https://www.odoo.com",
     "author": "Odoo PS",
     "depends": ["edi_ftp_connection"],
-    "data": [
-        "views/edi_connection.xml",
-    ],
+    "data": ["views/edi_connection.xml"],
     "hidden": True,
     "auto_install": False,
     "installable": True,
-    "external_dependencies": {
-        "python": [
-            "pysftp",
-        ],
-    },
+    "external_dependencies": {"python": ["paramiko", "pysftp"]},
 }

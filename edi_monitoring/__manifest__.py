@@ -6,10 +6,7 @@
     "category": "Tools",
     "website": "https://www.odoo.com",
     "author": "Odoo PS",
-    "depends": [
-        "edi_base",
-        "mail",
-    ],
+    "depends": ["edi_base", "mail"],
     "data": [
         "security/ir.model.access.csv",
         "data/edi_monitoring.xml",

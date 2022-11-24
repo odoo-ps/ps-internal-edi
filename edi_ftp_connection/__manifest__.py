@@ -7,9 +7,7 @@
     "website": "https://www.odoo.com",
     "author": "Odoo PS",
     "depends": ["edi_base"],
-    "data": [
-        "views/edi_connection.xml",
-    ],
+    "data": ["views/edi_connection.xml"],
     "auto_install": False,
     "installable": True,
 }

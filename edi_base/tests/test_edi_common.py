@@ -5,6 +5,7 @@ from odoo import api, fields, models, registry
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
+
 FOLDER_EDI = Path("/tmp/edi")
 
 

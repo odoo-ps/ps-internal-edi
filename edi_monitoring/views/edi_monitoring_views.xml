@@ -1,20 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="edi_monitoring_menu"
-              name="Monitoring"
-              parent="edi_base.root_menu"
-              sequence="20"/>
-
+    <menuitem id="edi_monitoring_menu" name="Monitoring" parent="edi_base.root_menu" sequence="20"/>
     <record id="edi_monitoring_configuration_action" model="ir.actions.act_window">
         <field name="name">Configurations</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">edi.monitoring</field>
     </record>
-
-    <menuitem id="edi_monitoring_configurations_menu"
-              action="edi_monitoring_configuration_action"
-              parent="edi_monitoring.edi_monitoring_menu"/>
-
+    <menuitem
+        id="edi_monitoring_configurations_menu"
+        action="edi_monitoring_configuration_action"
+        parent="edi_monitoring.edi_monitoring_menu"
+    />
     <record id="edi_monitoring_tree" model="ir.ui.view">
         <field name="name">edi.monitoring.tree</field>
         <field name="model">edi.monitoring</field>
@@ -25,14 +21,14 @@
             </tree>
         </field>
     </record>
-
     <record id="edi_monitoring_form" model="ir.ui.view">
         <field name="name">edi.monitoring.form</field>
         <field name="model">edi.monitoring</field>
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button type="object"
+                    <button
+                        type="object"
                         name="action_create_report"
                         string="Create and send report by email"
                         class="oe_highlight"
@@ -40,16 +36,18 @@
                     />
                 </header>
                 <sheet>
-                    <div class="oe_button_box" name="button_box"></div>
+                    <div class="oe_button_box" name="button_box"/>
                     <div class="oe_title">
-                        <h1><field name="name" placeholder="name"/></h1>
+                        <h1>
+                            <field name="name" placeholder="name"/>
+                        </h1>
                     </div>
                     <group>
                         <field name="email"/>
                         <field name="filter_id"/>
                         <field name="model_id" invisible="1"/>
                         <field name="active" invisible="1"/>
-                     </group>
+                    </group>
                     <notebook>
                         <page string="Reports" name="reports">
                             <field name="report_ids" options="{'no_create': True}" readonly="1">
@@ -68,17 +66,16 @@
             </form>
         </field>
     </record>
-
     <record id="edi_monitoring_reports_action" model="ir.actions.act_window">
         <field name="name">Reports</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">edi.monitoring.report</field>
     </record>
-
-    <menuitem id="edi_monitoring_reports_menu"
-              action="edi_monitoring_reports_action"
-              parent="edi_monitoring.edi_monitoring_menu"/>
-
+    <menuitem
+        id="edi_monitoring_reports_menu"
+        action="edi_monitoring_reports_action"
+        parent="edi_monitoring.edi_monitoring_menu"
+    />
     <record id="edi_monitoring_report_tree" model="ir.ui.view">
         <field name="name">edi.monitoring.report.tree</field>
         <field name="model">edi.monitoring.report</field>
@@ -90,14 +87,14 @@
             </tree>
         </field>
     </record>
-
     <record id="edi_monitoring_report_form" model="ir.ui.view">
         <field name="name">edi.monitoring.report.form</field>
         <field name="model">edi.monitoring.report</field>
         <field name="arch" type="xml">
             <form duplicate="0" create="0" edit="0" delete="0">
                 <header>
-                    <button type="object"
+                    <button
+                        type="object"
                         name="action_send_report"
                         string="Re-send report by email"
                         class="oe_highlight"
@@ -105,9 +102,11 @@
                     />
                 </header>
                 <sheet>
-                    <div class="oe_button_box" name="button_box"></div>
+                    <div class="oe_button_box" name="button_box"/>
                     <div class="oe_title">
-                        <h1><field name="create_date"/></h1>
+                        <h1>
+                            <field name="create_date"/>
+                        </h1>
                     </div>
                     <group>
                         <field name="email" invisible="1"/>
@@ -119,12 +118,20 @@
                     </group>
                     <notebook>
                         <page string="Lines" name="lines">
-                            <div class="alert alert-warning" role="alert" attrs="{'invisible': [('limit_reached', '=', False)]}">
-                                <field name="related_lines_count"/> items are related to this report, only the lasts are detailed here
+                            <div
+                                class="alert alert-warning"
+                                role="alert"
+                                attrs="{'invisible': [('limit_reached', '=', False)]}"
+                            >
+                                <field name="related_lines_count"/>
+                                items are related to this report, only the lasts are detailed here
                             </div>
                             <field name="line_ids"/>
                         </page>
-                        <page string="Related synchronizations" attrs="{'invisible': [('synchronization_ids', '=', [])]}">
+                        <page
+                            string="Related synchronizations"
+                            attrs="{'invisible': [('synchronization_ids', '=', [])]}"
+                        >
                             <field name="synchronization_ids"/>
                         </page>
                     </notebook>
@@ -136,17 +143,21 @@
             </form>
         </field>
     </record>
-
     <record id="edi_monitoring_report_line_tree" model="ir.ui.view">
         <field name="name">edi.monitoring.report.line.tree</field>
         <field name="model">edi.monitoring.report.line</field>
         <field name="arch" type="xml">
-            <tree duplicate="0" create="0" edit="0" delete="0"
-                  decoration-success="state=='done'"
-                  decoration-warning="state=='warning'"
-                  decoration-info="state=='new'"
-                  decoration-muted="state=='cancel'"
-                  decoration-danger="state=='fail'">
+            <tree
+                duplicate="0"
+                create="0"
+                edit="0"
+                delete="0"
+                decoration-success="state=='done'"
+                decoration-warning="state=='warning'"
+                decoration-info="state=='new'"
+                decoration-muted="state=='cancel'"
+                decoration-danger="state=='fail'"
+            >
                 <field name="source"/>
                 <field name="date"/>
                 <field name="state"/>
@@ -155,17 +166,18 @@
             </tree>
         </field>
     </record>
-
     <record id="edi_monitoring_report_line_form" model="ir.ui.view">
         <field name="name">edi.monitoring.report.line.form</field>
         <field name="model">edi.monitoring.report.line</field>
         <field name="arch" type="xml">
             <form duplicate="0" create="0" edit="0" delete="0">
-                <header></header>
+                <header/>
                 <sheet>
-                    <div class="oe_button_box" name="button_box"></div>
+                    <div class="oe_button_box" name="button_box"/>
                     <div class="oe_title">
-                        <h1><field name="source"/></h1>
+                        <h1>
+                            <field name="source"/>
+                        </h1>
                     </div>
                     <group>
                         <group>

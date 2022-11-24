@@ -11,6 +11,7 @@ from odoo.tools.safe_eval import safe_eval
 
 from ..tools.util import _chunks
 
+
 _logger = logging.getLogger(__name__)
 
 

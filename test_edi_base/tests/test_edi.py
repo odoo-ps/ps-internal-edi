@@ -21,6 +21,7 @@ from odoo.addons.edi_base.tests.test_edi_common import (
     TestEDICommon,
 )
 
+
 FILE_IN = Path(FOLDER_IN, "partner.csv")
 
 
@@ -158,11 +159,7 @@ class TestEdiINCases(TestEDICommon):
 
         now = fields.Datetime.now()
 
-        content = [
-            "name,id\n",
-            "Partner Test 1,partner_test_1\n",
-            "Partner Test 2,partner_test_2\n",
-        ]
+        content = ["name,id\n", "Partner Test 1,partner_test_1\n", "Partner Test 2,partner_test_2\n"]
 
         with open(FILE_IN, "w") as f:
             f.writelines(content)
@@ -198,11 +195,7 @@ class TestEdiINCases(TestEDICommon):
 
         now = fields.Datetime.now()
 
-        content = [
-            "name,id\n",
-            ",partner_test_1\n",
-            "Partner Test 2,partner_test_2\n",
-        ]
+        content = ["name,id\n", ",partner_test_1\n", "Partner Test 2,partner_test_2\n"]
 
         with open(FILE_IN, "w") as f:
             f.writelines(content)
@@ -524,10 +517,7 @@ class TestEdiOUTCases(TestEDICommon):
         filenames = [fname for fname in FOLDER_OUT.iterdir()]
         self.assertEqual(len(filenames), 7)
 
-        result = {
-            2: 1,
-            3: 6,
-        }
+        result = {2: 1, 3: 6}
         for fname in filenames:
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()

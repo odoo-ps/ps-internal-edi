@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-
         <record id="synchronizations_filter" model="ir.filters">
             <field name="name">Synchronizations to monitor</field>
             <field name="model_id">edi.synchronization</field>
             <field name="user_id" eval="False"/>
-            <field name="domain">["&amp;",["monitoring_report_id","=",False],"|",["state","=","new"],["state","=","fail"]]</field>
+            <field
+                name="domain"
+            >["&amp;",["monitoring_report_id","=",False],"|",["state","=","new"],["state","=","fail"]]</field>
         </record>
-
         <record id="main_monitoring" model="edi.monitoring">
             <field name="name">Shops integrations</field>
-            <field name="email"></field>
+            <field name="email"/>
             <field name="filter_id" ref="synchronizations_filter"/>
         </record>
     </data>

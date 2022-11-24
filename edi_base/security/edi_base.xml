@@ -1,46 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Make connections Company-restricted Records -->
-
     <record id="edi_connection_company_rule" model="ir.rule">
         <field name="name">Restricted edi connections: multi-company</field>
         <field name="model_id" ref="model_edi_connection"/>
         <field name="global" eval="True"/>
-        <field name="domain_force">
-            ['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]
-        </field>
+        <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
     </record>
-
     <!-- Make integrations Company-restricted Records -->
-
     <record id="edi_integration_company_rule" model="ir.rule">
         <field name="name">Restricted edi integrations: multi-company</field>
         <field name="model_id" ref="model_edi_integration"/>
         <field name="global" eval="True"/>
-        <field name="domain_force">
-            ['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]
-        </field>
+        <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
     </record>
-
     <!-- Make synchronizations Company-restricted Records -->
-
     <record id="edi_synchronization_company_rule" model="ir.rule">
         <field name="name">Restricted edi synchronization: multi-company</field>
         <field name="model_id" ref="model_edi_synchronization"/>
         <field name="global" eval="True"/>
-        <field name="domain_force">
-            ['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]
-        </field>
+        <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
     </record>
-
     <!-- Make synchronization errors Company-restricted Records -->
-
     <record id="edi_synchronization_error_company_rule" model="ir.rule">
         <field name="name">Restricted edi synchronization error: multi-company</field>
         <field name="model_id" ref="model_edi_synchronization_error"/>
         <field name="global" eval="True"/>
-        <field name="domain_force">
-            ['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]
-        </field>
+        <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
     </record>
 </odoo>

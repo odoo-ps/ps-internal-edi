@@ -1,15 +1,17 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 <odoo>
     <record id="report" model="ir.actions.report">
         <field name="name">EDI Monitoring PDF Report</field>
         <field name="model">edi.monitoring.report</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">edi_monitoring.report_template</field>
-        <field name="print_report_name">'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name, object.create_date)</field>
+        <field name="print_report_name">
+            '%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name,
+            object.create_date)
+        </field>
         <field name="binding_model_id" ref="model_edi_monitoring_report"/>
         <field name="binding_type">report</field>
     </record>
-
     <!-- Report added as an attached file to the email -->
     <template id="report_template">
         <t t-set="data_report_landscape" t-value="True"/>
@@ -19,14 +21,17 @@
             <t t-foreach="docs" t-as="o">
                 <t t-call="web.internal_layout">
                     <div class="page" style="font-size:70%">
-                        <h2><span t-field="o.monitoring_id.name"/> - <span t-field="o.create_date"/></h2>
-
+                        <h2>
+                            <span t-field="o.monitoring_id.name"/>
+                            -
+                            <span t-field="o.create_date"/>
+                        </h2>
                         <t t-if="o.limit_reached">
                             <div class="alert alert-warning" role="alert">
-                                <span t-field="o.related_lines_count"/> items are related to this report, only the lasts are detailed here
+                                <span t-field="o.related_lines_count"/>
+                                items are related to this report, only the lasts are detailed here
                             </div>
                         </t>
-
                         <table class="table table-sm o_main_table">
                             <thead>
                                 <tr>
@@ -39,13 +44,26 @@
                             </thead>
                             <tbody>
                                 <t t-foreach="o.line_ids" t-as="line">
-                                    <t t-set="state_color" t-value="'text-danger' if line.state == 'fail' else 'text-warning' if line.state == 'warning' else 'text-success' if line.state == 'done' else 'text-info' if line.state == 'new' else ''"/>
+                                    <t
+                                        t-set="state_color"
+                                        t-value="'text-danger' if line.state == 'fail' else 'text-warning' if line.state == 'warning' else 'text-success' if line.state == 'done' else 'text-info' if line.state == 'new' else ''"
+                                    />
                                     <tr t-att-class="state_color">
-                                        <td class="text-nowrap"><span t-field="line.source"/></td>
-                                        <td><span t-field="line.date"/></td>
-                                        <td><span t-field="line.state"/></td>
-                                        <td><span t-field="line.name"/></td>
-                                        <td><span t-field="line.detail"/></td>
+                                        <td class="text-nowrap">
+                                            <span t-field="line.source"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.date"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.state"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.name"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.detail"/>
+                                        </td>
                                     </tr>
                                 </t>
                             </tbody>
@@ -55,25 +73,31 @@
             </t>
         </t>
     </template>
-
     <!-- Body of the mail with a recap of all integrations monitored & number of synchronizations of each state -->
     <record id="report_mail" model="mail.template">
         <field name="name">EDI Monitoring report</field>
         <field name="model_id" ref="model_edi_monitoring_report"/>
         <field name="auto_delete" eval="False"/>
-        <field name="subject">Monitoring {{object.env['res.company'].search([], limit=1).name}} : {{object.monitoring_id.name}}</field>
-        <field name="email_from"></field>
+        <field name="subject">
+            Monitoring {{object.env['res.company'].search([], limit=1).name}} : {{object.monitoring_id.name}}
+        </field>
+        <field name="email_from"/>
         <field name="email_to">{{object.email}}</field>
-        <field name="partner_to"></field>
+        <field name="partner_to"/>
         <field name="report_template" ref="report"/>
-        <field name="report_name">{{'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name, object.create_date)}}</field>
+        <field name="report_name">
+            {{'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name,
+            object.create_date)}}
+        </field>
         <field name="body_html" type="html">
             <div t-if="object.limit_reached">
-                <div style="color: #7d5a29; background-color: #fcefdc; border: 1px solid #fbe8cd; padding: .75rem 1.25rem; margin-bottom: 1rem;">
-                    <t t-out="object.related_lines_count">25</t> items are related to this report, only the lasts are detailed here
+                <div
+                    style="color: #7d5a29; background-color: #fcefdc; border: 1px solid #fbe8cd; padding: .75rem 1.25rem; margin-bottom: 1rem;"
+                >
+                    <t t-out="object.related_lines_count">25</t>
+                    items are related to this report, only the lasts are detailed here
                 </div>
             </div>
-
             <div>
                 <table class="table">
                     <thead>
@@ -87,27 +111,40 @@
                         <t t-set="monitoring" t-value="ctx.get('monitoring')"/>
                         <t t-if="monitoring">
                             <t t-set="sources" t-value="monitoring['sources']"/>
-
                             <!-- Add sources -->
                             <t t-foreach="sources" t-as="source">
                                 <tr>
-                                    <th scope="row" t-out="source['name']">BizTalk Send Purchase Orders : Get the response</th>
-
+                                    <th scope="row" t-out="source['name']">
+                                        BizTalk Send Purchase Orders : Get the response
+                                    </th>
                                     <!-- Add states of the source -->
                                     <t t-foreach="enumerate(source['states'])" t-as="i_state">
                                         <!-- Variable values -->
                                         <t t-set="index" t-value="i_state[0]"/>
                                         <t t-set="state" t-value="i_state[1]"/>
                                         <t t-set="state_name" t-value="state['name']"/>
-
                                         <!-- Attribute values -->
                                         <t t-set="line_style" t-value="'border-top: none !important;'"/>
-                                        <t t-set="line_class" t-value="'text-danger' if state_name == 'fail' else 'text-warning' if state_name == 'warning' else 'text-success' if state_name == 'done' else 'text-info' if state_name == 'new' else 'text-secondary'"/>
-
+                                        <t
+                                            t-set="line_class"
+                                            t-value="'text-danger' if state_name == 'fail' else 'text-warning' if state_name == 'warning' else 'text-success' if state_name == 'done' else 'text-info' if state_name == 'new' else 'text-secondary'"
+                                        />
                                         <t t-if="index == 0">
                                             <span t-att-class="line_class">
-                                                <td t-att-style="line_style" t-att-class="line_class" t-out="state['name_display']">Fail</td>
-                                                <td t-att-style="line_style" t-att-class="line_class" t-out="state['number']">10</td>
+                                                <td
+                                                    t-att-style="line_style"
+                                                    t-att-class="line_class"
+                                                    t-out="state['name_display']"
+                                                >
+                                                    Fail
+                                                </td>
+                                                <td
+                                                    t-att-style="line_style"
+                                                    t-att-class="line_class"
+                                                    t-out="state['number']"
+                                                >
+                                                    10
+                                                </td>
                                             </span>
                                         </t>
                                         <tr t-else="" t-att-class="line_class">
@@ -124,7 +161,6 @@
             </div>
         </field>
     </record>
-
     <record id="report_cron" model="ir.cron">
         <field name="name">Send Mail EDI Monitoring Report</field>
         <field name="model_id" ref="model_edi_monitoring"/>
@@ -132,7 +168,10 @@
         <field name="code">model.action_create_report()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="nextcall" eval="(DateTime.now().replace(hour=7, minute=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')" />
+        <field
+            name="nextcall"
+            eval="(DateTime.now().replace(hour=7, minute=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"
+        />
         <field name="priority">99</field>
         <field name="numbercall">-1</field>
         <field name="active" eval="False"/>

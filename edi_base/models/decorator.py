@@ -5,6 +5,7 @@ from inspect import signature
 
 from odoo import SUPERUSER_ID, api, fields, registry
 
+
 _logger = logging.getLogger(__name__)
 
 

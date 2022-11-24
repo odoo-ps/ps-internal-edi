@@ -10,7 +10,6 @@
             </field>
         </field>
     </record>
-
     <record id="synchronization_tree_view_inherit_monitoring" model="ir.ui.view">
         <field name="name">edi.synchronization.tree.inherit.monitoring</field>
         <field name="model">edi.synchronization</field>

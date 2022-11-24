@@ -3,6 +3,7 @@ import operator
 
 from odoo import api, fields, models, tools
 
+
 MSG_NEW = (
     "Either report was created during the execution, "
     "or has been killed by odoo.sh because of too 15' execution timeout"
@@ -178,16 +179,11 @@ class MonitoringReport(models.Model):
 
     def _prepare_email(self):
         self.ensure_one()
-        extra_values = {
-            "sources": [],
-        }
+        extra_values = {"sources": []}
 
         for source, source_lines in tools.groupby(self.line_ids, operator.itemgetter("source")):
             source_lines = self.env["edi.monitoring.report.line"].concat(*source_lines)
-            source = {
-                "name": source,
-                "states": [],
-            }
+            source = {"name": source, "states": []}
 
             for state, state_lines in tools.groupby(source_lines, operator.itemgetter("state")):
                 state_lines = self.env["edi.monitoring.report.line"].concat(*state_lines)
