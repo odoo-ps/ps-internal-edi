@@ -4,19 +4,16 @@
         <field name="name">res.config.settings.view.form.inherit.edi.archiving</field>
         <field name="model">res.config.settings</field>
         <field name="priority" eval="10"/>
-        <field name="inherit_id" ref="edi_base.res_config_settings_view_form_edi" />
+        <field name="inherit_id" ref="edi_base.res_config_settings_view_form_edi"/>
         <field name="arch" type="xml">
             <xpath expr="//div[hasclass('edi_settings')]" position="inside">
                 <h2>Archiving</h2>
                 <div class="row mt16 o_settings_container" name="edi_archiving_setting_container">
-                    <div class="col-12 col-lg-6 o_setting_box"
-                        id="edi_archiving_duration">
+                    <div class="col-12 col-lg-6 o_setting_box" id="edi_archiving_duration">
                         <div class="o_setting_left_pane"/>
                         <div class="o_setting_right_pane">
                             <span class="o_form_label">Duration</span>
-                            <div class="text-muted">
-                                Before archiving the synchronizations (0 means never)
-                            </div>
+                            <div class="text-muted">Before archiving the synchronizations (0 means never)</div>
                             <div class="content-group">
                                 <div class="row mt16">
                                     <label string="Days" for="edi_archive_duration" class="col-lg-3 o_light_label"/>
@@ -29,10 +26,10 @@
                         <div class="o_setting_left_pane"/>
                         <div class="o_setting_right_pane">
                             <span class="o_form_label">States</span>
-                            <div class="text-muted">
-                                Archive synchronizations with those states
+                            <div class="text-muted">Archive synchronizations with those states</div>
+                            <div class="content-group">
+                                <div class="mt16"/>
                             </div>
-                            <div class="content-group"><div class="mt16"></div></div>
                             <div class="content-group">
                                 <div class="row" id="edi_archive_state_fail">
                                     <field name="edi_archive_state_fail" class="col-lg-1 ml16"/>

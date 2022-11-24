@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-
     <record id="integration_form_view" model="ir.ui.view">
         <field name="name">edi.integration.form</field>
         <field name="model">edi.integration</field>
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button type="object"
+                    <button
+                        type="object"
                         name="test_connection"
                         string="Test Connection"
                         attrs="{'invisible': [('has_sub_integration', '=', True)]}"
                     />
-                    <button type="object"
+                    <button
+                        type="object"
                         name="process_integration"
                         string="Synchronize"
                         class="oe_highlight"
@@ -24,8 +25,11 @@
                         <button class="oe_stat_button" type="object" name="toggle_active" icon="fa-archive">
                             <field name="active" widget="boolean_button" options='{"terminology": "active"}'/>
                         </button>
-                        <button type="object" name="open_synchronizations"
-                            icon="fa-cloud-upload" class="oe_stat_button"
+                        <button
+                            type="object"
+                            name="open_synchronizations"
+                            icon="fa-cloud-upload"
+                            class="oe_stat_button"
                             string="Synchronizations"
                         />
                     </div>
@@ -37,42 +41,56 @@
                     </div>
                     <group>
                         <group>
-                            <field name="sequence" />
-                            <field name="has_sub_integration" />
+                            <field name="sequence"/>
+                            <field name="has_sub_integration"/>
                             <field name="integration_flow"/>
-                            <field name="type" />
-                            <field name="synchronization_creation" attrs="{'invisible': [('has_sub_integration', '=', True)]}" />
+                            <field name="type"/>
+                            <field
+                                name="synchronization_creation"
+                                attrs="{'invisible': [('has_sub_integration', '=', True)]}"
+                            />
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                     </group>
                     <notebook>
-                        <page name="sub_integration" string="Sub Integrations" attrs="{'invisible': [('has_sub_integration', '=', False)]}" >
-                            <field name="sub_integration_ids" >
+                        <page
+                            name="sub_integration"
+                            string="Sub Integrations"
+                            attrs="{'invisible': [('has_sub_integration', '=', False)]}"
+                        >
+                            <field name="sub_integration_ids">
                                 <tree editable="bottom">
-                                    <field name="sequence" />
-                                    <field name="name" readonly="1" />
+                                    <field name="sequence"/>
+                                    <field name="name" readonly="1"/>
                                 </tree>
                             </field>
                         </page>
                         <page name="status" string="Status" attrs="{'invisible': [('has_sub_integration', '=', True)]}">
                             <group>
                                 <field name="last_execution_date"/>
-                                <field name="last_success_date" />
-                                <field name="last_failure_date" />
-                                <field name="last_sync_status" />
+                                <field name="last_success_date"/>
+                                <field name="last_failure_date"/>
+                                <field name="last_sync_status"/>
                             </group>
                         </page>
-                        <page name="configuration" string='Configuration' attrs="{'invisible': [('has_sub_integration', '=', True)]}">
+                        <page
+                            name="configuration"
+                            string='Configuration'
+                            attrs="{'invisible': [('has_sub_integration', '=', True)]}"
+                        >
                             <group>
                                 <group>
-                                    <field name="synchronization_content_type" />
+                                    <field name="synchronization_content_type"/>
                                     <field name="write_content_on_sync"/>
                                     <field name="connection_id"/>
-                                    <field name="record_filter_id" attrs="{'invisible': [('integration_flow', '=', 'in')]}" />
+                                    <field
+                                        name="record_filter_id"
+                                        attrs="{'invisible': [('integration_flow', '=', 'in')]}"
+                                    />
                                 </group>
                             </group>
-                            <separator string="Integration Parameter" />
-                            <field name="parameter" />
+                            <separator string="Integration Parameter"/>
+                            <field name="parameter"/>
                         </page>
                         <page name="cron" string="Cron information">
                             <group>
@@ -95,7 +113,6 @@
             </form>
         </field>
     </record>
-
     <record id="integration_tree_view" model="ir.ui.view">
         <field name="name">edi.integration.tree</field>
         <field name="model">edi.integration</field>
@@ -104,12 +121,15 @@
                 <field name="name"/>
                 <field name="integration_flow"/>
                 <field name="cron_id"/>
-                <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}" optional="show"/>
+                <field
+                    name="company_id"
+                    groups="base.group_multi_company"
+                    options="{'no_create': True}"
+                    optional="show"
+                />
             </tree>
         </field>
     </record>
-
-
     <record id="integration_kanban_view" model="ir.ui.view">
         <field name="name">edi.integration.kanban</field>
         <field name="model">edi.integration</field>
@@ -119,26 +139,55 @@
                 <field name="integration_flow"/>
                 <field name="cron_id"/>
                 <field name="active"/>
-                <field name="last_execution_date" />
-                <field name="last_success_date" />
-                <field name="last_failure_date" />
-                <field name="last_sync_status" />
-                <field name="color" />
-                <field name="has_sub_integration" />
+                <field name="last_execution_date"/>
+                <field name="last_success_date"/>
+                <field name="last_failure_date"/>
+                <field name="last_sync_status"/>
+                <field name="color"/>
+                <field name="has_sub_integration"/>
                 <field name="company_id" invisible="1"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon">
                             <div class="o_project_kanban_main">
                                 <div class="o_dropdown_kanban dropdown" groups="base.group_user">
-                                    <a role="button" class="dropdown-toggle o-no-caret btn" data-toggle="dropdown" href="#"
-                                        aria-label="Dropdown menu" title="Dropdown menu" >
+                                    <a
+                                        role="button"
+                                        class="dropdown-toggle o-no-caret btn"
+                                        data-toggle="dropdown"
+                                        href="#"
+                                        aria-label="Dropdown menu"
+                                        title="Dropdown menu"
+                                    >
                                         <span class="fa fa-ellipsis-v"/>
                                     </a>
                                     <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
-                                        <a role="menuitem" type="object" name="open_synchronizations" class="dropdown-item">Open Synchronizations</a>
-                                        <a role="menuitem" type="object" name="test_connection" class="dropdown-item" attrs="{'invisible': [('has_sub_integration', '=', True)]}">Test Connection</a>
-                                        <a role="menuitem" type="object" name="process_integration" class="dropdown-item" context="{'edi_raise_error': True}">Synchronize</a>
+                                        <a
+                                            role="menuitem"
+                                            type="object"
+                                            name="open_synchronizations"
+                                            class="dropdown-item"
+                                        >
+                                            Open Synchronizations
+                                        </a>
+                                        <a
+                                            role="menuitem"
+                                            type="object"
+                                            name="test_connection"
+                                            class="dropdown-item"
+                                            attrs="{'invisible': [('has_sub_integration', '=', True)]}"
+                                        >
+                                            Test Connection
+                                        </a>
+                                        <a
+                                            role="menuitem"
+                                            type="object"
+                                            name="process_integration"
+                                            class="dropdown-item"
+                                            context="{'edi_raise_error': True}"
+                                        >
+                                            Synchronize
+                                        </a>
                                         <a role="menuitem" type="object" name="toggle_active" class="dropdown-item">
                                             <t t-if="!record.active.raw_value">Unarchive</t>
                                             <t t-if="record.active.raw_value">Archive</t>
@@ -148,30 +197,40 @@
                                 <div class="o_kanban_card_content">
                                     <div class="o_kanban_primary_left">
                                         <div>
-                                            <h3><t t-out="record.name.value"/></h3>
+                                            <h3>
+                                                <t t-out="record.name.value"/>
+                                            </h3>
                                         </div>
                                         <div>
                                             <strong>
                                                 CRON State:
-                                                <t t-if="record.active.raw_value">
-                                                    Active
-                                                </t>
-                                                <t t-if="!record.active.raw_value">
-                                                    Inactive
-                                                </t>
+                                                <t t-if="record.active.raw_value">Active</t>
+                                                <t t-if="!record.active.raw_value">Inactive</t>
                                             </strong>
                                         </div>
                                         <div>
-                                            <strong>Last Status: <t t-out="record.last_sync_status.value"/></strong>
+                                            <strong>
+                                                Last Status:
+                                                <t t-out="record.last_sync_status.value"/>
+                                            </strong>
                                         </div>
                                         <div>
-                                            <span>Last Sync Sucess: <t t-out="record.last_success_date.value"/></span>
+                                            <span>
+                                                Last Sync Sucess:
+                                                <t t-out="record.last_success_date.value"/>
+                                            </span>
                                         </div>
                                         <div>
-                                            <span>Last Sync Fail: <t t-out="record.last_failure_date.value"/></span>
+                                            <span>
+                                                Last Sync Fail:
+                                                <t t-out="record.last_failure_date.value"/>
+                                            </span>
                                         </div>
                                         <t t-if="record.company_id.value">
-                                            <strong>Company: <t t-out="record.company_id.value"/></strong>
+                                            <strong>
+                                                Company:
+                                                <t t-out="record.company_id.value"/>
+                                            </strong>
                                         </t>
                                     </div>
                                 </div>
@@ -182,7 +241,6 @@
             </kanban>
         </field>
     </record>
-
     <record id="integration_search_view" model="ir.ui.view">
         <field name="name">edi.integration.search</field>
         <field name="model">edi.integration</field>
@@ -190,38 +248,70 @@
             <search>
                 <field name="name"/>
                 <field name="integration_flow"/>
-                <field name="type" />
+                <field name="type"/>
                 <field name="synchronization_content_type"/>
                 <filter name="all" string="All" domain="['|', ('active', '=', True), ('active', '=', False)]"/>
                 <filter name="active" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
-                <filter name="success" string="Success" domain="[('last_sync_status', '=', 'Success'), '|', ('active', '=', True), ('active', '=', False)]" />
-                <filter name="success" string="Fail" domain="[('last_sync_status', '=', 'Fail'), '|', ('active', '=', True), ('active', '=', False)]" />
+                <filter
+                    name="success"
+                    string="Success"
+                    domain="[('last_sync_status', '=', 'Success'), '|', ('active', '=', True), ('active', '=', False)]"
+                />
+                <filter
+                    name="success"
+                    string="Fail"
+                    domain="[('last_sync_status', '=', 'Fail'), '|', ('active', '=', True), ('active', '=', False)]"
+                />
                 <field name="company_id" groups="base.group_multi_company"/>
                 <group string="Group By">
-                    <filter name="group_by_last_sync_status" string="Sync Status" context="{'group_by': 'last_sync_status'}" />
-                    <filter name="group_by_integration_flow" string="Flow Type" context="{'group_by': 'integration_flow'}"/>
+                    <filter
+                        name="group_by_last_sync_status"
+                        string="Sync Status"
+                        context="{'group_by': 'last_sync_status'}"
+                    />
+                    <filter
+                        name="group_by_integration_flow"
+                        string="Flow Type"
+                        context="{'group_by': 'integration_flow'}"
+                    />
                     <filter name="group_by_type" string="Type" context="{'group_by': 'type'}"/>
-                    <filter name="group_by_synchronization_content_type" string="Content Type" context="{'group_by': 'synchronization_content_type'}"/>
-                    <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                    <filter
+                        name="group_by_synchronization_content_type"
+                        string="Content Type"
+                        context="{'group_by': 'synchronization_content_type'}"
+                    />
+                    <filter
+                        name="group_by_company"
+                        string="Company"
+                        context="{'group_by': 'company_id'}"
+                        groups="base.group_multi_company"
+                    />
                 </group>
             </search>
         </field>
     </record>
-
     <record id="integrations_act_window" model="ir.actions.act_window">
         <field name="name">Integrations</field>
         <field name="res_model">edi.integration</field>
         <field name="view_mode">kanban,tree,form</field>
         <field name="search_view_id" ref="edi_base.integration_search_view"/>
-        <field name="context" eval="{
+        <field
+            name="context"
+            eval="{
             'search_default_all': True,
             'search_default_group_by_last_sync_status' : True,
-        }"/>
+        }"
+        />
         <field name="help" type="html">
             <p class="oe_view_nocontent">Here you will find the integrations installed in your system.</p>
         </field>
     </record>
-
-    <menuitem id="integrations_menu" parent="root_menu" name="Integrations" sequence="1" action="integrations_act_window"/>
+    <menuitem
+        id="integrations_menu"
+        parent="root_menu"
+        name="Integrations"
+        sequence="1"
+        action="integrations_act_window"
+    />
 </odoo>

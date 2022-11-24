@@ -6,6 +6,7 @@ from odoo import api, models
 
 from odoo.addons.edi_base.models.decorator import integration
 
+
 _logger = logging.getLogger(__name__)
 
 

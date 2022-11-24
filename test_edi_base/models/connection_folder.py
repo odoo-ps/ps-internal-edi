@@ -56,12 +56,7 @@ class ConnectionFolder(models.Model):
             file_path = "%s/%s" % (config["in_folder"], f)
             if os.path.isfile(file_path):
                 with open(file_path, "r") as fd:
-                    data.append(
-                        {
-                            "filename": f,
-                            "content": fd.read(),
-                        }
-                    )
+                    data.append({"filename": f, "content": fd.read()})
         return data
 
     def _clean_synchronization_in(self, data, status, *args, **kwargs):

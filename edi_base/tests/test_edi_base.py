@@ -8,12 +8,7 @@ class TestEdiBase(TestEDICommon):
         """
         Test if sub_integration_ids has inactive children
         """
-        record_filter_id = self.new_env["ir.filters"].create(
-            {
-                "name": "Test ir filters",
-                "model_id": "res.partner",
-            }
-        )
+        record_filter_id = self.new_env["ir.filters"].create({"name": "Test ir filters", "model_id": "res.partner"})
         edi_parent_integration = self.new_env["edi.integration"].create(
             {
                 "name": "Test edi parent integration",

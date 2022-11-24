@@ -1,242 +1,307 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-
-<record id="synchronization_error_tree_view" model="ir.ui.view">
-    <field name="name">edi.synchronization.error.tree</field>
-    <field name="model">edi.synchronization.error</field>
-    <field name="arch" type="xml">
-        <tree string="Synchronization errors" edit="0" create="0" delete="0">
-            <field name="synchronization_id"/>
-            <field name="create_date"/>
-            <field name="write_date"/>
-            <field name="activity"/>
-            <field name="description_short"/>
-            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}" optional="show"/>
-        </tree>
-    </field>
-</record>
-
-<record id="synchronization_error_form_view" model="ir.ui.view">
-    <field name="name">edi.synchronization.error.form</field>
-    <field name="model">edi.synchronization.error</field>
-    <field name="arch" type="xml">
-        <form string="Synchronization error" edit="0" create="0" delete="0">
-            <sheet>
-                <h1>
-                    <field name="synchronization_id"/>
-                </h1>
-                <group>
-                    <group>
-                        <field name="activity"/>
-                        <field name="company_id" groups="base.group_multi_company"/>
-                    </group>
-                </group>
-                <separator string="Description" />
-                <field name="description" />
-            </sheet>
-        </form>
-    </field>
-</record>
-
-<record id="synchronization_error_embedded_tree_view" model="ir.ui.view">
-    <field name="name">edi.synchronization.error.embedded.tree</field>
-    <field name="model">edi.synchronization.error</field>
-    <field name="inherit_id" ref="edi_base.synchronization_error_tree_view"/>
-    <field name="mode">primary</field>
-    <field name="arch" type="xml">
-        <field name="synchronization_id" position="attributes">
-            <attribute name="invisible">1</attribute>
+    <record id="synchronization_error_tree_view" model="ir.ui.view">
+        <field name="name">edi.synchronization.error.tree</field>
+        <field name="model">edi.synchronization.error</field>
+        <field name="arch" type="xml">
+            <tree string="Synchronization errors" edit="0" create="0" delete="0">
+                <field name="synchronization_id"/>
+                <field name="create_date"/>
+                <field name="write_date"/>
+                <field name="activity"/>
+                <field name="description_short"/>
+                <field
+                    name="company_id"
+                    groups="base.group_multi_company"
+                    options="{'no_create': True}"
+                    optional="show"
+                />
+            </tree>
         </field>
-    </field>
-</record>
+    </record>
+    <record id="synchronization_error_form_view" model="ir.ui.view">
+        <field name="name">edi.synchronization.error.form</field>
+        <field name="model">edi.synchronization.error</field>
+        <field name="arch" type="xml">
+            <form string="Synchronization error" edit="0" create="0" delete="0">
+                <sheet>
+                    <h1>
+                        <field name="synchronization_id"/>
+                    </h1>
+                    <group>
+                        <group>
+                            <field name="activity"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <separator string="Description"/>
+                    <field name="description"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="synchronization_error_embedded_tree_view" model="ir.ui.view">
+        <field name="name">edi.synchronization.error.embedded.tree</field>
+        <field name="model">edi.synchronization.error</field>
+        <field name="inherit_id" ref="edi_base.synchronization_error_tree_view"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <field name="synchronization_id" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </field>
+        </field>
+    </record>
+    <record id="synchronization_form_view" model="ir.ui.view">
+        <field name="name">edi.synchronization.form</field>
+        <field name="model">edi.synchronization</field>
+        <field name="arch" type="xml">
+            <form string="Synchronization" edit="0" create="0" delete="0">
+                <field name="integration_id" invisible="1"/>
+                <field name="res_id" invisible="1"/>
+                <header>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
 
-<record id="synchronization_form_view" model="ir.ui.view">
-    <field name="name">edi.synchronization.form</field>
-    <field name="model">edi.synchronization</field>
-    <field name="arch" type="xml">
-        <form string="Synchronization" edit="0" create="0" delete="0">
-            <field name="integration_id" invisible="1"/>
-            <field name="res_id" invisible="1"/>
-            <header>
-                <field name="state" widget="statusbar"/>
-            </header>
-            <sheet>
-                <div class="oe_button_box" name="button_box">
-                </div>
-                <h1>
-                    <field name="name"/>
-                </h1>
-                <div>
-                    <field name="filename"/>
-                </div>
-                <separator string="Basic Information"/>
-                <group>
+                    </div>
+                    <h1>
+                        <field name="name"/>
+                    </h1>
+                    <div>
+                        <field name="filename"/>
+                    </div>
+                    <separator string="Basic Information"/>
                     <group>
-                        <field name="create_date"/>
-                        <field name="write_date"/>
-                        <field name="company_id" groups="base.group_multi_company"/>
+                        <group>
+                            <field name="create_date"/>
+                            <field name="write_date"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="synchronization_date"/>
+                        </group>
                     </group>
-                    <group>
-                        <field name="synchronization_date"/>
-                    </group>
-                </group>
-                <notebook attrs="{
+                    <notebook
+                        attrs="{
                     'invisible': [
                         ('error_ids', '=', []),
                         ('content', '=', False)
                     ]
-                }">
-                    <page string="Content" attrs="{
+                }"
+                    >
+                        <page
+                            string="Content"
+                            attrs="{
                         'invisible': [('content', '=', False)]
-                    }">
-                        <group>
-                            <field name="content_type"/>
-                            <field name="content"
-                                attrs="{
+                    }"
+                        >
+                            <group>
+                                <field name="content_type"/>
+                                <field
+                                    name="content"
+                                    attrs="{
                                     'invisible': [('content_type', '=', 'pdf')]
                                 }"
-                            />
-                        </group>
-                    </page>
-                    <page string="Failures" attrs="{
+                                />
+                            </group>
+                        </page>
+                        <page
+                            string="Failures"
+                            attrs="{
                         'invisible': [('error_ids', '=', [])]
-                    }">
-                        <field name="error_ids" context="{
+                    }"
+                        >
+                            <field
+                                name="error_ids"
+                                context="{
                                 'tree_view_ref': 'edi_base.synchronization_error_embedded_tree_view',
                                 'sync_id': active_id
                             }"
-                        />
-                    </page>
-                </notebook>
-            </sheet>
-        </form>
-    </field>
-</record>
-
-<record id="synchronization_list_view" model="ir.ui.view">
-    <field name="name">edi.synchronization.tree</field>
-    <field name="model">edi.synchronization</field>
-    <field name="arch" type="xml">
-        <tree string="Synchronizations" edit="0" create="0" delete="0"
-              decoration-success="state=='done'"
-              decoration-info="state=='new'"
-              decoration-muted="state=='cancel'"
-              decoration-danger="state=='fail'">
-            <field name="name"/>
-            <field name="content_type"/>
-            <field name="create_date"/>
-            <field name="synchronization_date"/>
-            <field name="synchronization_flow" invisible="1"/>
-            <field name="state" invisible="1"/>
-            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}" optional="show"/>
-        </tree>
-    </field>
-</record>
-
-<record id="synchronization_kanban_view" model="ir.ui.view">
-    <field name="name">edi.syncrhonization.kanban.view</field>
-    <field name="model">edi.synchronization</field>
-    <field name="arch" type="xml">
-        <kanban string="Synchronizations" create="0" delete="0">
-            <field name="name"/>
-            <field name="name_short"/>
-            <field name="color"/>
-            <field name="state"/>
-            <field name="filename_short"/>
-            <field name="synchronization_date"/>
-            <field name="company_id"/>
-            <templates>
-                <t t-name="kanban-box">
-                    <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon oe_kanban_global_click">
-                        <div class="o_project_kanban_main">
-                            <div class="o_dropdown_kanban dropdown" groups="base.group_user">
-                                <a role="button" class="dropdown-toggle o-no-caret btn" data-toggle="dropdown" href="#"
-                                    aria-label="Dropdown menu" title="Dropdown menu" >
-                                    <span class="fa fa-ellipsis-v"/>
-                                </a>
-                                <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
-                                    <a role="menuitem" type="object" name="open_integration" class="dropdown-item">Open Integration</a>
+                            />
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="synchronization_list_view" model="ir.ui.view">
+        <field name="name">edi.synchronization.tree</field>
+        <field name="model">edi.synchronization</field>
+        <field name="arch" type="xml">
+            <tree
+                string="Synchronizations"
+                edit="0"
+                create="0"
+                delete="0"
+                decoration-success="state=='done'"
+                decoration-info="state=='new'"
+                decoration-muted="state=='cancel'"
+                decoration-danger="state=='fail'"
+            >
+                <field name="name"/>
+                <field name="content_type"/>
+                <field name="create_date"/>
+                <field name="synchronization_date"/>
+                <field name="synchronization_flow" invisible="1"/>
+                <field name="state" invisible="1"/>
+                <field
+                    name="company_id"
+                    groups="base.group_multi_company"
+                    options="{'no_create': True}"
+                    optional="show"
+                />
+            </tree>
+        </field>
+    </record>
+    <record id="synchronization_kanban_view" model="ir.ui.view">
+        <field name="name">edi.syncrhonization.kanban.view</field>
+        <field name="model">edi.synchronization</field>
+        <field name="arch" type="xml">
+            <kanban string="Synchronizations" create="0" delete="0">
+                <field name="name"/>
+                <field name="name_short"/>
+                <field name="color"/>
+                <field name="state"/>
+                <field name="filename_short"/>
+                <field name="synchronization_date"/>
+                <field name="company_id"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div
+                            t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon oe_kanban_global_click"
+                        >
+                            <div class="o_project_kanban_main">
+                                <div class="o_dropdown_kanban dropdown" groups="base.group_user">
+                                    <a
+                                        role="button"
+                                        class="dropdown-toggle o-no-caret btn"
+                                        data-toggle="dropdown"
+                                        href="#"
+                                        aria-label="Dropdown menu"
+                                        title="Dropdown menu"
+                                    >
+                                        <span class="fa fa-ellipsis-v"/>
+                                    </a>
+                                    <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
+                                        <a role="menuitem" type="object" name="open_integration" class="dropdown-item">
+                                            Open Integration
+                                        </a>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="o_kanban_card_content">
-                                <div class="o_kanban_primary_left">
-                                    <div class="o_primary">
-                                        <h5>
-                                            <t t-out="record.name_short.value"/>
-                                        </h5>
-                                        <div t-if="record.filename_short.raw_value">
-                                            <i><field name="filename_short"/></i>
+                                <div class="o_kanban_card_content">
+                                    <div class="o_kanban_primary_left">
+                                        <div class="o_primary">
+                                            <h5>
+                                                <t t-out="record.name_short.value"/>
+                                            </h5>
+                                            <div t-if="record.filename_short.raw_value">
+                                                <i>
+                                                    <field name="filename_short"/>
+                                                </i>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div>
-                                    <strong>Status: <t t-out="record.state.value"/></strong>
-                                </div>
-                                <div>
-                                    <span><i class="fa fa-calendar-plus-o" aria-label="Synchronization Date"/> <field name="create_date"/></span>
-                                </div>
-                                <div>
-                                    <span><i class="fa fa-calendar-check-o" aria-label="Synchronization Date"/> <field name="synchronization_date"/></span>
-                                </div>
-                                <div>
-                                    <span><i class="fa fa-file-o" aria-label="Content Type"/> <field name="content_type"/></span>
-                                </div>
-                                <t t-if="record.company_id.value">
                                     <div>
-                                        <strong>Company: <t t-out="record.company_id.value"/></strong>
+                                        <strong>
+                                            Status:
+                                            <t t-out="record.state.value"/>
+                                        </strong>
                                     </div>
-                                </t>
+                                    <div>
+                                        <span>
+                                            <i class="fa fa-calendar-plus-o" aria-label="Synchronization Date"/>
+                                            <field name="create_date"/>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span>
+                                            <i class="fa fa-calendar-check-o" aria-label="Synchronization Date"/>
+                                            <field name="synchronization_date"/>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span>
+                                            <i class="fa fa-file-o" aria-label="Content Type"/>
+                                            <field name="content_type"/>
+                                        </span>
+                                    </div>
+                                    <t t-if="record.company_id.value">
+                                        <div>
+                                            <strong>
+                                                Company:
+                                                <t t-out="record.company_id.value"/>
+                                            </strong>
+                                        </div>
+                                    </t>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </t>
-            </templates>
-        </kanban>
-    </field>
-</record>
-
-<record id="synchronization_search_view" model="ir.ui.view">
-    <field name="name">edi.syncrhonization.search.view</field>
-    <field name="model">edi.synchronization</field>
-    <field name="arch" type="xml">
-        <search string="Synchronization File">
-            <field name="name" filter_domain="['|', ('name', 'ilike', self), ('filename', 'ilike', self)]"/>
-            <field name="integration_id"/>
-            <field name="content"/>
-            <field name="company_id" groups="base.group_multi_company"/>
-            <filter name="in_synchronizations" string="Incoming Synchronizations"
-                domain="[('synchronization_flow', '=', 'in')]"
-            />
-            <filter name="out_synchronizations" string="Outgoing Synchronizations"
-                domain="[('synchronization_flow', '=', 'out')]"
-            />
-            <filter name="new" string="New" domain="[('state', '=', 'new')]"/>
-            <filter name="done" string="Done" domain="[('state', '=', 'done')]"/>
-            <filter name="fail" string="Failed" domain="[('state', '=', 'fail')]"/>
-            <filter name="cancel" string="Cancelled" domain="[('state', '=', 'cancel')]"/>
-
-            <group string="Group By">
-                <filter name="group_by_integration" string="Integration" context="{'group_by': 'integration_id'}"/>
-                <filter name="group_by_type" string="Flow Type" context="{'group_by': 'synchronization_flow'}"/>
-                <filter name="group_by_content_type" string="Content Type" context="{'group_by': 'content_type'}"/>
-                <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
-                <filter name="group_by_synchronization_month" string="Synchronization Month" context="{'group_by': 'synchronization_date:month'}"/>
-                <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
-            </group>
-        </search>
-    </field>
-</record>
-
-<record id="synchronizations_act_window" model="ir.actions.act_window">
-    <field name="name">Synchronizations</field>
-    <field name="res_model">edi.synchronization</field>
-    <field name="view_mode">tree,kanban,form</field>
-    <field name="search_view_id" ref="edi_base.synchronization_search_view"/>
-    <field name="help" type="html">
-        <p class="oe_view_nocontent">Here you will find the files created to be synchronized with the remote servers configured on your integrations.</p>
-    </field>
-</record>
-
-<menuitem id="synchronizations_menu" parent="root_menu" name="Synchronizations" sequence="10" action="synchronizations_act_window"/>
-
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+    <record id="synchronization_search_view" model="ir.ui.view">
+        <field name="name">edi.syncrhonization.search.view</field>
+        <field name="model">edi.synchronization</field>
+        <field name="arch" type="xml">
+            <search string="Synchronization File">
+                <field name="name" filter_domain="['|', ('name', 'ilike', self), ('filename', 'ilike', self)]"/>
+                <field name="integration_id"/>
+                <field name="content"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <filter
+                    name="in_synchronizations"
+                    string="Incoming Synchronizations"
+                    domain="[('synchronization_flow', '=', 'in')]"
+                />
+                <filter
+                    name="out_synchronizations"
+                    string="Outgoing Synchronizations"
+                    domain="[('synchronization_flow', '=', 'out')]"
+                />
+                <filter name="new" string="New" domain="[('state', '=', 'new')]"/>
+                <filter name="done" string="Done" domain="[('state', '=', 'done')]"/>
+                <filter name="fail" string="Failed" domain="[('state', '=', 'fail')]"/>
+                <filter name="cancel" string="Cancelled" domain="[('state', '=', 'cancel')]"/>
+                <group string="Group By">
+                    <filter name="group_by_integration" string="Integration" context="{'group_by': 'integration_id'}"/>
+                    <filter name="group_by_type" string="Flow Type" context="{'group_by': 'synchronization_flow'}"/>
+                    <filter name="group_by_content_type" string="Content Type" context="{'group_by': 'content_type'}"/>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter
+                        name="group_by_synchronization_month"
+                        string="Synchronization Month"
+                        context="{'group_by': 'synchronization_date:month'}"
+                    />
+                    <filter
+                        name="group_by_company"
+                        string="Company"
+                        context="{'group_by': 'company_id'}"
+                        groups="base.group_multi_company"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="synchronizations_act_window" model="ir.actions.act_window">
+        <field name="name">Synchronizations</field>
+        <field name="res_model">edi.synchronization</field>
+        <field name="view_mode">tree,kanban,form</field>
+        <field name="search_view_id" ref="edi_base.synchronization_search_view"/>
+        <field name="help" type="html">
+            <p class="oe_view_nocontent">
+                Here you will find the files created to be synchronized with the remote servers configured on your
+                integrations.
+            </p>
+        </field>
+    </record>
+    <menuitem
+        id="synchronizations_menu"
+        parent="root_menu"
+        name="Synchronizations"
+        sequence="10"
+        action="synchronizations_act_window"
+    />
 </odoo>

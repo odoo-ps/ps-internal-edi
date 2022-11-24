@@ -49,7 +49,9 @@ repos:
     rev: 22.3.0
     hooks:
       - id: black
-        args: [--line-length=120]
+        args:
+          - --line-length=120
+          - --skip-magic-trailing-comma
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v2.1.2
     hooks:
@@ -60,7 +62,7 @@ repos:
           - "@prettier/plugin-xml@0.12.0"
         args:
           - --plugin=@prettier/plugin-xml
-        files: \.(css|htm|html|js|json|jsx|less|md|scss|toml|ts|yaml|yml)$
+        files: \.(css|htm|html|js|json|jsx|less|md|scss|toml|ts|xml|yaml|yml)$
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v7.8.1
     hooks:

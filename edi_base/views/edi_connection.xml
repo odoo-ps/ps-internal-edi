@@ -6,12 +6,8 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button type="object"
-                        name="test"
-                        string="Test"/>
-                    <button type="object"
-                        name="reset_config"
-                        string="Reset Configuration"/>
+                    <button type="object" name="test" string="Test"/>
+                    <button type="object" name="reset_config" string="Reset Configuration"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -27,6 +23,7 @@
                             <field name="configuration" groups="base.group_system"/>
                         </group>
                         <group name="details">
+
                         </group>
                     </group>
                     <notebook>
@@ -38,7 +35,6 @@
             </form>
         </field>
     </record>
-
     <record id="connection_tree_view" model="ir.ui.view">
         <field name="name">edi.connection.tree</field>
         <field name="model">edi.connection</field>
@@ -46,14 +42,15 @@
             <tree>
                 <field name="name"/>
                 <field name="type"/>
-                <field name="company_id"
-                       groups="base.group_multi_company"
-                       options="{'no_create': True}"
-                       optional="show"/>
+                <field
+                    name="company_id"
+                    groups="base.group_multi_company"
+                    options="{'no_create': True}"
+                    optional="show"
+                />
             </tree>
         </field>
     </record>
-
     <record id="connection_search_view" model="ir.ui.view">
         <field name="name">edi.connection.search.view</field>
         <field name="model">edi.connection</field>
@@ -63,32 +60,35 @@
                 <field name="type"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <group string="Group By">
-                    <filter name="group_by_type" string="Type" context="{'group_by': 'type'}" />
-                    <filter name="group_by_company"
-                            string="Company"
-                            context="{'group_by': 'company_id'}"
-                            groups="base.group_multi_company"/>
+                    <filter name="group_by_type" string="Type" context="{'group_by': 'type'}"/>
+                    <filter
+                        name="group_by_company"
+                        string="Company"
+                        context="{'group_by': 'company_id'}"
+                        groups="base.group_multi_company"
+                    />
                 </group>
             </search>
         </field>
     </record>
-
     <record id="connections_act_window" model="ir.actions.act_window">
         <field name="name">Connections</field>
         <field name="res_model">edi.connection</field>
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="edi_base.connection_search_view"/>
     </record>
-
-    <menuitem id="root_menu"
-              name="EDI"
-              sequence="98"
-              groups="base.group_system"
-              web_icon="edi_base,static/description/icon.png"/>
-
-    <menuitem id="connections_menu"
-              parent="root_menu"
-              name="Connections"
-              sequence="10"
-              action="connections_act_window"/>
+    <menuitem
+        id="root_menu"
+        name="EDI"
+        sequence="98"
+        groups="base.group_system"
+        web_icon="edi_base,static/description/icon.png"
+    />
+    <menuitem
+        id="connections_menu"
+        parent="root_menu"
+        name="Connections"
+        sequence="10"
+        action="connections_act_window"
+    />
 </odoo>

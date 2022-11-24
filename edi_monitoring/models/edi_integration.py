@@ -3,6 +3,7 @@ import os
 
 from odoo import _, fields, models
 
+
 _logger = logging.getLogger(__name__)
 
 
@@ -53,10 +54,7 @@ class Integration(models.Model):
             _logger.log(level, msg, *args, **kwargs)
 
     def _process_in_file(self, data, raise_error=False):
-        self.env.fail_safe.env.context = {
-            **self.env.fail_safe.env.context,
-            "file": data.get("file"),
-        }
+        self.env.fail_safe.env.context = {**self.env.fail_safe.env.context, "file": data.get("file")}
         return super(Integration, self)._process_in_file(data, raise_error)
 
     def _create_synchronzation_in(self, filename, content):
