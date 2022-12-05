@@ -1,9 +1,14 @@
 import logging
 
+from odoo.tools import column_exists
+
 logger = logging.getLogger(__name__)
 
 
 def migrate(cr, version):
+    if not column_exists(cr, "edi_connection", "in_done_let"):
+        logger.info("Column in_done_let already renamed, skipping ...")
+        return
     # rename field in_done_let to ftp_in_done_let
     logger.info("Rename field edi.connection.in_done_let into edi.connection.ftp_in_done_let")
 
