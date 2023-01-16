@@ -35,7 +35,7 @@ def migrate(cr, version):
     cr.execute("""DO $$ BEGIN IF (EXISTS (
             SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'edi_integration' AND column_name='in_process_type'
             ))
-            THEN ALTER TABLE edi_intgration DROP COLUMN in_process_type;
+            THEN ALTER TABLE edi_integration DROP COLUMN in_process_type;
         END IF; END; $$""")
     cr.execute("DELETE FROM ir_model_fields WHERE name='in_process_type' AND model='edi.integration';")
 
