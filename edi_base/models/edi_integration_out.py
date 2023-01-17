@@ -54,27 +54,49 @@ class IntegrationOut(models.Model):
             # all operations must be executed in the same savepoint
             # because they should be atomic
             with self.env.cr.savepoint():
-                self.env.activity = "Get Content"
-                content = self._get_content(records)
-                if self.write_content_on_sync:
-                    self.env.sync._write_content(content)
-
-                self.env.activity = "Send Synchro"
-                res = self._send_content(content, records)
-
-                self.env.activity = "Postprocess"
-                self._postprocess(res, content, records)
-
+                content = self._process_out_data(records)
                 # at the exit, the savepoint will flush (force to reveal concurrent updates)
                 # thus, no need of explicit flush
-
         except Exception:
+            raise
+        finally:
             if content:
                 # force the write of the content on the synchronization
                 if self.write_content_on_sync:
                     self.env.sync._write_content(content)
 
-            raise
+    def _get_out_data(self):
+        """Return the data to process for out flow
+
+        :return: recordset to synchronize (use to generate the content)
+        """
+        self.ensure_one()
+        return self._get_record_to_send()
+
+    def _get_out_content(self, data):
+        """Process the given data for in flow
+
+        :param records: recordset
+        :return: str
+        """
+        self.ensure_one()
+        return self._get_content(data)
+
+    def _process_out_data(self, records):
+        """Process the given records for out flow
+
+        :param records: recordset
+        :return: str
+        """
+        self.env.activity = "Get Content"
+        content = self._get_out_content(records)
+
+        self.env.activity = "Send Synchro"
+        res = self._send_content(content, records)
+
+        self.env.activity = "Postprocess"
+        self._postprocess(res, content, records)
+        return content
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
