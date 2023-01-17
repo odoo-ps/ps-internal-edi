@@ -71,12 +71,12 @@
                 </div>
                 <separator string="Basic Information"/>
                 <group>
-                    <group>
+                    <group name="left_group">
                         <field name="create_date"/>
                         <field name="write_date"/>
                         <field name="company_id" groups="base.group_multi_company"/>
                     </group>
-                    <group>
+                    <group name="right_group">
                         <field name="synchronization_date"/>
                     </group>
                 </group>
@@ -204,12 +204,14 @@
             <field name="integration_id"/>
             <field name="content"/>
             <field name="company_id" groups="base.group_multi_company"/>
+
             <filter name="in_synchronizations" string="Incoming Synchronizations"
                 domain="[('synchronization_flow', '=', 'in')]"
             />
             <filter name="out_synchronizations" string="Outgoing Synchronizations"
                 domain="[('synchronization_flow', '=', 'out')]"
             />
+            <separator/>
             <filter name="new" string="New" domain="[('state', '=', 'new')]"/>
             <filter name="done" string="Done" domain="[('state', '=', 'done')]"/>
             <filter name="fail" string="Failed" domain="[('state', '=', 'fail')]"/>
@@ -220,7 +222,7 @@
                 <filter name="group_by_type" string="Flow Type" context="{'group_by': 'synchronization_flow'}"/>
                 <filter name="group_by_content_type" string="Content Type" context="{'group_by': 'content_type'}"/>
                 <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
-                <filter name="group_by_synchronization_month" string="Synchronization Month" context="{'group_by': 'synchronization_date:month'}"/>
+                <filter name="group_by_synchronization_date" string="Synchronization Date" context="{'group_by': 'synchronization_date:month'}"/>
                 <filter name="group_by_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
             </group>
         </search>

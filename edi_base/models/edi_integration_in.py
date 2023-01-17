@@ -38,7 +38,7 @@ class IntegrationIn(models.Model):
         }
 
         if self.write_content_on_sync:
-            vals["content"] = "\n\n".join([d.get("content", "") for d in data])
+            vals["content"] = "\n\n".join([d.get("content") or "" for d in data])
 
         return self.env["edi.synchronization"].create(vals)
 
@@ -53,7 +53,7 @@ class IntegrationIn(models.Model):
         # because they should be atomic
         with self.env.cr.savepoint():
             self.env.activity = "Process Content"
-            status = self._process_content(data)
+            status = self._process_in_data(data)
 
             # flush before calling _clean, because concurrent updates are revealed with the flush
             # if an update has been applied on a locked record, the flush will wait until the lock is released
@@ -67,6 +67,29 @@ class IntegrationIn(models.Model):
 
             # at the exit, the savepoint will still flush (force to reveal concurrent updates)
             # thus, no need of explicit flush
+
+    def _get_in_data(self):
+        """Return the data to process for in flow
+
+        :return: list of dict
+            the dict should be {
+                'filename': FILENAME (str),
+                'content': str
+                    will be handle by in edi.integration._process_content
+                    and will be write on the synchronization
+            }
+        """
+        self.ensure_one()
+        return self._get_in_content()
+
+    def _process_in_data(self, data):
+        """Process the given data for in flow
+
+        :param data: list of dict
+        :return: status use by _clean
+        """
+        self.ensure_one()
+        return self._process_content(data)
 
     ##################################################
     # Default Behavior: Probably need to reimplement #
@@ -152,24 +175,3 @@ class IntegrationIn(models.Model):
         """
         self.ensure_one()
         return "done"
-
-    ##########################################################
-    # Common default Behavior: Probably need to reimplement  #
-    ##########################################################
-    # ========================================================#
-
-    def _handle_error(self, data, exc):
-        """Can be use to handle an error at the end of each synchronization
-
-        To implement in each integration
-        if not self.type == 'My type':
-            return super()._handle_error(data, exc)
-        ....
-
-        :param data:
-            - in: list of dict
-            - out: recordset
-        :param: exception
-        """
-        self.ensure_one()
-        self._clean_synchronization(data, "error")

@@ -74,7 +74,7 @@
                             <separator string="Integration Parameter" />
                             <field name="parameter" />
                         </page>
-                        <page name="cron" string="Cron information">
+                        <page name="cron" string="Cron Information">
                             <group>
                                 <group>
                                     <field name="user_id"/>
@@ -192,12 +192,15 @@
                 <field name="integration_flow"/>
                 <field name="type" />
                 <field name="synchronization_content_type"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+
                 <filter name="all" string="All" domain="['|', ('active', '=', True), ('active', '=', False)]"/>
                 <filter name="active" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+                <separator/>
                 <filter name="success" string="Success" domain="[('last_sync_status', '=', 'Success'), '|', ('active', '=', True), ('active', '=', False)]" />
                 <filter name="success" string="Fail" domain="[('last_sync_status', '=', 'Fail'), '|', ('active', '=', True), ('active', '=', False)]" />
-                <field name="company_id" groups="base.group_multi_company"/>
+
                 <group string="Group By">
                     <filter name="group_by_last_sync_status" string="Sync Status" context="{'group_by': 'last_sync_status'}" />
                     <filter name="group_by_integration_flow" string="Flow Type" context="{'group_by': 'integration_flow'}"/>

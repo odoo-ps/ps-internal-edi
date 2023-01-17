@@ -1,6 +1,6 @@
 import logging
 
-from odoo.tools import create_column, column_exists
+from odoo.tools import column_exists, create_column
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,13 @@ def migrate(cr, version):
     # delete field in_process_type if it exists
     logger.info("Delete field edi.integration.in_process_type")
 
-    cr.execute("""DO $$ BEGIN IF (EXISTS (
+    cr.execute(
+        """DO $$ BEGIN IF (EXISTS (
             SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'edi_integration' AND column_name='in_process_type'
             ))
             THEN ALTER TABLE edi_integration DROP COLUMN in_process_type;
-        END IF; END; $$""")
+        END IF; END; $$"""
+    )
     cr.execute("DELETE FROM ir_model_fields WHERE name='in_process_type' AND model='edi.integration';")
 
     # fill-in default value for last execution_date
