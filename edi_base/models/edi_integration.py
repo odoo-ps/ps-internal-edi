@@ -37,7 +37,7 @@ class Integration(models.Model):
     Data processing and synchronization status are performed on the same cursor
     and committed at the same time (to be fully consistent)
         By default:
-            - outside unittests: a new cursor is created and a commit is performed between each synchronization
+            - outside unittest: a new cursor is created and a commit is performed between each synchronization
             - inside unittest: the current cursor is used (no cursor created) and no commits is performed
     """
 
@@ -197,6 +197,14 @@ class Integration(models.Model):
         cursor = self.env.cr
         cursor.commit() if self._should_commit() else cursor.flush()
 
+    @api.model
+    def _default_cron_vals(self):
+        return {
+            "model_id": self.env.ref("edi_base.model_edi_integration").id,
+            "state": "code",
+            "numbercall": -1,
+        }
+
     def _set_status(self):
         """Set the status of the integration based on the last synchronization"""
 
@@ -276,9 +284,7 @@ class Integration(models.Model):
     def create(self, values):
 
         for vals in values:
-            vals.update(
-                {"model_id": self.env.ref("edi_base.model_edi_integration").id, "state": "code", "numbercall": -1}
-            )
+            vals.update(self._default_cron_vals())
 
         integrations = super().create(values)
 
@@ -534,8 +540,8 @@ class Integration(models.Model):
             - in: list of dict
             - out: recordset
             if None:
-                - in flow: call _get_in_content
-                - out flow: call _get_record_to_send
+                - in flow: call _get_in_data
+                - out flow: call _get_out_data
             if not None:  return param data
 
         :return:
@@ -546,7 +552,7 @@ class Integration(models.Model):
 
         if data is None:
             with self.env.cr.savepoint():
-                data = self._exec_method_based_on_flow(self._get_in_content, self._get_record_to_send)
+                data = self._exec_method_based_on_flow(self._get_in_data, self._get_out_data)
 
         if not data:
             _logger.info(_("No data found to synchronize for %s [%s]", self.name, self.id))
@@ -599,11 +605,19 @@ class Integration(models.Model):
         if not data:
             return []
 
-        if self.synchronization_creation <= 0:
+        max_chunk_size = self._get_sync_max_chunk_size()
+        if max_chunk_size <= 0:
             return [data]
 
         # chunk type is preserved (list -> list of lists, recordset -> list of recordsets)
-        return _chunks(data, self.synchronization_creation)
+        return _chunks(data, max_chunk_size)
+
+    def _get_sync_max_chunk_size(self):
+        """Get the max chunk size for a synchronization
+        :return: integer
+        """
+        self.ensure_one()
+        return self.synchronization_creation
 
     def _process_synchronization(self, data):
         """Process one synchronization (the data will be part of one synchronization)
@@ -682,6 +696,27 @@ class Integration(models.Model):
         """
         self.ensure_one()
         self._exec_method_based_on_flow(self._clean_in_sync, self._clean_out_sync, data, status)
+
+    ##########################################################
+    # Common default Behavior: Probably need to reimplement  #
+    ##########################################################
+    # ========================================================#
+
+    def _handle_error(self, data, exc):
+        """Can be use to handle an error at the end of each synchronization
+
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._handle_error(data, exc)
+        ....
+
+        :param data:
+            - in: list of dict
+            - out: recordset
+        :param: exception
+        """
+        self.ensure_one()
+        self._clean_synchronization(data, "error")
 
     #####################################################################
     #                Implementation of process Realtime             #
