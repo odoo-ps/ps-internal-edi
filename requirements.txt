@@ -1,5 +1,6 @@
 azure-storage-blob==12.10.0
 cryptography==3.4.7
 google-cloud-storage
+paramiko==2.12.0
 pyjwt==2.1.0
 pysftp==0.2.9
