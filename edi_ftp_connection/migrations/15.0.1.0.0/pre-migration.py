@@ -1,22 +1,12 @@
 import logging
 
-from odoo.tools import column_exists
+from odoo import tools
 
 logger = logging.getLogger(__name__)
 
 
 def migrate(cr, version):
-    if not column_exists(cr, "edi_connection", "in_done_let"):
-        logger.info("Column in_done_let already renamed, skipping ...")
-        return
-    # rename field in_done_let to ftp_in_done_let
-    logger.info("Rename field edi.connection.in_done_let into edi.connection.ftp_in_done_let")
-
-    cr.execute("ALTER TABLE edi_connection ADD COLUMN ftp_in_done_let boolean;")
-    cr.execute("""DO $$ BEGIN IF (EXISTS (
-            SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'edi_integration' AND column_name='in_done_let'
-            ))
-            THEN UPDATE edi_connection SET ftp_in_done_let = in_done_let;
-        END IF; END; $$""")
-    cr.execute("ALTER TABLE edi_connection DROP COLUMN in_done_let;")
-    cr.execute("DELETE FROM ir_model_fields WHERE name='in_done_let' AND model='edi.connection';")
+    """Rename field in_done_let to ftp_in_done_let"""
+    if tools.column_exists(cr, "edi_connection", "in_done_let"):
+        tools.rename_column(cr, "edi_connection", "in_done_let", "ftp_in_done_let")
+        cr.execute("DELETE FROM ir_model_fields WHERE name='in_done_let' AND model='edi.connection'")
