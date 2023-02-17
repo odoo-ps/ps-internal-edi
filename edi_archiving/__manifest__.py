@@ -10,4 +10,5 @@
     "data": ["data/cron.xml", "views/res_config_settings_views.xml"],
     "auto_install": False,
     "installable": True,
+    "cloc_exclude": ["**/*"],
 }

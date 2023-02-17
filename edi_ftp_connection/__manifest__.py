@@ -10,4 +10,5 @@
     "data": ["views/edi_connection.xml"],
     "auto_install": False,
     "installable": True,
+    "cloc_exclude": ["**/*"],
 }

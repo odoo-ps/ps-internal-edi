@@ -19,4 +19,5 @@
     ],
     "auto_install": False,
     "installable": True,
+    "cloc_exclude": ["**/*"],
 }
