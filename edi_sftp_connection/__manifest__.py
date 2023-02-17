@@ -12,4 +12,5 @@
     "auto_install": False,
     "installable": True,
     "external_dependencies": {"python": ["paramiko", "pysftp"]},
+    "cloc_exclude": ["**/*"],
 }
