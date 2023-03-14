@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="synchronization_search_view_edi_archiving" model="ir.ui.view">
+        <field name="name">edi.syncrhonization.search.view.edi.archiving</field>
+        <field name="model">edi.synchronization</field>
+        <field name="inherit_id" ref="edi_base.synchronization_search_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="before">
+                <filter
+                    name="active_inactive"
+                    string="Active &amp; Inactive"
+                    domain="['|', ('active', '=', True), ('active', '=', False)]"
+                />
+                <filter name="active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+                <separator/>
+            </field>
+        </field>
+    </record>
+</odoo>
