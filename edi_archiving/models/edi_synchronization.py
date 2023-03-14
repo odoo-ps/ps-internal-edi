@@ -31,7 +31,7 @@ class Synchronization(models.Model):
             return True
         domain += self._archive_states_domain(states)
 
-        self.search(domain).active = False
+        self.search(domain).action_archive()
         return True
 
     @api.model
