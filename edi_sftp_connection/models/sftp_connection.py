@@ -4,7 +4,7 @@ import logging
 import os
 from base64 import decodebytes
 
-import paramiko
+from paramiko import RSAKey
 import pysftp
 
 from odoo import api, fields, models
@@ -85,13 +85,13 @@ class SFTPConnection(models.Model):
 
         host_key_str = config.get("host_key")
         if host_key_str:
-            host_key = paramiko.RSAKey(data=decodebytes(host_key_str.encode()))
+            host_key = RSAKey(data=decodebytes(host_key_str.encode()))
             cnopts.hostkeys.add(config.get("host"), "ssh-rsa", host_key)
         else:
             cnopts.hostkeys = None
 
         key_str = config.get("key", None)
-        key = paramiko.RSAKey.from_private_key(io.StringIO(key_str)) if key_str else None
+        key = RSAKey.from_private_key(io.StringIO(key_str)) if key_str else None
 
         server = pysftp.Connection(
             host=config.get("host"),
