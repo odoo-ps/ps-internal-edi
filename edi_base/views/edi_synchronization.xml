@@ -83,40 +83,29 @@
                         </group>
                     </group>
                     <notebook
-                        attrs="{
-                    'invisible': [
-                        ('error_ids', '=', []),
-                        ('content', '=', False)
-                    ]
-                }"
+                        invisible="not error_ids and not content"
                     >
                         <page
                             string="Content"
-                            attrs="{
-                        'invisible': [('content', '=', False)]
-                    }"
+                            invisible="not content"
                         >
                             <group>
                                 <field name="content_type"/>
                                 <field
                                     name="content"
-                                    attrs="{
-                                    'invisible': [('content_type', '=', 'pdf')]
-                                }"
+                                    invisible="content_type == 'pdf'"
                                 />
                             </group>
                         </page>
                         <page
                             string="Failures"
-                            attrs="{
-                        'invisible': [('error_ids', '=', [])]
-                    }"
+                            invisible="not error_ids"
                         >
                             <field
                                 name="error_ids"
                                 context="{
                                 'tree_view_ref': 'edi_base.synchronization_error_embedded_tree_view',
-                                'sync_id': active_id
+                                'sync_id': id
                             }"
                             />
                         </page>

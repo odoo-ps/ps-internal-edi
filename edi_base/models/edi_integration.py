@@ -73,7 +73,7 @@ class Integration(models.Model):
     )
     connection_id = fields.Many2one("edi.connection", required=True, string="Connection")
     type = fields.Selection(
-        selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")], required=True, string="Type"
+        selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")], required=True, string="EDI Type"
     )  # Add selection for your integration
     parameter = fields.Text(string="Parameter")
 

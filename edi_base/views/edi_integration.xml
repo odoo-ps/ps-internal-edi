@@ -10,7 +10,7 @@
                         type="object"
                         name="test_connection"
                         string="Test Connection"
-                        attrs="{'invisible': [('has_sub_integration', '=', True)]}"
+                        invisible="has_sub_integration"
                     />
                     <button
                         type="object"
@@ -47,7 +47,7 @@
                             <field name="type"/>
                             <field
                                 name="synchronization_creation"
-                                attrs="{'invisible': [('has_sub_integration', '=', True)]}"
+                                invisible="has_sub_integration"
                             />
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
@@ -56,7 +56,7 @@
                         <page
                             name="sub_integration"
                             string="Sub Integrations"
-                            attrs="{'invisible': [('has_sub_integration', '=', False)]}"
+                            invisible="not has_sub_integration"
                         >
                             <field name="sub_integration_ids">
                                 <tree editable="bottom">
@@ -65,7 +65,7 @@
                                 </tree>
                             </field>
                         </page>
-                        <page name="status" string="Status" attrs="{'invisible': [('has_sub_integration', '=', True)]}">
+                        <page name="status" string="Status" invisible="has_sub_integration">
                             <group>
                                 <field name="last_execution_date"/>
                                 <field name="last_success_date"/>
@@ -76,7 +76,7 @@
                         <page
                             name="configuration"
                             string='Configuration'
-                            attrs="{'invisible': [('has_sub_integration', '=', True)]}"
+                            invisible="has_sub_integration"
                         >
                             <group>
                                 <group>
@@ -85,7 +85,7 @@
                                     <field name="connection_id"/>
                                     <field
                                         name="record_filter_id"
-                                        attrs="{'invisible': [('integration_flow', '=', 'in')]}"
+                                        invisible="integration_flow == 'in'"
                                     />
                                 </group>
                             </group>
@@ -175,7 +175,7 @@
                                             type="object"
                                             name="test_connection"
                                             class="dropdown-item"
-                                            attrs="{'invisible': [('has_sub_integration', '=', True)]}"
+                                            invisible="has_sub_integration"
                                         >
                                             Test Connection
                                         </a>

@@ -6,10 +6,10 @@
         <field name="inherit_id" ref="edi_ftp_connection.connection_form_view_ftp"/>
         <field name="arch" type="xml">
             <field name="ftp_in_done_let" position="attributes">
-                <attribute name="attrs">{'invisible': [('type', 'not in', ['ftp', 'sftp'])]}</attribute>
+                <attribute name="invisible">type not in ['ftp', 'sftp']</attribute>
             </field>
             <field name="ftp_load_content" position="attributes">
-                <attribute name="attrs">{'invisible': [('type', 'not in', ['ftp', 'sftp'])]}</attribute>
+                <attribute name="invisible">type not in ['ftp', 'sftp']</attribute>
             </field>
         </field>
     </record>

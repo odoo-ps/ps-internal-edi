@@ -84,11 +84,7 @@
         <field name="email_from"/>
         <field name="email_to">{{object.email}}</field>
         <field name="partner_to"/>
-        <field name="report_template" ref="report"/>
-        <field name="report_name">
-            {{'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name,
-            object.create_date)}}
-        </field>
+        <field name="report_template_ids" eval="[(4, ref('edi_monitoring.report'))]"/>
         <field name="body_html" type="html">
             <div t-if="object.limit_reached">
                 <div

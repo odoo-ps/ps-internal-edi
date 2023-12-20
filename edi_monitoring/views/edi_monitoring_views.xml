@@ -32,7 +32,7 @@
                         name="action_create_report"
                         string="Create and send report by email"
                         class="oe_highlight"
-                        attrs="{'invisible': ['|', ('active', '=', False), ('filter_id', '=', False)]}"
+                        invisible="not active or not filter_id"
                     />
                 </header>
                 <sheet>
@@ -98,7 +98,7 @@
                         name="action_send_report"
                         string="Re-send report by email"
                         class="oe_highlight"
-                        attrs="{'invisible': ['|', ('email', '=', False), ('lines_count', '=', 0)]}"
+                        invisible="not email or lines_count == 0"
                     />
                 </header>
                 <sheet>
@@ -121,7 +121,7 @@
                             <div
                                 class="alert alert-warning"
                                 role="alert"
-                                attrs="{'invisible': [('limit_reached', '=', False)]}"
+                                invisible="not limit_reached"
                             >
                                 <field name="related_lines_count"/>
                                 items are related to this report, only the lasts are detailed here
@@ -130,7 +130,7 @@
                         </page>
                         <page
                             string="Related synchronizations"
-                            attrs="{'invisible': [('synchronization_ids', '=', [])]}"
+                            invisible="not synchronization_ids"
                         >
                             <field name="synchronization_ids"/>
                         </page>
