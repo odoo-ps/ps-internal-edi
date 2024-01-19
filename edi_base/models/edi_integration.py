@@ -498,15 +498,15 @@ class Integration(models.Model):
             self.env.activity = "Set Status"
             self._set_status()
 
+            self._safe_commit()
+            if autocommit:
+                new_cr.close()
+
             # logging + traceback
             if not self.env.context.get("no_exception_log"):
                 for e in exceptions:
                     _logger.exception(ustr(e))
             self._process_in_out_raise_errors(exceptions, raise_error)
-
-            self._safe_commit()
-            if autocommit:
-                new_cr.close()
 
     def _process_in_out_raise_errors(self, exceptions, raise_error):
         """Separated method to allow to define specific behaviour in case of errors (send emails...)"""
