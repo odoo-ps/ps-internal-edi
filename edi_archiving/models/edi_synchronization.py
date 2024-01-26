@@ -11,6 +11,7 @@ class Synchronization(models.Model):
     _inherit = "edi.synchronization"
 
     active = fields.Boolean(default=True)
+    error_ids = fields.One2many(context={"active_test": False})  # consider archived errors too
 
     @api.model
     def archive_outdated_synchronizations(self):
