@@ -6,51 +6,35 @@
         <field name="priority" eval="10"/>
         <field name="inherit_id" ref="edi_base.res_config_settings_view_form_edi"/>
         <field name="arch" type="xml">
-            <xpath expr="//div[hasclass('edi_settings')]" position="inside">
-                <h2>Archiving</h2>
-                <div class="row mt16 o_settings_container" name="edi_archiving_setting_container">
-                    <div class="col-12 col-lg-6 o_setting_box" id="edi_archiving_duration">
-                        <div class="o_setting_left_pane"/>
-                        <div class="o_setting_right_pane">
-                            <span class="o_form_label">Duration</span>
-                            <div class="text-muted">Before archiving the synchronizations (0 means never)</div>
-                            <div class="content-group">
-                                <div class="row mt16">
-                                    <label string="Days" for="edi_archive_duration" class="col-lg-3 o_light_label"/>
-                                    <field name="edi_archive_duration"/>
-                                </div>
+            <xpath expr="//app[@name='edi']" position="inside">
+                <block name="Archiving">
+                    <setting string="Duration" help="Before archiving the synchronizations (0 means never)">
+                        <div class="content-group" id="edi_archiving_duration">
+                            <div class="row mt16">
+                                <label string="Days" for="edi_archive_duration" class="col-lg-3 o_light_label"/>
+                                <field name="edi_archive_duration"/>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box" id="edi_archive_synchronization_types">
-                        <div class="o_setting_left_pane"/>
-                        <div class="o_setting_right_pane">
-                            <span class="o_form_label">States</span>
-                            <div class="text-muted">Archive synchronizations with those states</div>
-                            <div class="content-group">
-                                <div class="mt16"/>
-                            </div>
-                            <div class="content-group">
-                                <div class="row" id="edi_archive_state_fail">
-                                    <field name="edi_archive_state_fail" class="col-lg-1 ml16"/>
-                                    <label for="edi_archive_state_fail" class="o_light_label" string="Fail"/>
-                                </div>
-                                <div class="row" id="edi_archive_state_done">
-                                    <field name="edi_archive_state_done" class="col-lg-1 ml16"/>
-                                    <label for="edi_archive_state_done" class="o_light_label" string="Done"/>
-                                </div>
-                                <div class="row" id="edi_archive_state_new">
-                                    <field name="edi_archive_state_new" class="col-lg-1 ml16"/>
-                                    <label for="edi_archive_state_new" class="o_light_label" string="New"/>
-                                </div>
-                                <div class="row" id="edi_archive_state_cancel">
-                                    <field name="edi_archive_state_cancel" class="col-lg-1 ml16"/>
-                                    <label for="edi_archive_state_cancel" class="o_light_label" string="Cancel"/>
-                                </div>
-                            </div>
+                    </setting>
+                    <setting string="States" help="Archive synchronizations with those states">
+                        <div class="mt16 content-group" id="edi_archive_state_fail">
+                            <field name="edi_archive_state_fail"/>
+                            <label for="edi_archive_state_fail" class="o_light_label" string="Fail"/>
                         </div>
-                    </div>
-                </div>
+                        <div class="mt16 content-group" id="edi_archive_state_done">
+                            <field name="edi_archive_state_done"/>
+                            <label for="edi_archive_state_done" class="o_light_label" string="Done"/>
+                        </div>
+                        <div class="mt16 content-group" id="edi_archive_state_new">
+                            <field name="edi_archive_state_new"/>
+                            <label for="edi_archive_state_new" class="o_light_label" string="New"/>
+                        </div>
+                        <div class="mt16 content-group" id="edi_archive_state_cancel">
+                            <field name="edi_archive_state_cancel"/>
+                            <label for="edi_archive_state_cancel" class="o_light_label" string="Cancel"/>
+                        </div>
+                    </setting>
+                </block>
             </xpath>
         </field>
     </record>

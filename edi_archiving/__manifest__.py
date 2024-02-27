@@ -1,6 +1,6 @@
 {
     "name": "Odoo PS EDI Archiving",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.0.1",
     "license": "OEEL-1",
     "summary": "Automatically archive synchronizations",
     "category": "Tools",
