@@ -41,7 +41,7 @@ class Monitoring(models.Model):
 
         # force a new search for line_ids at next usage, otherwise we will get them from cache
         # => the order will the created order (id asc) and not the order defined in _order
-        report_ids.invalidate_cache(["line_ids"], report_ids.ids)
+        report_ids.invalidate_recordset(["line_ids"])
 
         report_ids.action_send_report()
         return True
