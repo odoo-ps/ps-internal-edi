@@ -23,7 +23,10 @@
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button class="oe_stat_button" type="object" name="toggle_active" icon="fa-archive">
-                            <field name="active" widget="boolean_button" options='{"terminology": "active"}'/>
+                            <field name="active" widget="boolean_button"/>
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_text">Active</span>
+                            </div>
                         </button>
                         <button
                             type="object"
@@ -45,19 +48,12 @@
                             <field name="has_sub_integration"/>
                             <field name="integration_flow"/>
                             <field name="type"/>
-                            <field
-                                name="synchronization_creation"
-                                invisible="has_sub_integration"
-                            />
+                            <field name="synchronization_creation" invisible="has_sub_integration"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                     </group>
                     <notebook>
-                        <page
-                            name="sub_integration"
-                            string="Sub Integrations"
-                            invisible="not has_sub_integration"
-                        >
+                        <page name="sub_integration" string="Sub Integrations" invisible="not has_sub_integration">
                             <field name="sub_integration_ids">
                                 <tree editable="bottom">
                                     <field name="sequence"/>
@@ -73,20 +69,13 @@
                                 <field name="last_sync_status"/>
                             </group>
                         </page>
-                        <page
-                            name="configuration"
-                            string='Configuration'
-                            invisible="has_sub_integration"
-                        >
+                        <page name="configuration" string='Configuration' invisible="has_sub_integration">
                             <group>
                                 <group>
                                     <field name="synchronization_content_type"/>
                                     <field name="write_content_on_sync"/>
                                     <field name="connection_id"/>
-                                    <field
-                                        name="record_filter_id"
-                                        invisible="integration_flow == 'in'"
-                                    />
+                                    <field name="record_filter_id" invisible="integration_flow == 'in'"/>
                                 </group>
                             </group>
                             <separator string="Integration Parameter"/>
