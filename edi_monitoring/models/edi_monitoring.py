@@ -216,10 +216,9 @@ class MonitoringReportLine(models.Model):
         for rec in self:
             rec.state_val = [x[1] for x in rec._fields.get("state").selection if x[0] == rec.state][0]
 
-    def name_get(self):
-        res = []
+    @api.depends("source", "date", "name")
+    def _compute_display_name(self):
         for rec in self:
-            res.append(
-                (rec.id, "%s%s%s%s" % (rec.source, " - " if rec.date else "", rec.date, " : " if rec.name else ""))
+            rec.display_name = "".join(
+                [f"[{rec.id}] {rec.source}", " - " + rec.date if rec.date else "", " : " + rec.name if rec.name else ""]
             )
-        return res
