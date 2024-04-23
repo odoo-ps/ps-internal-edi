@@ -99,6 +99,7 @@ class SFTPConnection(models.Model):
             password=None if key else config.get("password"),
             private_key=key,
             cnopts=cnopts,
+            port=config.get("port", 22),
         )
 
         self.ftp_load_config(server, config)
