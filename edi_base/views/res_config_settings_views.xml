@@ -7,7 +7,9 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app data-string="EDI" string="EDI" name="edi_base"/>
+                <app data-string="EDI" string="EDI" name="edi_base">
+                    <div></div>
+                </app>
             </xpath>
         </field>
     </record>
