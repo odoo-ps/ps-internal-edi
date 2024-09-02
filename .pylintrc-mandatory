@@ -7,8 +7,8 @@ readme_template_url="https://github.com/OCA/maintainer-tools/blob/master/templat
 manifest_required_authors=Odoo PS
 manifest_required_keys=license
 manifest_deprecated_keys=active
-license_allowed=OEEL-1
-valid_odoo_versions=16.0
+license_allowed=OEEL-1,OPL-1
+valid_odoo_versions=17.0
 
 [MESSAGES CONTROL]
 disable=all
