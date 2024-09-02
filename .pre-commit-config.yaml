@@ -51,7 +51,6 @@ repos:
       - id: black
         args:
           - --line-length=120
-          - --skip-magic-trailing-comma
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v2.1.2
     hooks:
@@ -64,7 +63,7 @@ repos:
           - --plugin=@prettier/plugin-xml
         files: \.(css|htm|html|js|json|jsx|less|md|scss|toml|ts|xml|yaml|yml)$
   - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v7.8.1
+    rev: v8.31.0
     hooks:
       - id: eslint
         verbose: true
@@ -99,7 +98,7 @@ repos:
       - id: pyupgrade
         args: ["--keep-percent-format"]
   - repo: https://github.com/PyCQA/isort
-    rev: 5.11.5
+    rev: 5.12.0
     hooks:
       - id: isort
         name: isort except __init__.py
