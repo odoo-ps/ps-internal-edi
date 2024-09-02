@@ -53,7 +53,7 @@ class Synchronization(models.Model):
         related="integration_id.synchronization_content_type", store=True, readonly=True, string="Content type"
     )
     res_id = fields.Integer(string="Resource ID")
-    synchronization_date = fields.Datetime(readonly=True, string="Synchronized on")
+    synchronization_date = fields.Datetime(readonly=True, string="Synchronized on", index=True)
     content = fields.Text(readonly=True)
     error_ids = fields.One2many("edi.synchronization.error", "synchronization_id", string="synchronization_id")
     user_id = fields.Many2one(
