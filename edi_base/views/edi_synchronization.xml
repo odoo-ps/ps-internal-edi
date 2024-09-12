@@ -47,7 +47,7 @@
         <field name="mode">primary</field>
         <field name="arch" type="xml">
             <field name="synchronization_id" position="attributes">
-                <attribute name="invisible">1</attribute>
+                <attribute name="column_invisible">1</attribute>
             </field>
         </field>
     </record>
@@ -132,8 +132,8 @@
                 <field name="content_type"/>
                 <field name="create_date"/>
                 <field name="synchronization_date"/>
-                <field name="synchronization_flow" invisible="1"/>
-                <field name="state" invisible="1"/>
+                <field name="synchronization_flow" column_invisible="1"/>
+                <field name="state" column_invisible="1"/>
                 <field
                     name="company_id"
                     groups="base.group_multi_company"
