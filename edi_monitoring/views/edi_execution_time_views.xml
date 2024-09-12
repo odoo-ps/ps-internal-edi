@@ -16,7 +16,7 @@
         <field name="inherit_id" ref="edi_base.synchronization_list_view"/>
         <field name="arch" type="xml">
             <xpath expr="//tree">
-                <field name="reasonable_execution_time" invisible="1"/>
+                <field name="reasonable_execution_time" column_invisible="1"/>
                 <field
                     name="execution_time"
                     widget="float_time"
