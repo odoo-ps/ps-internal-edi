@@ -30,6 +30,7 @@ class Connection(models.Model):
         return records
 
     def reset_config(self):
+        self.ensure_one()
         self.configuration = json.dumps(self._get_default_configuration(), indent=4, sort_keys=True)
 
     def test(self):
@@ -116,12 +117,14 @@ class Connection(models.Model):
         this type of connection
 
         To implement in each connection
+        self.ensure_one()
         if not self.type == 'My type':
             return super()._get_default_configuration()
         ....
 
         :return: dict
         """
+        self.ensure_one()
         return {}
 
     ###################################
@@ -131,6 +134,7 @@ class Connection(models.Model):
 
     @api.onchange("type")
     def _set_default_configuration(self):
+        self.ensure_one()
         if not self.configuration or self.configuration == "{}":
             self.configuration = json.dumps(self._get_default_configuration(), indent=4, sort_keys=True)
 

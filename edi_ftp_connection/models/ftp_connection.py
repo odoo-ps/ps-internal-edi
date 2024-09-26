@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
+import warnings
 from io import BytesIO as StringIO
 
 from odoo import _, api, fields, models
@@ -84,10 +85,21 @@ class FTPConnection(models.Model):
 
     def _get_default_configuration(self):
         """Provide a configuration template for this type of connection"""
+        self.ensure_one()
         if self.type != "ftp":
             return super()._get_default_configuration()
-
-        return self._ftp_default_configuration()
+        return {
+            "host": "host",
+            "user": "user",
+            "password": "password",
+            "on_conflict": "choose one from : raise, rename, replace",
+            "on_conflict_rename_extension": "old",
+            "is_active": "False",
+            "in_folder": "<PATH HERE>",
+            "in_folder_done": "<PATH HERE>",
+            "in_folder_error": "<PATH HERE>",
+            "out_folder": "<PATH HERE>",
+        }
 
     #####################################################################
     #    Specific FTP Methods that should be overridden                 #
@@ -423,6 +435,8 @@ class FTPConnection(models.Model):
 
     @api.model
     def _ftp_default_configuration(self):
+        # TODO Delete this method on 18.0
+        warnings.warn("Since 17.0, please directly override default_configuration instead", DeprecationWarning, 2)
         return {
             "host": "host",
             "user": "user",
