@@ -2,10 +2,11 @@
 import io
 import logging
 import os
+import warnings
 from base64 import decodebytes
 
-from paramiko import RSAKey
 import pysftp
+from paramiko import RSAKey
 
 from odoo import api, fields, models
 
@@ -63,10 +64,23 @@ class SFTPConnection(models.Model):
 
     def _get_default_configuration(self):
         """Provide a configuration template for this type of connection"""
+        self.ensure_one()
         if self.type != "sftp":
             return super()._get_default_configuration()
-
-        return self._sftp_default_configuration()
+        return {
+            "host": "host",
+            "host_key": "",
+            "user": "user",
+            "password": "password (ignored if key supplied)",
+            "key": "",
+            "on_conflict": "choose one from : raise, rename, replace",
+            "on_conflict_rename_extension": "old",
+            "is_active": "False",
+            "in_folder": "<PATH HERE>",
+            "in_folder_done": "<PATH HERE>",
+            "in_folder_error": "<PATH HERE>",
+            "out_folder": "<PATH HERE>",
+        }
 
     #####################################################################
     #    Specific SFTP Methods that should be overridden                #
@@ -190,6 +204,8 @@ class SFTPConnection(models.Model):
 
     @api.model
     def _sftp_default_configuration(self):
+        # TODO Delete this method on 18.0
+        warnings.warn("Since 17.0, please directly override default_configuration instead", DeprecationWarning, 2)
         return {
             "host": "host",
             "host_key": "",
@@ -198,6 +214,7 @@ class SFTPConnection(models.Model):
             "key": "",
             "on_conflict": "choose one from : raise, rename, replace",
             "on_conflict_rename_extension": "old",
+            "is_active": "False",
             "in_folder": "<PATH HERE>",
             "in_folder_done": "<PATH HERE>",
             "in_folder_error": "<PATH HERE>",
