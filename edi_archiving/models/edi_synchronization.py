@@ -13,38 +13,6 @@ class Synchronization(models.Model):
     active = fields.Boolean(default=True)
     error_ids = fields.One2many(context={"active_test": False})  # consider archived errors too
 
-    @api.autovacuum
-    def _archive_outdated_synchronizations(self):
-        """Call by cron task to archive synchronizations having reach the duration
-        - Limit the execution but force the cron to flush the rest the minute after
-        - Empty the content sent or received at the same time
-        """
-        limit = 10000
-        config = self.env["ir.config_parameter"].sudo()
-
-        # consider the configured duration
-        duration = int(config.get_param("edi.archive.duration", 0))
-        if not duration:
-            return True
-        domain = [("create_date", "<=", fields.Datetime.now() - timedelta(days=duration))]
-
-        # only consider the configured states
-        states = [x for x in self._archive_states() if config.get_param("edi.archive.state.%s" % x, False)]
-        if not states:
-            # just a security, but should never happen thanks to check on settings side
-            return True
-        domain += self._archive_states_domain(states)
-
-        records = self.search(domain, limit=limit + 1)
-        records[:limit].with_context(prefetch_fields=False).action_archive()  # boom without prefetch with few hundreds
-
-        # free some space if the content sent or received was stored
-        records[:limit].content = False
-
-        if len(records) > limit:
-            self.env.ref("base.autovacuum_job")._trigger()
-        return True
-
     @api.model
     def _archive_states(self):
         return ["new", "fail", "done", "cancel"]
@@ -52,6 +20,68 @@ class Synchronization(models.Model):
     @api.model
     def _archive_states_domain(self, states):
         return [("state", "in", states)]
+
+    @api.model
+    def _archive_outdated_synchronizations(self):
+        """Archive synchronizations that reached the duration and delete the content
+        And empty the content sent or received at the same time
+        :return: True if all matching records are archived, False if more to handle
+        """
+        limit = 10000
+        records = self._get_records_to_vacuum(limit, "edi.archive.duration")
+        if not records:
+            return True
+        records[:limit].with_context(prefetch_fields=False).action_archive()  # slow without prefetch with few hundreds
+        _logger.info("GC %d synchronizations archived", len(records[:limit]))
+        return len(records) <= limit
+
+    @api.model
+    def _delete_outdated_synchronizations(self):
+        """Delete synchronizations that reached the duration
+        :return: True if all matching records are deleted, False if more to handle
+        """
+        limit = 10000
+        records = self.with_context(active_test=False)._get_records_to_vacuum(limit, "edi.archive.duration.delete")
+        if not records:
+            return True
+        records[:limit].unlink()
+        _logger.info("GC %d synchronizations deleted", len(records[:limit]))
+        return len(records) <= limit
+
+    @api.model
+    def _get_records_to_vacuum(self, limit, duration_param):
+        """Consider duration and configured states to get records to be vacuumed
+        :param limit:
+        :param duration_param:
+        :return: records to process
+        """
+        # consider the configured duration
+        config = self.env["ir.config_parameter"].sudo()
+        duration = int(config.get_param(duration_param, 0))
+        if not duration:
+            return self
+        domain = [("create_date", "<=", fields.Datetime.now() - timedelta(days=duration))]
+
+        # only consider the configured states
+        states = [x for x in self._archive_states() if config.get_param("edi.archive.state.%s" % x, False)]
+        if not states:  # just a security, but should never happen thanks to check on settings side
+            return self
+        domain += self._archive_states_domain(states)
+        return self.search(domain, limit=limit + 1)
+
+    @api.autovacuum
+    def _process_outdated_synchronizations(self):
+        delete_complete = self._delete_outdated_synchronizations()
+        archive_complete = self._archive_outdated_synchronizations()
+        if not delete_complete or not archive_complete:
+            self.env.ref("base.autovacuum_job")._trigger(at=fields.Datetime.now() + timedelta(minutes=1))
+
+    def action_archive(self):
+        """Free some space if the content sent or received was stored"""
+        if not self:
+            return
+        self.content = False
+        return super().action_archive()
 
 
 class SynchronizationError(models.Model):
