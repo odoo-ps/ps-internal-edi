@@ -1,4 +1,5 @@
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class ResConfigSettings(models.TransientModel):
@@ -11,15 +12,8 @@ class ResConfigSettings(models.TransientModel):
     edi_archive_state_cancel = fields.Boolean(default=False, config_parameter="edi.archive.state.cancel")
 
     def execute(self):
-        """Active or archive the cron task depending on the parameters
-        Notes :
-        - cost is less to change status of cron on every execution than to consider change of values from ir_config
-        - introspection with edi_archive_state_ allow other modules to define new state fields,
-          and still this code will be able to check them, so no need to add control in other modules
-        """
-        cron = self.env.ref("edi_archiving.archive_outdated_synchronizations_cron")
-        if abs(self.edi_archive_duration) and any(self[f] for f in self._fields if f.startswith("edi_archive_state_")):
-            cron.active = True
-        else:
-            cron.active = False
+        if self.edi_archive_duration and not any(
+            self[f] for f in self._fields if f.startswith("edi_archive_state_")
+        ):
+            raise UserError(_("An EDI archive duration should go with actual states to consider for archiving"))
         return super(ResConfigSettings, self).execute()
