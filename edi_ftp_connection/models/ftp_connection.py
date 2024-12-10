@@ -102,6 +102,8 @@ class FTPConnection(models.Model):
 
         config = self._read_configuration()
         server = ftplib.FTP(host=config["host"], user=config["user"], passwd=config["password"])
+        if config.get("port"):
+            server.port = int(config["port"])
 
         if "is_active" in config and config["is_active"] == "True":
             server.set_pasv(False)
