@@ -95,6 +95,7 @@ class SFTPConnection(models.Model):
 
         server = pysftp.Connection(
             host=config.get("host"),
+            port=int(config.get("port", 22)),
             username=config.get("user"),
             password=None if key else config.get("password"),
             private_key=key,
