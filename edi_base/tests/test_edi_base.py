@@ -12,7 +12,7 @@ class TestEdiBase(TestEDICommon):
         edi_parent_integration = self.new_env["edi.integration"].create(
             {
                 "name": "Test edi parent integration",
-                "type": "partner_folder_out",
+                "type": "api",
                 "integration_flow": "out",
                 "connection_id": self.folder_connection.id,
                 "has_sub_integration": True,
@@ -20,7 +20,7 @@ class TestEdiBase(TestEDICommon):
                     Command.create(
                         {
                             "name": "Test edi integration",
-                            "type": "partner_folder_out",
+                            "type": "api",
                             "integration_flow": "out",
                             "connection_id": self.folder_connection.id,
                             "record_filter_id": record_filter_id.id,

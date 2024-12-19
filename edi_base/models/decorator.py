@@ -3,7 +3,8 @@ import logging
 import time
 from inspect import signature
 
-from odoo import SUPERUSER_ID, api, fields, registry
+from odoo import SUPERUSER_ID, api, fields
+from odoo.modules.registry import Registry
 
 
 _logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def integration(name):
 
             self.env.flush_all()
 
-            new_cr = registry(self.env.cr.dbname).cursor()
+            new_cr = Registry(self.env.cr.dbname).cursor()
             new_env = api.Environment(new_cr, SUPERUSER_ID, self.env.context)
             self = self.with_env(new_env)
 
