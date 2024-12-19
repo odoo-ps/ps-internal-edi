@@ -4,8 +4,9 @@ import logging
 import threading
 from datetime import datetime
 
-from odoo import _, api, fields, models, registry
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.modules.registry import Registry
 from odoo.tools import ustr
 from odoo.tools.safe_eval import safe_eval
 
@@ -200,7 +201,7 @@ class Integration(models.Model):
 
     @api.model
     def _default_cron_vals(self):
-        return {"model_id": self.env.ref("edi_base.model_edi_integration").id, "state": "code", "numbercall": -1}
+        return {"model_id": self.env.ref("edi_base.model_edi_integration").id, "state": "code"}
 
     def _set_status(self):
         """Set the status of the integration based on the last synchronization"""
@@ -293,6 +294,15 @@ class Integration(models.Model):
             integration.code = "model._process(%i)" % integration.id
 
         return integrations
+
+    def unlink(self):
+        """Remove server action & cron task on cascade."""
+        crons = self.cron_id
+        actions = crons.ir_actions_server_id
+        res = super().unlink()
+        crons.unlink()
+        actions.unlink()
+        return res
 
     def _load_records(self, data_list, update=False):
 
@@ -472,7 +482,7 @@ class Integration(models.Model):
         if autocommit:
             # new cursor is used for the complete process
             # so that everything is committed simultaneously
-            new_cr = registry(self.env.cr.dbname).cursor()
+            new_cr = Registry(self.env.cr.dbname).cursor()
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             self = self.with_env(new_env)
 
@@ -791,7 +801,7 @@ class Integration(models.Model):
         """
         data_cursor = self.env.context.get("edi_data_cursor")
         if data_cursor:
-            with registry(self.env.cr.dbname).cursor() as cr:
+            with Registry(self.env.cr.dbname).cursor() as cr:
                 env = api.Environment(cr, self.env.user.id, self.env.context)
                 sync_ids = data_cursor.postrollback.data.pop("edi.integration.postrollback.synchronization_ids", [])
                 integration_ids = data_cursor.postrollback.data.pop("edi.integration.postrollback.integration_ids", [])

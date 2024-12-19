@@ -55,10 +55,10 @@
                     <notebook>
                         <page name="sub_integration" string="Sub Integrations" invisible="not has_sub_integration">
                             <field name="sub_integration_ids">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="sequence"/>
                                     <field name="name" readonly="1"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                         <page name="status" string="Status" invisible="has_sub_integration">
@@ -106,7 +106,7 @@
         <field name="name">edi.integration.tree</field>
         <field name="model">edi.integration</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="name"/>
                 <field name="integration_flow"/>
                 <field name="cron_id"/>
@@ -116,7 +116,7 @@
                     options="{'no_create': True}"
                     optional="show"
                 />
-            </tree>
+            </list>
         </field>
     </record>
     <record id="integration_kanban_view" model="ir.ui.view">
@@ -136,7 +136,7 @@
                 <field name="has_sub_integration"/>
                 <field name="company_id" invisible="1"/>
                 <templates>
-                    <t t-name="kanban-box">
+                    <t t-name="card">
                         <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon">
                             <div class="o_project_kanban_main">
                                 <div class="o_dropdown_kanban dropdown" groups="base.group_user">
@@ -284,7 +284,7 @@
     <record id="integrations_act_window" model="ir.actions.act_window">
         <field name="name">Integrations</field>
         <field name="res_model">edi.integration</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="search_view_id" ref="edi_base.integration_search_view"/>
         <field
             name="context"

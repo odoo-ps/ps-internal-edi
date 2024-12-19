@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-from odoo import api, fields, models, registry
+from odoo import api
+from odoo.modules.registry import Registry
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
@@ -36,38 +37,16 @@ class TestEDICommon(TransactionCase):
     be accessed by the cursor belonging to the new environment.
     """
 
-    class ConnectionFolder(models.Model):
-
-        _inherit = "edi.connection"
-
-        type = fields.Selection(selection_add=[("folder", "Folder")], ondelete={"folder": "cascade"})
-
-    class TestIntegration(models.Model):
-
-        _inherit = "edi.integration"
-
-        type = fields.Selection(
-            selection_add=[
-                ("partner_folder_out", "Export Partner in Folder"),
-                ("partner_folder_in", "Import Partner in Folder"),
-            ],
-            ondelete={"partner_folder_out": "cascade", "partner_folder_in": "cascade"},
-        )
-
     @classmethod
     def setUpClass(cls):
-
         super().setUpClass()
-
-        cls.new_cr = registry(cls.env.cr.dbname).cursor()
+        cls.new_cr = Registry(cls.env.cr.dbname).cursor()
         cls.new_env = api.Environment(cls.new_cr, cls.env.user.id, cls.env.context)
-
         cls.Integration = cls.new_env["edi.integration"]
-
         cls.folder_connection = cls.new_env["edi.connection"].create(
             {
                 "name": "Connection to folder",
-                "type": "folder",
+                "type": "api",
                 "configuration": json.dumps(
                     {
                         "in_folder": str(FOLDER_IN),
@@ -88,7 +67,7 @@ class TestEDICommon(TransactionCase):
     @mute_logger("odoo.models.unlink")
     def _clean_connections(self):
 
-        with registry(self.env.cr.dbname).cursor() as cr:
+        with Registry(self.env.cr.dbname).cursor() as cr:
 
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.connection")])
@@ -97,7 +76,7 @@ class TestEDICommon(TransactionCase):
     @mute_logger("odoo.models.unlink")
     def _clean_integrations(self):
 
-        with registry(self.env.cr.dbname).cursor() as cr:
+        with Registry(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             env["edi.integration"].with_context(active_test=False).search(
@@ -117,7 +96,7 @@ class TestEDICommon(TransactionCase):
     @mute_logger("odoo.models.unlink")
     def _clean_synchronizations(self):
 
-        with registry(self.env.cr.dbname).cursor() as cr:
+        with Registry(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             integrations = (
@@ -132,7 +111,7 @@ class TestEDICommon(TransactionCase):
 
     def _reset_integrations(self):
 
-        with registry(self.env.cr.dbname).cursor() as cr:
+        with Registry(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             env["edi.integration"].with_context(active_test=False).search(

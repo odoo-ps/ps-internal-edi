@@ -169,7 +169,6 @@
             eval="(DateTime.now().replace(hour=7, minute=0) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"
         />
         <field name="priority">99</field>
-        <field name="numbercall">-1</field>
         <field name="active" eval="False"/>
     </record>
 </odoo>

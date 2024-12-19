@@ -10,7 +10,7 @@ class ConnectionFolder(models.Model):
     _inherit = "edi.connection"
 
     def _get_default_configuration(self):
-        if self.type != "folder":
+        if self.type != "api":
             return super()._get_default_configuration()
 
         return {
@@ -22,7 +22,7 @@ class ConnectionFolder(models.Model):
 
     def test(self):
         self.ensure_one()
-        if not self.type == "folder":
+        if not self.type == "api":
             return super().test()
 
         config = self._read_configuration()
@@ -35,7 +35,7 @@ class ConnectionFolder(models.Model):
 
     def _send_synchronization(self, filename, content, *args, **kwargs):
         self.ensure_one()
-        if not self.type == "folder":
+        if not self.type == "api":
             return super()._send_synchronization(filename, content, *args, **kwargs)
 
         config = self._read_configuration()
@@ -46,7 +46,7 @@ class ConnectionFolder(models.Model):
 
     def _fetch_synchronizations(self, *args, **kwargs):
         self.ensure_one()
-        if not self.type == "folder":
+        if not self.type == "api":
             return super()._fetch_synchronizations(*args, **kwargs)
 
         config = self._read_configuration()
@@ -60,20 +60,20 @@ class ConnectionFolder(models.Model):
         return data
 
     def _clean_synchronization_in(self, data, status, *args, **kwargs):
-        if self.type != "folder":
+        if self.type != "api":
             return super()._clean_synchronization_in(data, status, *args, **kwargs)
 
         return self._clean_synchronization(data.get("filename"), status, "in", *args, **kwargs)
 
     def _clean_synchronization_out(self, filename, status, *args, **kwargs):
-        if self.type != "folder":
+        if self.type != "api":
             return super()._clean_synchronization_out(filename, status, *args, **kwargs)
 
         return self._clean_synchronization(filename, status, "out", *args, **kwargs)
 
     def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
         self.ensure_one()
-        if not self.type == "folder":
+        if not self.type == "api":
             return super()._clean_synchronization(filename, status, flow_type, *args, **kwargs)
 
         config = self._read_configuration()

@@ -36,7 +36,7 @@ class TestIntegration(models.Model):
     _inherit = "edi.integration"
 
     def _get_record_to_send(self):
-        if self.type != "partner_folder_out":
+        if self.type != "api":
             return super()._get_record_to_send()
 
         conf = self._read_parameter()
@@ -46,7 +46,7 @@ class TestIntegration(models.Model):
         return self.env["res.partner"].search(domain)
 
     def _get_content(self, records):
-        if self.type != "partner_folder_out":
+        if self.type != "api":
             return super()._get_content(records)
 
         if len(records) == 1 and "error" in records.name:
@@ -73,7 +73,7 @@ class TestIntegration(models.Model):
         return content.getvalue()
 
     def _process_content(self, data):
-        if self.type != "partner_folder_in":
+        if self.type != "api":
             return super()._process_content(data)
 
         for d in data:
