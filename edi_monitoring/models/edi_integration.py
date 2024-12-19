@@ -1,5 +1,4 @@
 import logging
-import os
 
 from odoo import _, fields, models
 
@@ -56,13 +55,3 @@ class Integration(models.Model):
     def _process_in_file(self, data, raise_error=False):
         self.env.fail_safe.env.context = {**self.env.fail_safe.env.context, "file": data.get("file")}
         return super(Integration, self)._process_in_file(data, raise_error)
-
-    def _create_synchronzation_in(self, filename, content):
-        sync = super()._create_synchronzation_in(filename, content)
-        try:
-            size = os.path.getsize(self.env.context.get("file"))
-        except Exception:
-            # skip if the file does not exist or is inaccessible
-            size = False
-        sync.file_size = size
-        return sync
