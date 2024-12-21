@@ -11,12 +11,13 @@ class Connection(models.Model):
     """
 
     _name = "edi.connection"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "EDI Connection"
 
     name = fields.Char(required=True)
-    type = fields.Selection(selection=[], required=True, string="EDI Type")
-    configuration = fields.Text()
-    company_id = fields.Many2one("res.company")
+    type = fields.Selection(selection=[], required=True, string="EDI Type", tracking=True)
+    configuration = fields.Text(tracking=True)
+    company_id = fields.Many2one("res.company", tracking=True)
     integration_ids = fields.One2many("edi.integration", "connection_id", readonly=True, context={"active_test": False})
 
     @api.model_create_multi

@@ -45,11 +45,12 @@ class Integration(models.Model):
 
     _name = "edi.integration"
     _description = "Integration to process by Odoo instance"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _inherits = {"ir.cron": "cron_id"}
     _order = "sequence"
 
     # Common for in/out flows
-    company_id = fields.Many2one("res.company")
+    company_id = fields.Many2one("res.company", tracking=True)
     integration_flow = fields.Selection(
         [
             ("in", "From provider to Odoo"),
@@ -58,6 +59,7 @@ class Integration(models.Model):
         ],
         required=True,
         string="Flow of data",
+        tracking=True,
     )
     integration_flow_type = fields.Selection(
         [("in", "In"), ("out", "Out"), ("unknown", "Unknown")],
@@ -71,33 +73,44 @@ class Integration(models.Model):
         """n: max n data in the same synchronization""",
         required=True,
         default=1,
+        tracking=True,
     )
-    connection_id = fields.Many2one("edi.connection", required=True, string="Connection")
+    connection_id = fields.Many2one("edi.connection", required=True, string="Connection", tracking=True)
     type = fields.Selection(
-        selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")], required=True, string="EDI Type"
+        selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")],
+        required=True,
+        string="EDI Type",
+        tracking=True,
     )  # Add selection for your integration
-    parameter = fields.Text(string="Parameter")
+    parameter = fields.Text(string="Parameter", tracking=True)
 
     synchronization_content_type = fields.Selection(
         selection=[("text", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON"), ("pdf", "PDF")],
         default="text",
         required=True,
         string="Content Type",
+        tracking=True,
     )
     write_content_on_sync = fields.Boolean(
         string="Write Content On Synchronizations",
         default=True,
         help="Allows you to decide if the content should be written on the synchronizations.",
+        tracking=True,
     )
 
     # Cron inheritance
     cron_id = fields.Many2one("ir.cron", ondelete="restrict", required=True, string="Cron Job")
+    active = fields.Boolean(related="cron_id.active", readonly=False, tracking=True)
+    interval_number = fields.Integer(related="cron_id.interval_number", readonly=False, tracking=True)
+    interval_type = fields.Selection(related="cron_id.interval_type", readonly=False, tracking=True)
+    user_id = fields.Many2one(related="cron_id.user_id", readonly=False, tracking=True)
 
     # Multiple Integration at once
     has_sub_integration = fields.Boolean(
         string="Has sub Integration",
         default=False,
         help="If you need to run many integration in a specific order in the same CRON execution",
+        tracking=True,
     )
     sequence = fields.Integer()
     sub_integration_ids = fields.Many2many(
@@ -113,6 +126,7 @@ class Integration(models.Model):
         string="Record Filter",
         ondelete="restrict",
         help="Filter for default behavior of _get_record_to_send",
+        tracking=True,
     )
 
     # Status

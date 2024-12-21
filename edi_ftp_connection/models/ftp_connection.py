@@ -28,9 +28,11 @@ class FTPConnection(models.Model):
 
     type = fields.Selection(selection_add=[("ftp", "FTP")], ondelete={"ftp": "cascade"})
     ftp_in_done_let = fields.Boolean(
-        'Let in "in_folder"', help="When downloading, let the file on the folder when process is done"
+        'Let in "in_folder"', help="When downloading, let the file on the folder when process is done", tracking=True
     )
-    ftp_load_content = fields.Boolean("Load Content", default=True, help='Load the content of the file (for "in" flow)')
+    ftp_load_content = fields.Boolean(
+        "Load Content", default=True, help='Load the content of the file (for "in" flow)', tracking=True
+    )
 
     @api.constrains("ftp_in_done_let", "integration_ids")
     def _check_let_in_folder_and_synchronization_creation(self):
