@@ -15,7 +15,6 @@
         "views/edi_file_size_views.xml",
         "views/edi_logging_views.xml",
         "views/edi_monitoring_views.xml",
-        "views/edi_tracking_views.xml",
     ],
     "auto_install": False,
     "installable": True,
