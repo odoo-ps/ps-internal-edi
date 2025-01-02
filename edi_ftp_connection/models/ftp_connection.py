@@ -102,6 +102,10 @@ class FTPConnection(models.Model):
 
         config = self._read_configuration()
         server = ftplib.FTP(host=config["host"], user=config["user"], passwd=config["password"])
+
+        if config.get("encoding"):
+            server.encoding = config["encoding"]
+
         if config.get("port"):
             server.port = int(config["port"])
 
@@ -302,7 +306,7 @@ class FTPConnection(models.Model):
                     raise UserError(_("Fetch synchronization failed for file %s:\n%s") % (filename, ustr(e)))
         if self.ftp_load_content:
             for res in result:
-                with open(res["file"], "r") as f:
+                with open(res["file"], "r", encoding=server.encoding) as f:
                     res["content"] = f.read()
         return result
 
