@@ -7,7 +7,6 @@ from datetime import datetime
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.modules.registry import Registry
-from odoo.tools import ustr
 from odoo.tools.safe_eval import safe_eval
 
 from ..tools.util import _chunks
@@ -529,7 +528,7 @@ class Integration(models.Model):
             # logging + traceback
             if not self.env.context.get("no_exception_log"):
                 for e in exceptions:
-                    _logger.exception(ustr(e))
+                    _logger.exception(e)
             self._process_in_out_raise_errors(exceptions, raise_error)
 
     def _process_in_out_raise_errors(self, exceptions, raise_error):
