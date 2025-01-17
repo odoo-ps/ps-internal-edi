@@ -62,7 +62,8 @@ class TestEdiApiCases(TestEDICommon):
 
         name = "Test partner"
 
-        res_id = self.new_env["res.partner"].with_context(autocommit=True).create_partner({"name": name})
+        with mute_logger('odoo.addons.edi_base.models.decorator'):
+            res_id = self.new_env["res.partner"].with_context(autocommit=True).create_partner({"name": name})
         self.assertTrue(res_id)
 
         partner = self.new_env["res.partner"].browse(res_id)
@@ -90,7 +91,7 @@ class TestEdiApiCases(TestEDICommon):
 
         now = fields.Datetime.now()
 
-        with self.assertRaises(IntegrityError):
+        with self.assertRaises(IntegrityError), mute_logger('odoo.addons.edi_base.models.decorator'):
             self.new_env["res.partner"].with_context(autocommit=True).create_partner({"name": False})
 
         with Registry(self.env.cr.dbname).cursor() as new_cr:
