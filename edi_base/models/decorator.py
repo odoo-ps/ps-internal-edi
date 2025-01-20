@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import logging
 import time
+from functools import wraps
 from inspect import signature
 
 from odoo import SUPERUSER_ID, api, fields
@@ -21,6 +22,8 @@ def integration(name):
     """
 
     def decorator(fct):
+
+        @wraps(fct)
         def wrapper(*args, **kwargs):
 
             self = args[0]
