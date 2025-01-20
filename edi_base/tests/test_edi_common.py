@@ -43,7 +43,7 @@ class TestEDICommon(TransactionCase):
         cls.new_cr = Registry(cls.env.cr.dbname).cursor()
         cls.new_env = api.Environment(cls.new_cr, cls.env.user.id, cls.env.context)
         cls.Integration = cls.new_env["edi.integration"]
-        cls.folder_connection = cls.new_env["edi.connection"].create(
+        cls.folder_connection = cls.new_env["edi.connection"].with_context(mail_create_nolog=True).create(
             {
                 "name": "Connection to folder",
                 "type": "api",
