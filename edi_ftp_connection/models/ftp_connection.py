@@ -318,9 +318,13 @@ class FTPConnection(models.Model):
                 except Exception as e:
                     _logger.error(e)
                     raise UserError(_("Fetch synchronization failed for file %s:\n%s") % (filename, ustr(e)))
+        if hasattr(server, "encoding"):
+            encoding = server.encoding
+        else:
+            encoding = "utf-8"
         if self.ftp_load_content:
             for res in result:
-                with open(res["file"], "r", encoding=server.encoding) as f:
+                with open(res["file"], "r", encoding=encoding) as f:
                     res["content"] = f.read()
         return result
 
