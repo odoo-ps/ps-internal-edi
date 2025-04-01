@@ -84,7 +84,7 @@ class Integration(models.Model):
     parameter = fields.Text(string="Parameter", tracking=True)
 
     synchronization_content_type = fields.Selection(
-        selection=[("text", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON"), ("pdf", "PDF")],
+        selection=[("txt", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON"), ("pdf", "PDF")],
         default="text",
         required=True,
         string="Content Type",
