@@ -219,6 +219,8 @@ class Integration(models.Model):
     def _set_status(self):
         """Set the status of the integration based on the last synchronization"""
 
+        self.flush_model()
+
         sync_datas = []
 
         self.env.cr.execute(

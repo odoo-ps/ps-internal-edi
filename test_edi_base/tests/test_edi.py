@@ -1,5 +1,6 @@
 import csv
 import json
+import xmlrpc
 from datetime import timedelta
 from pathlib import Path
 from unittest import mock
@@ -9,7 +10,7 @@ from psycopg2 import IntegrityError
 from odoo import api, fields
 from odoo.exceptions import UserError
 from odoo.modules.registry import Registry
-from odoo.tests.common import tagged
+from odoo.tests.common import get_db_name, tagged, HttpCase
 from odoo.tools import mute_logger
 
 from odoo.addons.edi_base.models.edi_integration import ProcessIntegrationException
@@ -97,10 +98,12 @@ class TestEdiApiCases(TestEDICommon):
         with Registry(self.env.cr.dbname).cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
+            # Check integration has been created
             edi = new_env["edi.integration"].with_context(active_test=False).search([("name", "=", "Create Partner")])
             self.assertTrue(edi)
             self.assertGreaterEqual(edi.last_failure_date, now)
             self.assertEqual(edi.last_sync_status, "Fail")
+
             # Check synchronization object has been created and is in state fail
             sync = new_env["edi.synchronization"].search(
                 [("integration_id", "=", edi.id), ("synchronization_date", ">=", now)]
@@ -109,6 +112,44 @@ class TestEdiApiCases(TestEDICommon):
             self.assertEqual(sync.state, "fail")
             self.assertTrue(sync.content)
             self.assertEqual(len(sync.error_ids), 1)
+
+
+@tagged("post_install", "-at_install", "edi_decorator")
+class TestEdiApiCasesXMLRPC(HttpCase):
+
+    @classmethod
+    def setUpClass(cls):
+
+        super().setUpClass()
+
+        cls.base_args = [get_db_name(), cls.env.ref('base.user_admin').id, 'admin']
+
+    def test_api_decorator_xmlrpc(self):
+        """Test Api decorator"""
+
+        args = self.base_args + ['res.partner', 'create_partner']
+
+        with mute_logger('odoo.addons.edi_base.models.decorator'):
+            res_id = self.xmlrpc_object.execute(*args, {'name': 'Test partner'})
+
+        self.assertTrue(res_id)
+
+        partner = self.env["res.partner"].browse(res_id)
+        self.assertEqual(partner.display_name, 'Test partner')
+
+    @mute_logger("odoo.sql_db", "odoo.http")
+    def test_api_decorator_error_xmlrpc(self):
+        """Test Api decorator with error"""
+
+        args = self.base_args + ['res.partner', 'create_partner']
+
+        with (
+            mute_logger('odoo.addons.edi_base.models.decorator'),
+            self.assertRaises(xmlrpc.client.Fault) as cm
+        ):
+            self.xmlrpc_object.execute(*args, {'name': False})
+
+        self.assertIn('Contacts require a name', cm.exception.faultString)
 
 
 @tagged("edi_in")

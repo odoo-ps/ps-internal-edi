@@ -2,7 +2,6 @@
 import logging
 import time
 from functools import wraps
-from inspect import signature
 
 from odoo import SUPERUSER_ID, api, fields
 from odoo.modules.registry import Registry
@@ -24,17 +23,14 @@ def integration(name):
     def decorator(fct):
 
         @wraps(fct)
-        def wrapper(*args, **kwargs):
-
-            self = args[0]
+        def wrapper(self, *args, **kwargs):
 
             self.env.flush_all()
 
             new_cr = Registry(self.env.cr.dbname).cursor()
             new_env = api.Environment(new_cr, SUPERUSER_ID, self.env.context)
-            self = self.with_env(new_env)
 
-            edi = self.env["edi.integration"].search(
+            edi = new_env["edi.integration"].search(
                 [("name", "=", name), "|", ("active", "=", False), ("active", "=", True)], limit=1
             )
 
@@ -43,15 +39,13 @@ def integration(name):
                 edi = edi.create(
                     {
                         "integration_flow": "in",
-                        "connection_id": self.env.ref("edi_base.api_connection").id,
+                        "connection_id": new_env.ref("edi_base.api_connection").id,
                         "type": "api",
                         "name": name,
                         "synchronization_content_type": "json",
                         "active": False,
                     }
                 )
-
-                new_cr.commit()
 
                 _logger.info("No integration found, a default one has been created: '%s' [%s]", name, edi.id)
 
@@ -85,7 +79,7 @@ def integration(name):
 
             try:
                 with self.env.cr.savepoint():
-                    res = fct(*args, **kwargs)
+                    res = fct(self, *args, **kwargs)
             except Exception as e:
                 sync._report_error(name, e)
                 raise
@@ -98,9 +92,6 @@ def integration(name):
                 new_cr.close()
 
             return res
-
-        sig = signature(fct)
-        wrapper.__signature__ = sig
 
         return wrapper
 
