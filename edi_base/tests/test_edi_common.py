@@ -42,20 +42,6 @@ class TestEDICommon(TransactionCase):
         cls.new_cr = cls.registry.cursor()
         cls.new_env = api.Environment(cls.new_cr, cls.env.user.id, cls.env.context)
         cls.Integration = cls.new_env["edi.integration"]
-        cls.folder_connection = cls.new_env["edi.connection"].with_context(mail_create_nolog=True).create(
-            {
-                "name": "Connection to folder",
-                "type": "api",
-                "configuration": json.dumps(
-                    {
-                        "in_folder": str(FOLDER_IN),
-                        "in_folder_done": str(FOLDER_IN_DONE),
-                        "in_folder_error": str(FOLDER_IN_ERROR),
-                        "out_folder": str(FOLDER_OUT),
-                    }
-                ),
-            }
-        )
 
         cls.addClassCleanup(cls.new_cr.close)
         # NOTE: We clean the connections and the created integrations at the end
@@ -118,3 +104,24 @@ class TestEDICommon(TransactionCase):
             env["edi.integration"].with_context(active_test=False).search(
                 [("id", "not in", imds.mapped("res_id"))]
             ).write({"last_sync_status": "No Sync Yet", "last_success_date": False, "last_failure_date": False})
+
+
+class TestEDICommonBase(TestEDICommon):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.folder_connection = cls.new_env["edi.connection"].with_context(mail_create_nolog=True).create(
+            {
+                "name": "Connection to folder",
+                "type": "api",
+                "configuration": json.dumps(
+                    {
+                        "in_folder": str(FOLDER_IN),
+                        "in_folder_done": str(FOLDER_IN_DONE),
+                        "in_folder_error": str(FOLDER_IN_ERROR),
+                        "out_folder": str(FOLDER_OUT),
+                    }
+                ),
+            }
+        )

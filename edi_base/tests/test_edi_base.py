@@ -1,9 +1,9 @@
 from odoo import Command
 
-from .test_edi_common import TestEDICommon
+from .test_edi_common import TestEDICommonBase
 
 
-class TestEdiBase(TestEDICommon):
+class TestEdiBase(TestEDICommonBase):
     def test_sub_integration_ids(self):
         """
         Test if sub_integration_ids has inactive children

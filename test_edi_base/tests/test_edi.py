@@ -19,7 +19,7 @@ from odoo.addons.edi_base.tests.test_edi_common import (
     FOLDER_IN_DONE,
     FOLDER_IN_ERROR,
     FOLDER_OUT,
-    TestEDICommon,
+    TestEDICommonBase,
 )
 
 
@@ -27,7 +27,7 @@ FILE_IN = Path(FOLDER_IN, "partner.csv")
 
 
 @tagged("edi_decorator")
-class TestEdiApiCases(TestEDICommon):
+class TestEdiApiCases(TestEDICommonBase):
     def setUp(self):
         super().setUp()
 
@@ -152,7 +152,7 @@ class TestEdiApiCasesXMLRPC(HttpCase):
 
 
 @tagged("edi_in")
-class TestEdiINCases(TestEDICommon):
+class TestEdiINCases(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
 
@@ -387,7 +387,7 @@ class TestEdiINCases(TestEDICommon):
 
 
 @tagged("edi_out")
-class TestEdiOUTCases(TestEDICommon):
+class TestEdiOUTCases(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
 
@@ -938,7 +938,7 @@ class TestEdiOUTCases(TestEDICommon):
 
 
 @tagged("edi_base")
-class TestEdiBase(TestEDICommon):
+class TestEdiBase(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
 
