@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from odoo import api
-from odoo.modules.registry import Registry
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
@@ -40,7 +39,7 @@ class TestEDICommon(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.new_cr = Registry(cls.env.cr.dbname).cursor()
+        cls.new_cr = cls.registry.cursor()
         cls.new_env = api.Environment(cls.new_cr, cls.env.user.id, cls.env.context)
         cls.Integration = cls.new_env["edi.integration"]
         cls.folder_connection = cls.new_env["edi.connection"].with_context(mail_create_nolog=True).create(
@@ -61,23 +60,25 @@ class TestEDICommon(TransactionCase):
         cls.addClassCleanup(cls.new_cr.close)
         # NOTE: We clean the connections and the created integrations at the end
         #       of each test suite
-        cls.addClassCleanup(cls._clean_connections, cls)
-        cls.addClassCleanup(cls._clean_integrations, cls)
+        cls.addClassCleanup(cls._clean_connections)
+        cls.addClassCleanup(cls._clean_integrations)
 
+    @classmethod
     @mute_logger("odoo.models.unlink")
-    def _clean_connections(self):
+    def _clean_connections(cls):
 
-        with Registry(self.env.cr.dbname).cursor() as cr:
+        with cls.registry.cursor() as cr:
 
-            env = api.Environment(cr, self.env.user.id, self.env.context)
+            env = api.Environment(cr, cls.env.user.id, cls.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.connection")])
             env["edi.connection"].search([("id", "not in", imds.mapped("res_id"))]).unlink()
 
+    @classmethod
     @mute_logger("odoo.models.unlink")
-    def _clean_integrations(self):
+    def _clean_integrations(cls):
 
-        with Registry(self.env.cr.dbname).cursor() as cr:
-            env = api.Environment(cr, self.env.user.id, self.env.context)
+        with cls.registry.cursor() as cr:
+            env = api.Environment(cr, cls.env.user.id, cls.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             env["edi.integration"].with_context(active_test=False).search(
                 [("id", "not in", imds.mapped("res_id"))]
@@ -96,7 +97,7 @@ class TestEDICommon(TransactionCase):
     @mute_logger("odoo.models.unlink")
     def _clean_synchronizations(self):
 
-        with Registry(self.env.cr.dbname).cursor() as cr:
+        with self.registry.cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             integrations = (
@@ -111,7 +112,7 @@ class TestEDICommon(TransactionCase):
 
     def _reset_integrations(self):
 
-        with Registry(self.env.cr.dbname).cursor() as cr:
+        with self.registry.cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             env["edi.integration"].with_context(active_test=False).search(

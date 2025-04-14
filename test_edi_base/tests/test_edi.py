@@ -9,7 +9,6 @@ from psycopg2 import IntegrityError
 
 from odoo import api, fields
 from odoo.exceptions import UserError
-from odoo.modules.registry import Registry
 from odoo.tests.common import get_db_name, tagged, HttpCase
 from odoo.tools import mute_logger
 
@@ -37,7 +36,7 @@ class TestEdiApiCases(TestEDICommon):
 
     @mute_logger("odoo.models.unlink")
     def _clean_edi(self):
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = (
@@ -48,7 +47,7 @@ class TestEdiApiCases(TestEDICommon):
 
     @mute_logger("odoo.models.unlink")
     def _clean_partners(self):
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             new_env["res.partner"].search([("name", "like", "Test partner")]).unlink()
 
@@ -70,7 +69,7 @@ class TestEdiApiCases(TestEDICommon):
         partner = self.new_env["res.partner"].browse(res_id)
         self.assertEqual(partner.display_name, name)
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             # Check integration has been created
@@ -95,7 +94,7 @@ class TestEdiApiCases(TestEDICommon):
         with self.assertRaises(IntegrityError), mute_logger('odoo.addons.edi_base.models.decorator'):
             self.new_env["res.partner"].with_context(autocommit=True).create_partner({"name": False})
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             # Check integration has been created
@@ -184,7 +183,7 @@ class TestEdiINCases(TestEDICommon):
 
     @mute_logger("odoo.models.unlink")
     def _clean_partners(self):
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             new_env["res.partner"].search([("name", "like", "Partner Test")]).unlink()
 
@@ -212,7 +211,7 @@ class TestEdiINCases(TestEDICommon):
         edi = self.integration
         edi.process_integration()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -248,7 +247,7 @@ class TestEdiINCases(TestEDICommon):
         edi = self.integration
         edi.process_integration()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -287,7 +286,7 @@ class TestEdiINCases(TestEDICommon):
         edi = self.integration
         edi.process_integration()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -323,7 +322,7 @@ class TestEdiINCases(TestEDICommon):
         with self.assertRaises(Exception, msg="The integration should raise an Exception"):
             edi.with_context(edi_raise_error=True).process_integration()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -361,7 +360,7 @@ class TestEdiINCases(TestEDICommon):
             with self.assertRaises(UserError, msg="The integration should raise a UserError"):
                 edi.with_context(edi_raise_error=True).process_integration()
 
-            with Registry(self.env.cr.dbname).cursor() as new_cr:
+            with self.registry.cursor() as new_cr:
 
                 new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -449,7 +448,7 @@ class TestEdiOUTCases(TestEDICommon):
     @mute_logger("odoo.models.unlink")
     def _clean_filters(self):
 
-        with Registry(self.env.cr.dbname).cursor() as cr:
+        with self.registry.cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             # NOTE: We need to unset the filter on the integrations since the `ondelete`
             #       policy is defined as `restrict`, thus raising an error.
@@ -497,7 +496,7 @@ class TestEdiOUTCases(TestEDICommon):
             self.assertEqual(len(data.keys()), 2)
             self.assertEqual(data["name"], "EDI TEST %s" % str(i).zfill(3))
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -534,7 +533,7 @@ class TestEdiOUTCases(TestEDICommon):
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -579,7 +578,7 @@ class TestEdiOUTCases(TestEDICommon):
         for value in result.values():
             self.assertEqual(value, 0)
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -606,7 +605,7 @@ class TestEdiOUTCases(TestEDICommon):
 
         self.edi.process_integration()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -633,7 +632,7 @@ class TestEdiOUTCases(TestEDICommon):
 
         self.edi.process_integration()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -660,7 +659,7 @@ class TestEdiOUTCases(TestEDICommon):
         with self.assertRaises(UserError):
             self.edi.with_context(edi_raise_error=True).process_integration()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -700,7 +699,7 @@ class TestEdiOUTCases(TestEDICommon):
             self.assertEqual(len(data.keys()), 2)
             self.assertEqual(data["name"], "EDI TEST %s" % str(i).zfill(3))
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -729,7 +728,7 @@ class TestEdiOUTCases(TestEDICommon):
 
         self.assertEqual(partner.mapped("country_id").id, self.country.id)
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -758,7 +757,7 @@ class TestEdiOUTCases(TestEDICommon):
 
         self.assertEqual(partner.mapped("country_id").id, self.country.id)
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -789,7 +788,7 @@ class TestEdiOUTCases(TestEDICommon):
         # Check value has been properly written by business Code (the current cursor is not rolledback)
         self.assertEqual(partner.mapped("country_id").id, self.country.id)
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -820,7 +819,7 @@ class TestEdiOUTCases(TestEDICommon):
         self.new_env.cr.commit()
 
         with self.assertRaises(ValueError):
-            with Registry(self.env.cr.dbname).cursor() as new_cr:
+            with self.registry.cursor() as new_cr:
 
                 new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -846,7 +845,7 @@ class TestEdiOUTCases(TestEDICommon):
                 self.assertTrue("EDI TEST" in data["name"])
                 self.assertTrue("UPDATED" in data["name"])  # updated data have been synchronized
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -885,7 +884,7 @@ class TestEdiOUTCases(TestEDICommon):
         self.new_env.cr.commit()
 
         with self.assertRaises(ValueError):
-            with Registry(self.env.cr.dbname).cursor() as new_cr:
+            with self.registry.cursor() as new_cr:
 
                 new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -913,7 +912,7 @@ class TestEdiOUTCases(TestEDICommon):
                 self.assertTrue("EDI TEST" in data["name"])
                 self.assertTrue("UPDATED" in data["name"])  # updated data have been synchronized
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -975,7 +974,7 @@ class TestEdiBase(TestEDICommon):
 
         now = fields.Datetime.now()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -1001,7 +1000,7 @@ class TestEdiBase(TestEDICommon):
 
         now = fields.Datetime.now()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
@@ -1027,7 +1026,7 @@ class TestEdiBase(TestEDICommon):
 
         now = fields.Datetime.now()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             new_env["edi.synchronization"].create(
                 {
@@ -1064,7 +1063,7 @@ class TestEdiBase(TestEDICommon):
 
         now = fields.Datetime.now()
 
-        with Registry(self.env.cr.dbname).cursor() as new_cr:
+        with self.registry.cursor() as new_cr:
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
