@@ -1,3 +1,7 @@
+========================================
+Better monitoring for developers & users
+========================================
+
 - Add the file size on the synchronizations
 - Add the the execution time on synchronizations
 - Add tracked fields on integration model + chatter
