@@ -1,4 +1,6 @@
-## Automatically archive synchronizations
+======================================
+Automatically archive synchronizations
+======================================
 
 - add active field on synchronizations & synchronizations_errors
 - allow to choose duration before archive synchronizations, by status

@@ -163,7 +163,7 @@ class IntegrationOut(models.Model):
         self.ensure_one()
         self.connection_id._clean_synchronization_out(self.env.sync.filename, status)
 
-    def _postprocess(self, send_result, content, records):
+    def _postprocess(self, response, content, records):
         """
         Standard behavior can be overwrite if needed
         Called at the end of each synchronization
@@ -173,10 +173,10 @@ class IntegrationOut(models.Model):
 
         To implement in each integration
         if not self.type == 'My type':
-            return super()._postprocess(send_result, content, records)
+            return super()._postprocess(response, content, records)
         ....
 
-        :param send_result: any (value returned by self.connection_id._send_synchronization)
+        :param response: any (value returned by self.connection_id._send_synchronization)
         :param content: str
         :param records: recordset
         """

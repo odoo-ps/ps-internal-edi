@@ -2,7 +2,8 @@
 import json
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
+from odoo.tools import ormcache
 
 
 class Connection(models.Model):
@@ -145,6 +146,18 @@ class Connection(models.Model):
         """
         self.ensure_one()
         return json.loads(self.configuration)
+
+    @property
+    @ormcache("self.configuration")
+    def json_configuration(self):
+        return self._read_configuration()
+
+    def _get_configuration_value(self, name, raise_if_not_found=False):
+        self.ensure_one()
+        value = self.json_configuration.get(name)
+        if raise_if_not_found and not value:
+            raise ValidationError(_("No %s defined in configuration", name))
+        return value
 
 
 class ConnectionApi(models.Model):
