@@ -43,7 +43,3 @@ class Integration(models.Model):
             if prefix:
                 msg = "%s : %s" % (self.name, msg)
             _logger.log(level, msg, *args, **kwargs)
-
-    def _process_in_file(self, data, raise_error=False):
-        self.env.fail_safe.env.context = {**self.env.fail_safe.env.context, "file": data.get("file")}
-        return super(Integration, self)._process_in_file(data, raise_error)
