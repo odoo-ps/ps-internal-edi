@@ -342,7 +342,7 @@ The data model Integration provides a bunch of methods that can be redefined. Mo
 just 2 **must** be redefined :
 
 For an "out" flow : ``_get_content_(self, records)``
---------------------------------------------------
+----------------------------------------------------
 
 This method takes some records as input (basically the ones from the ir.filter defined), and the purpose is to convert
 the records to something else, like a JSON or XML data.
@@ -350,7 +350,7 @@ the records to something else, like a JSON or XML data.
 A string with the converted data can be returned by the method.
 
 For an "in" flow : ``_process_content(self, data)``
--------------------------------------------------
+---------------------------------------------------
 
 This method takes a list of dictionary as input (basically the ones returned by the \_fetch_content method of the
 connection, should always contains the key filename and content).
