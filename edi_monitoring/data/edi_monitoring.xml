@@ -4,7 +4,6 @@
         <record id="synchronizations_filter" model="ir.filters">
             <field name="name">Synchronizations to monitor</field>
             <field name="model_id">edi.synchronization</field>
-            <field name="user_id" eval="False"/>
             <field
                 name="domain"
             >["&amp;",["monitoring_report_id","=",False],"|",["state","=","new"],["state","=","fail"]]</field>

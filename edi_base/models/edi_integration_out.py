@@ -63,7 +63,7 @@ class IntegrationOut(models.Model):
             if content:
                 # force the write of the content on the synchronization
                 if self.write_content_on_sync:
-                    self.env.sync._write_content(content)
+                    self.env.cr.sync._write_content(content)
 
     def _get_out_data(self):
         """Return the data to process for out flow
@@ -88,13 +88,13 @@ class IntegrationOut(models.Model):
         :param records: recordset
         :return: str
         """
-        self.env.activity = "Get Content"
+        self.env.cr.activity = "Get Content"
         content = self._get_out_content(records)
 
-        self.env.activity = "Send Synchro"
+        self.env.cr.activity = "Send Synchro"
         res = self._send_content(content, records)
 
-        self.env.activity = "Postprocess"
+        self.env.cr.activity = "Postprocess"
         self._postprocess(res, content, records)
         return content
 
@@ -138,7 +138,7 @@ class IntegrationOut(models.Model):
         Standard behavior can be overwrite if needed
 
         Can use self._report_error
-        Filename can be accessed by self.env.sync.filename
+        Filename can be accessed by self.env.cr.sync.filename
 
         To implement in each integration
         if not self.type == 'My type':
@@ -151,7 +151,7 @@ class IntegrationOut(models.Model):
         """
         self.ensure_one()
 
-        res = self.connection_id._send_synchronization(self.env.sync.filename, content)
+        res = self.connection_id._send_synchronization(self.env.cr.sync.filename, content)
         self._clean_synchronization(records, "done")
         return res
 
@@ -161,7 +161,7 @@ class IntegrationOut(models.Model):
         :param status: str
         """
         self.ensure_one()
-        self.connection_id._clean_synchronization_out(self.env.sync.filename, status)
+        self.connection_id._clean_synchronization_out(self.env.cr.sync.filename, status)
 
     def _postprocess(self, response, content, records):
         """
@@ -169,7 +169,7 @@ class IntegrationOut(models.Model):
         Called at the end of each synchronization
         By default, do nothing
 
-        Filename can be accessed by self.env.sync.filename
+        Filename can be accessed by self.env.cr.sync.filename
 
         To implement in each integration
         if not self.type == 'My type':

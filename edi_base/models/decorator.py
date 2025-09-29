@@ -21,7 +21,6 @@ def integration(name):
     """
 
     def decorator(fct):
-
         @wraps(fct)
         def wrapper(self, *args, **kwargs):
 
@@ -68,7 +67,7 @@ def integration(name):
                     Context
                     \t%s
                 """
-                    % (self._name, fct.__name__, args, kwargs, self._context),
+                    % (self._name, fct.__name__, args, kwargs, self.env.context),
                     "user_id": self.env.user.id,
                 }
             )

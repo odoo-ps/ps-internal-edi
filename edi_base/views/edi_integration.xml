@@ -255,7 +255,7 @@
                     string="Fail"
                     domain="[('last_sync_status', '=', 'Fail'), '|', ('active', '=', True), ('active', '=', False)]"
                 />
-                <group string="Group By">
+                <group>
                     <filter
                         name="group_by_last_sync_status"
                         string="Sync Status"

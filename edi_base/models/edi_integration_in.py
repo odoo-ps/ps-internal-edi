@@ -53,17 +53,17 @@ class IntegrationIn(models.Model):
         # all operations must be executed in the same savepoint
         # because they should be atomic
         with self.env.cr.savepoint():
-            self.env.activity = "Process Content"
+            self.env.cr.activity = "Process Content"
             status = self._process_in_data(data)
 
             # flush before calling _clean, because concurrent updates are revealed with the flush
             # if an update has been applied on a locked record, the flush will wait until the lock is released
             # when it is released, the concurrent update exception is revealed
             # we don't want to call the _clean if a concurrent update happened
-            self.env.activity = "Flush Content"
+            self.env.cr.activity = "Flush Content"
             self.env.flush_all()
 
-            self.env.activity = "Clean Synchro"
+            self.env.cr.activity = "Clean Synchro"
             self._clean(data, status)
 
             # at the exit, the savepoint will still flush (force to reveal concurrent updates)
