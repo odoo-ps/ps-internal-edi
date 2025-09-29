@@ -19,7 +19,7 @@ By default 10 minutes, considering that we reach 2/3 of real time limit on odoo.
         except Exception:
             raise
         finally:
-            self.env.sync.synchronization_end_date = fields.Datetime.now()
+            self.env.cr.sync.synchronization_end_date = fields.Datetime.now()
         return res
 
 

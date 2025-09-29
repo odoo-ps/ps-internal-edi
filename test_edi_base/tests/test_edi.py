@@ -1,7 +1,6 @@
 import csv
 import json
-import xmlrpc
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -9,7 +8,7 @@ from psycopg2 import IntegrityError
 
 from odoo import api, fields
 from odoo.exceptions import UserError
-from odoo.tests.common import get_db_name, tagged, HttpCase
+from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 
 from odoo.addons.edi_base.models.edi_integration import ProcessIntegrationException
@@ -21,6 +20,7 @@ from odoo.addons.edi_base.tests.test_edi_common import (
     FOLDER_OUT,
     TestEDICommonBase,
 )
+from odoo.addons.test_http.tests.test_common import TestHttpBase
 
 
 FILE_IN = Path(FOLDER_IN, "partner.csv")
@@ -62,7 +62,7 @@ class TestEdiApiCases(TestEDICommonBase):
 
         name = "Test partner"
 
-        with mute_logger('odoo.addons.edi_base.models.decorator'):
+        with mute_logger("odoo.addons.edi_base.models.decorator"):
             res_id = self.new_env["res.partner"].with_context(autocommit=True).create_partner({"name": name})
         self.assertTrue(res_id)
 
@@ -91,7 +91,7 @@ class TestEdiApiCases(TestEDICommonBase):
 
         now = fields.Datetime.now()
 
-        with self.assertRaises(IntegrityError), mute_logger('odoo.addons.edi_base.models.decorator'):
+        with self.assertRaises(IntegrityError), mute_logger("odoo.addons.edi_base.models.decorator"):
             self.new_env["res.partner"].with_context(autocommit=True).create_partner({"name": False})
 
         with self.registry.cursor() as new_cr:
@@ -114,41 +114,42 @@ class TestEdiApiCases(TestEDICommonBase):
 
 
 @tagged("post_install", "-at_install", "edi_decorator")
-class TestEdiApiCasesXMLRPC(HttpCase):
-
+class TestEdiApiCasesXMLRPC(TestHttpBase):
     @classmethod
     def setUpClass(cls):
-
         super().setUpClass()
+        user = cls.env.ref("base.user_admin")
+        user = user.with_user(user)
+        key = (
+            user.env["res.users.apikeys"]
+            .sudo()
+            ._generate(scope="rpc", name="test", expiration_date=datetime.now() + timedelta(days=0.5))
+        )
+        cls.bearer_header = {"Authorization": f"Bearer {key}"}
 
-        cls.base_args = [get_db_name(), cls.env.ref('base.user_admin').id, 'admin']
-
-    def test_api_decorator_xmlrpc(self):
+    def test_api_decorator_json(self):
         """Test Api decorator"""
-
-        args = self.base_args + ['res.partner', 'create_partner']
-
-        with mute_logger('odoo.addons.edi_base.models.decorator'):
-            res_id = self.xmlrpc_object.execute(*args, {'name': 'Test partner'})
-
+        with mute_logger("odoo.addons.edi_base.models.decorator"):
+            res_id = self.url_open(
+                "/json/2/res.partner/create_partner",
+                headers=self.bearer_header,
+                json={"data": {"name": "Test partner"}},
+            ).json()
         self.assertTrue(res_id)
 
         partner = self.env["res.partner"].browse(res_id)
-        self.assertEqual(partner.display_name, 'Test partner')
+        self.assertEqual(partner.display_name, "Test partner")
 
     @mute_logger("odoo.sql_db", "odoo.http")
-    def test_api_decorator_error_xmlrpc(self):
+    def test_api_decorator_error_json(self):
         """Test Api decorator with error"""
-
-        args = self.base_args + ['res.partner', 'create_partner']
-
-        with (
-            mute_logger('odoo.addons.edi_base.models.decorator'),
-            self.assertRaises(xmlrpc.client.Fault) as cm
-        ):
-            self.xmlrpc_object.execute(*args, {'name': False})
-
-        self.assertIn('Contacts require a name', cm.exception.faultString)
+        with mute_logger("odoo.addons.edi_base.models.decorator"):
+            res = self.url_open(
+                "/json/2/res.partner/create_partner", headers=self.bearer_header, json={"data": {"name": False}}
+            )
+            self.assertEqual(res.status_code, 422)
+            body = res.json()
+            self.assertIn("Contacts require a name", body["message"])
 
 
 @tagged("edi_in")

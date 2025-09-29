@@ -60,7 +60,7 @@
                 <field name="name"/>
                 <field name="type"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-                <group string="Group By">
+                <group>
                     <filter name="group_by_type" string="Type" context="{'group_by': 'type'}"/>
                     <filter
                         name="group_by_company"

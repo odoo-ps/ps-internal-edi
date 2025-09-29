@@ -2,7 +2,6 @@
 import io
 import logging
 import os
-import warnings
 from base64 import decodebytes
 
 import pysftp
@@ -201,22 +200,3 @@ class SFTPConnection(models.Model):
 
         server.get(filename, os.path.join(directory, filename))
         return os.path.join(directory, filename)
-
-    @api.model
-    def _sftp_default_configuration(self):
-        # TODO Delete this method on 18.0
-        warnings.warn("Since 17.0, please directly override default_configuration instead", DeprecationWarning, 2)
-        return {
-            "host": "host",
-            "host_key": "",
-            "user": "user",
-            "password": "password (ignored if key supplied)",
-            "key": "",
-            "on_conflict": "choose one from : raise, rename, replace",
-            "on_conflict_rename_extension": "old",
-            "is_active": "False",
-            "in_folder": "<PATH HERE>",
-            "in_folder_done": "<PATH HERE>",
-            "in_folder_error": "<PATH HERE>",
-            "out_folder": "<PATH HERE>",
-        }

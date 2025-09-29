@@ -201,9 +201,9 @@ class Integration(models.Model):
         :return: True if should commit else False
         """
         autocommit = not getattr(threading.current_thread(), "testing", False)
-        if "autocommit" in self._context:
+        if "autocommit" in self.env.context:
             # Context key as priority to decide
-            return bool(self._context.get("autocommit"))
+            return bool(self.env.context.get("autocommit"))
         return autocommit
 
     @api.model
@@ -434,7 +434,7 @@ class Integration(models.Model):
                 "synchronization_date": fields.Datetime.now(),
             }
         )
-        synchronization._report_error(self.env.activity, exception=exception)
+        synchronization._report_error(self.env.cr.activity, exception=exception)
         return synchronization
 
     def _report_error(self, exception=None, message=None):
@@ -447,8 +447,8 @@ class Integration(models.Model):
         :param message: str
         """
 
-        if self.env.sync:
-            self.env.sync._report_error(self.env.activity, exception=exception, message=message)
+        if self.env.cr.sync:
+            self.env.cr.sync._report_error(self.env.cr.activity, exception=exception, message=message)
             return
 
         _logger.error(_("Cannot log error on sync object, sync object is not created yet"))
@@ -513,14 +513,14 @@ class Integration(models.Model):
         exceptions = []
         try:
             # processing
-            self.env.activity = "Process"
+            self.env.cr.activity = "Process"
             exceptions.extend(self._process_data(data=data, raise_error=raise_error))
         except Exception as e:
             self._create_error_sync(e)
             self._safe_commit()
             exceptions.append(e)
         finally:
-            self.env.activity = "Set Status"
+            self.env.cr.activity = "Set Status"
             self._set_status()
 
             self._safe_commit()
@@ -657,7 +657,7 @@ class Integration(models.Model):
         # create a default synchronization
         # commit it, so that the synchronization is created
         # even in case of timeout during the prosess
-        self.env.sync = self._create_synchronization(data)
+        self.env.cr.sync = self._create_synchronization(data)
         self._safe_commit()
 
         try:
@@ -692,15 +692,15 @@ class Integration(models.Model):
         self.ensure_one()
 
         # report error on the sync
-        self.env.sync._report_error(self.env.activity, exc)
+        self.env.cr.sync._report_error(self.env.cr.activity, exc)
 
         # handle error
         try:
             with self.env.cr.savepoint():
-                self.env.activity = "Handle Error"
+                self.env.cr.activity = "Handle Error"
                 self._handle_error(data, exc)
         except Exception as exc_2:
-            self.env.sync._report_error(self.env.activity, exc_2)
+            self.env.cr.sync._report_error(self.env.cr.activity, exc_2)
             raise ProcessIntegrationException("Fail to handle the exception (%s) due to %s" % (str(exc), str(exc_2)))
 
     def _handle_success_execute_synchronization(self, data):
@@ -711,7 +711,7 @@ class Integration(models.Model):
         """
         self.ensure_one()
         # mark sync as done
-        self.env.sync._done()
+        self.env.cr.sync._done()
 
     def _clean_synchronization(self, data, status):
         """

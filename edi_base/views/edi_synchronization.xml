@@ -240,7 +240,7 @@
                 <filter name="done" string="Done" domain="[('state', '=', 'done')]"/>
                 <filter name="fail" string="Failed" domain="[('state', '=', 'fail')]"/>
                 <filter name="cancel" string="Cancelled" domain="[('state', '=', 'cancel')]"/>
-                <group string="Group By">
+                <group>
                     <filter name="group_by_integration" string="Integration" context="{'group_by': 'integration_id'}"/>
                     <filter name="group_by_type" string="Flow Type" context="{'group_by': 'synchronization_flow'}"/>
                     <filter name="group_by_content_type" string="Content Type" context="{'group_by': 'content_type'}"/>
