@@ -172,7 +172,7 @@ class MonitoringReport(models.Model):
         sendable_ids = self.filtered(lambda x: x.email and x.line_ids)
         for rec in sendable_ids:
             template.with_context(monitoring=rec._prepare_email()).send_mail(
-                rec.id, notif_layout="mail.mail_notification_light"
+                rec.id, email_layout_xmlid="mail.mail_notification_light"
             )
         sendable_ids.write({"sent": fields.Datetime.now()})
         return True
