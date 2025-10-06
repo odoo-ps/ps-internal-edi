@@ -19,6 +19,13 @@
                         class="oe_highlight"
                         context="{'edi_raise_error': True}"
                     />
+                    <field
+                        name="last_state"
+                        widget="statusbar"
+                        statusbar_visible="no_sync,new,done,fail,cancelled"
+                        nolabel="1"
+                        readonly="1"
+                    />
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -66,7 +73,6 @@
                                 <field name="last_execution_date"/>
                                 <field name="last_success_date"/>
                                 <field name="last_failure_date"/>
-                                <field name="last_sync_status"/>
                             </group>
                         </page>
                         <page name="configuration" string='Configuration' invisible="has_sub_integration">
@@ -110,13 +116,18 @@
             <list>
                 <field name="name"/>
                 <field name="integration_flow"/>
-                <field name="cron_id"/>
+                <field name="type" optional="hide"/>
                 <field
                     name="company_id"
                     groups="base.group_multi_company"
                     options="{'no_create': True}"
                     optional="show"
                 />
+                <field name="synchronization_creation" optional="hide"/>
+                <field name="synchronization_content_type" optional="hide"/>
+                <field name="write_content_on_sync" optional="hide"/>
+                <field name="last_state" optional="show"/>
+                <field name="last_execution_date" optional="hide"/>
             </list>
         </field>
     </record>
@@ -132,100 +143,77 @@
                 <field name="last_execution_date"/>
                 <field name="last_success_date"/>
                 <field name="last_failure_date"/>
-                <field name="last_sync_status"/>
-                <field name="color"/>
+                <field name="last_state"/>
                 <field name="has_sub_integration"/>
                 <field name="company_id" invisible="1"/>
                 <templates>
-                    <t t-name="card">
-                        <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon">
-                            <div class="o_project_kanban_main">
-                                <div class="o_dropdown_kanban dropdown" groups="base.group_user">
-                                    <a
-                                        role="button"
-                                        class="dropdown-toggle o-no-caret btn"
-                                        data-toggle="dropdown"
-                                        href="#"
-                                        aria-label="Dropdown menu"
-                                        title="Dropdown menu"
-                                    >
-                                        <span class="fa fa-ellipsis-v"/>
+                    <t t-name="menu" groups="base.group_user">
+                        <div class="container">
+                            <div class="row">
+                                <div class="col-12">
+                                    <a role="menuitem" type="object" name="open_synchronizations" class="dropdown-item">
+                                        Open Synchronizations
                                     </a>
-                                    <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
-                                        <a
-                                            role="menuitem"
-                                            type="object"
-                                            name="open_synchronizations"
-                                            class="dropdown-item"
-                                        >
-                                            Open Synchronizations
-                                        </a>
-                                        <a
-                                            role="menuitem"
-                                            type="object"
-                                            name="test_connection"
-                                            class="dropdown-item"
-                                            invisible="has_sub_integration"
-                                        >
-                                            Test Connection
-                                        </a>
-                                        <a
-                                            role="menuitem"
-                                            type="object"
-                                            name="process_integration"
-                                            class="dropdown-item"
-                                            context="{'edi_raise_error': True}"
-                                        >
-                                            Synchronize
-                                        </a>
-                                        <a role="menuitem" type="object" name="toggle_active" class="dropdown-item">
-                                            <t t-if="!record.active.raw_value">Unarchive</t>
-                                            <t t-if="record.active.raw_value">Archive</t>
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="o_kanban_card_content">
-                                    <div class="o_kanban_primary_left">
-                                        <div>
-                                            <h3>
-                                                <t t-out="record.name.value"/>
-                                            </h3>
-                                        </div>
-                                        <div>
-                                            <strong>
-                                                CRON State:
-                                                <t t-if="record.active.raw_value">Active</t>
-                                                <t t-if="!record.active.raw_value">Inactive</t>
-                                            </strong>
-                                        </div>
-                                        <div>
-                                            <strong>
-                                                Last Status:
-                                                <t t-out="record.last_sync_status.value"/>
-                                            </strong>
-                                        </div>
-                                        <div>
-                                            <span>
-                                                Last Sync Sucess:
-                                                <t t-out="record.last_success_date.value"/>
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span>
-                                                Last Sync Fail:
-                                                <t t-out="record.last_failure_date.value"/>
-                                            </span>
-                                        </div>
-                                        <t t-if="record.company_id.value">
-                                            <strong>
-                                                Company:
-                                                <t t-out="record.company_id.value"/>
-                                            </strong>
-                                        </t>
-                                    </div>
+                                    <a
+                                        role="menuitem"
+                                        type="object"
+                                        name="test_connection"
+                                        class="dropdown-item"
+                                        invisible="has_sub_integration"
+                                    >
+                                        Test Connection
+                                    </a>
+                                    <a
+                                        role="menuitem"
+                                        type="object"
+                                        name="process_integration"
+                                        class="dropdown-item"
+                                        context="{'edi_raise_error': True}"
+                                    >
+                                        Synchronize
+                                    </a>
+                                    <a role="menuitem" type="object" name="toggle_active" class="dropdown-item">
+                                        <t t-if="!record.active.raw_value">Unarchive</t>
+                                        <t t-if="record.active.raw_value">Archive</t>
+                                    </a>
                                 </div>
                             </div>
                         </div>
+                    </t>
+                    <t t-name="card">
+                         <main class="o_integration_kanban_main">
+                            <div>
+                                <field class="d-block fw-bold fs-5" name="name"/>
+                            </div>
+                            <hr class="mt4 mb4"/>
+                            <div class="row">
+                                <div class="col">
+                                    <div id="last_execution_date" t-if="record.last_execution_date">
+                                        <span>Last execution :</span> <field name="last_execution_date"/>
+                                    </div>
+                                    <div id="last_success_date" t-if="record.last_success_date">
+                                        <span>Last success :</span> <field name="last_success_date"/>
+                                    </div>
+                                    <div id="last_failure_date" t-if="record.last_failure_date">
+                                        <span>Last failure :</span> <field name="last_failure_date"/>
+                                    </div>
+                                </div>
+                            </div>
+                         </main>
+                        <footer class="align-items-end">
+                            <span t-if="record.active.raw_value" class="text-success float-start">
+                                    <i class="fa fa-circle" role="img" aria-label="Active" title="Active"/>
+                                </span>
+                                <span t-else="" class="text-danger float-start">
+                                    <i class="fa fa-circle" role="img" aria-label="Archived" title="Archived"/>
+                                </span>
+                            <field
+                                name="last_state"
+                                widget="label_selection"
+                                options="{'classes': {'no_sync': 'light', 'new': 'info', 'done': 'success', 'fail': 'danger', 'cancelled': 'secondary'}}"
+                                class="ms-auto"
+                            />
+                        </footer>
                     </t>
                 </templates>
             </kanban>
@@ -248,19 +236,15 @@
                 <filter
                     name="success"
                     string="Success"
-                    domain="[('last_sync_status', '=', 'Success'), '|', ('active', '=', True), ('active', '=', False)]"
+                    domain="[('last_state', '=', 'done'), '|', ('active', '=', True), ('active', '=', False)]"
                 />
                 <filter
-                    name="success"
+                    name="fail"
                     string="Fail"
-                    domain="[('last_sync_status', '=', 'Fail'), '|', ('active', '=', True), ('active', '=', False)]"
+                    domain="[('last_state', '=', 'fail'), '|', ('active', '=', True), ('active', '=', False)]"
                 />
                 <group>
-                    <filter
-                        name="group_by_last_sync_status"
-                        string="Sync Status"
-                        context="{'group_by': 'last_sync_status'}"
-                    />
+                    <filter name="group_by_last_state" string="Sync Status" context="{'group_by': 'last_state'}"/>
                     <filter
                         name="group_by_integration_flow"
                         string="Flow Type"
@@ -291,7 +275,7 @@
             name="context"
             eval="{
             'search_default_all': True,
-            'search_default_group_by_last_sync_status' : True,
+            'search_default_group_by_last_state' : True,
         }"
         />
         <field name="help" type="html">

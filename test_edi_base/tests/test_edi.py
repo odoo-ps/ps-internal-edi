@@ -74,7 +74,7 @@ class TestEdiApiCases(TestEDICommonBase):
 
             # Check integration has been created
             edi = new_env["edi.integration"].with_context(active_test=False).search([("name", "=", "Create Partner")])
-            self.assertEqual(edi.last_sync_status, "Success")
+            self.assertEqual(edi.last_state, "done")
             self.assertGreaterEqual(edi.last_success_date, now)
 
             # Check synchronization object has been created and is in state done
@@ -101,7 +101,7 @@ class TestEdiApiCases(TestEDICommonBase):
             edi = new_env["edi.integration"].with_context(active_test=False).search([("name", "=", "Create Partner")])
             self.assertTrue(edi)
             self.assertGreaterEqual(edi.last_failure_date, now)
-            self.assertEqual(edi.last_sync_status, "Fail")
+            self.assertEqual(edi.last_state, "fail")
 
             # Check synchronization object has been created and is in state fail
             sync = new_env["edi.synchronization"].search(
@@ -220,7 +220,7 @@ class TestEdiINCases(TestEDICommonBase):
             self.assertEqual(len(partners), 2, "The integration should create 2 partners")
 
             integration = new_env["edi.integration"].browse(edi.id)
-            self.assertEqual(integration.last_sync_status, "Success", "The integration should have succeed")
+            self.assertEqual(integration.last_state, "done", "The integration should have succeed")
             self.assertTrue(integration.last_success_date, "The integration should have the last success date set")
             self.assertGreaterEqual(
                 integration.last_success_date, now, "The integration should be updated after the initial date"
@@ -256,7 +256,7 @@ class TestEdiINCases(TestEDICommonBase):
             self.assertEqual(len(partners), 1, "The integration should create 1 partner")
 
             integration = new_env["edi.integration"].browse(edi.id)
-            self.assertEqual(integration.last_sync_status, "Success", "The integration should have succeed")
+            self.assertEqual(integration.last_state, "done", "The integration should have succeed")
             self.assertGreaterEqual(
                 integration.last_success_date, now, "The integration should be updated after the initial date"
             )
@@ -295,7 +295,7 @@ class TestEdiINCases(TestEDICommonBase):
             self.assertEqual(len(partners), 0, "The integration should create any partners")
 
             integration = new_env["edi.integration"].browse(edi.id)
-            self.assertEqual(integration.last_sync_status, "Fail", "The integration should have failed")
+            self.assertEqual(integration.last_state, "fail", "The integration should have failed")
             self.assertGreaterEqual(
                 integration.last_failure_date, now, "The integration should be updated after the initial date"
             )
@@ -333,7 +333,7 @@ class TestEdiINCases(TestEDICommonBase):
             self.assertEqual(len(partners), 0, "The integration shouldn't create any partners")
 
             integration = new_env["edi.integration"].browse(edi.id)
-            self.assertEqual(integration.last_sync_status, "Fail", "The integration should have failed")
+            self.assertEqual(integration.last_state, "fail", "The integration should have failed")
             self.assertGreaterEqual(
                 integration.last_failure_date, now, "The integration should be updated after the initial date"
             )
@@ -371,7 +371,7 @@ class TestEdiINCases(TestEDICommonBase):
                 self.assertEqual(len(partners), 0, "The integration should create any partners")
 
                 integration = new_env["edi.integration"].browse(edi.id)
-                self.assertEqual(integration.last_sync_status, "Fail", "The integration should have failed")
+                self.assertEqual(integration.last_state, "fail", "The integration should have failed")
                 self.assertGreaterEqual(
                     integration.last_failure_date, now, "The integration should be updated after the initial date"
                 )
@@ -504,7 +504,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi.id)
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertGreaterEqual(integration.last_success_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -541,7 +541,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi_one.id)
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertGreaterEqual(integration.last_success_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -586,7 +586,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi_multi.id)
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertGreaterEqual(integration.last_success_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -614,7 +614,7 @@ class TestEdiOUTCases(TestEDICommonBase):
 
             integration = new_env["edi.integration"].browse(self.edi.id)
             self.assertGreaterEqual(integration.last_success_date, now)
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
 
             sync = new_env["edi.synchronization"].search(
                 [("integration_id", "=", self.edi.id), ("synchronization_date", ">=", now)]
@@ -640,7 +640,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi.id)
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertGreaterEqual(integration.last_failure_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -667,7 +667,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi.id)
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertGreaterEqual(integration.last_failure_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -707,7 +707,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi.id)
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertGreaterEqual(integration.last_success_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -737,7 +737,7 @@ class TestEdiOUTCases(TestEDICommonBase):
 
             integration = new_env["edi.integration"].browse(self.edi.id)
             self.assertGreaterEqual(integration.last_success_date, now)
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
 
             sync = new_env["edi.synchronization"].search(
                 [("integration_id", "=", self.edi.id), ("synchronization_date", ">=", now)]
@@ -765,7 +765,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi.id)
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertGreaterEqual(integration.last_failure_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -794,7 +794,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
             integration = new_env["edi.integration"].browse(self.edi.id)
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertGreaterEqual(integration.last_failure_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -857,7 +857,7 @@ class TestEdiOUTCases(TestEDICommonBase):
 
             # since their is an inconsitency, integration and synchronizations should be in error
             integration = new_env["edi.integration"].browse(self.edi_one.id)
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertGreaterEqual(integration.last_success_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -924,7 +924,7 @@ class TestEdiOUTCases(TestEDICommonBase):
 
             # since their is no inconsitency, integration and synchronizations should be in success
             integration = new_env["edi.integration"].browse(self.edi_one.id)
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertGreaterEqual(integration.last_success_date, now)
 
             sync = new_env["edi.synchronization"].search(
@@ -957,13 +957,13 @@ class TestEdiBase(TestEDICommonBase):
         )
         cls.new_env.cr.commit()
 
+    @mute_logger("odoo.addons.edi_base.models.edi_integration")
     def test_set_status_01(self):
         """
         Test integration's initial status
         """
         self.integration._set_status()
-
-        self.assertEqual(self.integration.last_sync_status, "No Sync Yet")
+        self.assertEqual(self.integration.last_state, "no_sync")
         self.assertFalse(self.integration.last_success_date)
         self.assertFalse(self.integration.last_failure_date)
 
@@ -987,9 +987,9 @@ class TestEdiBase(TestEDICommonBase):
             sync.flush_recordset(fnames=["state", "synchronization_date"])
 
             integration = new_env["edi.integration"].browse(self.integration.id)
-            integration._set_status()
+            integration._set_status(sync)
 
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertTrue(integration.last_success_date)
             self.assertFalse(integration.last_failure_date)
 
@@ -1013,9 +1013,9 @@ class TestEdiBase(TestEDICommonBase):
             sync.flush_recordset()
 
             integration = new_env["edi.integration"].browse(self.integration.id)
-            integration._set_status()
+            integration._set_status(sync)
 
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertFalse(integration.last_success_date)
             self.assertTrue(integration.last_failure_date)
 
@@ -1028,7 +1028,7 @@ class TestEdiBase(TestEDICommonBase):
 
         with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
-            new_env["edi.synchronization"].create(
+            sync = new_env["edi.synchronization"].create(
                 {
                     "name": "Synchronization 1",
                     "integration_id": self.integration.id,
@@ -1039,9 +1039,9 @@ class TestEdiBase(TestEDICommonBase):
             new_cr.commit()
 
             integration = new_env["edi.integration"].browse(self.integration.id)
-            integration._set_status()
+            integration._set_status(sync)
 
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertFalse(integration.last_success_date)
             self.assertTrue(integration.last_failure_date)
 
@@ -1050,9 +1050,9 @@ class TestEdiBase(TestEDICommonBase):
             )
             sync.write({"state": "done", "synchronization_date": now + timedelta(days=1)})
             sync.flush_recordset()
-            integration._set_status()
+            integration._set_status(sync)
 
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertTrue(integration.last_success_date)
             self.assertEqual(integration.last_failure_date, now)
 
@@ -1067,7 +1067,7 @@ class TestEdiBase(TestEDICommonBase):
 
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
 
-            new_env["edi.synchronization"].create(
+            sync = new_env["edi.synchronization"].create(
                 {
                     "name": "Synchronization 1",
                     "integration_id": self.integration.id,
@@ -1079,9 +1079,9 @@ class TestEdiBase(TestEDICommonBase):
             new_cr.commit()
 
             integration = new_env["edi.integration"].browse(self.integration.id)
-            integration._set_status()
+            integration._set_status(sync)
 
-            self.assertEqual(integration.last_sync_status, "Success")
+            self.assertEqual(integration.last_state, "done")
             self.assertTrue(integration.last_success_date)
             self.assertFalse(integration.last_failure_date)
 
@@ -1094,8 +1094,8 @@ class TestEdiBase(TestEDICommonBase):
             sync.flush_recordset()
 
             integration = new_env["edi.integration"].browse(self.integration.id)
-            integration._set_status()
+            integration._set_status(sync)
 
-            self.assertEqual(integration.last_sync_status, "Fail")
+            self.assertEqual(integration.last_state, "fail")
             self.assertEqual(integration.last_success_date, now)
             self.assertTrue(integration.last_failure_date)

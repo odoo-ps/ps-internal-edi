@@ -42,7 +42,9 @@ class Synchronization(models.Model):
     filename = fields.Char(readonly=True)
     filename_short = fields.Char(compute="_compute_filename_short")
     state = fields.Selection(
-        [("new", "New"), ("fail", "Fail"), ("done", "Done"), ("cancelled", "Cancelled")], default="new", string="Status"
+        [("new", "Started"), ("fail", "Fail"), ("done", "Done"), ("cancelled", "Cancelled")],
+        default="new",
+        string="Status",
     )
     integration_id = fields.Many2one("edi.integration", required=True, string="Integration")
     company_id = fields.Many2one(related="integration_id.company_id", store=True)
@@ -59,12 +61,6 @@ class Synchronization(models.Model):
     user_id = fields.Many2one(
         "res.users", string="Trigger User", help="User that trigger the synchronization or call the API"
     )
-    color = fields.Integer(compute="_compute_color")
-
-    def _compute_color(self):
-        mapping = {"new": 4, "fail": 1, "done": 10, "cancelled": 0}
-        for rec in self:
-            rec.color = mapping.get(rec.state, 0)
 
     def _compute_name_short(self):
         max_size = 80

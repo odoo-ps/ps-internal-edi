@@ -78,7 +78,7 @@ def integration(name):
             else:
                 sync._done()
             finally:
-                edi._set_status()
+                edi._set_status(sync)
 
                 new_cr.commit()
                 new_cr.close()

@@ -1,7 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import json
 import logging
-from datetime import datetime
 
 from odoo import _, api, fields, models, tools
 from odoo.exceptions import UserError, ValidationError
@@ -131,12 +130,25 @@ class Integration(models.Model):
     synchronization_ids = fields.One2many("edi.synchronization", "integration_id")
     error_ids = fields.One2many("edi.synchronization.error", "integration_id")
     last_execution_date = fields.Datetime(
-        string="Last Trigger Date", readonly=True, help="Last time the integration has been triggered"
+        string="Last Synchronization Date",
+        readonly=True,
+        copy=False,
+        help="Last time the integration has been triggered",
     )
-    last_success_date = fields.Datetime(readonly=True)
-    last_failure_date = fields.Datetime(readonly=True)
-    last_sync_status = fields.Char(default="No Sync Yet", readonly=True)
-    color = fields.Integer()
+    last_success_date = fields.Datetime(readonly=True, copy=False)
+    last_failure_date = fields.Datetime(readonly=True, copy=False)
+    last_state = fields.Selection(
+        [
+            ("no_sync", "No Sync Yet"),
+            ("new", "Started"),
+            ("done", "Done"),
+            ("fail", "Fail"),
+            ("cancelled", "Cancelled"),
+        ],
+        default="no_sync",
+        readonly=True,
+        copy=False,
+    )
 
     @api.depends("integration_flow")
     def _compute_integration_flow_type(self):
@@ -213,82 +225,37 @@ class Integration(models.Model):
     def _default_cron_vals(self):
         return {"model_id": self.env.ref("edi_base.model_edi_integration").id, "state": "code"}
 
-    def _set_status(self):
-        """Set the status of the integration based on the last synchronization"""
-
-        self.flush_model()
-
-        sync_datas = []
-
-        self.env.cr.execute(
-            """
-            SELECT DISTINCT ON (integration_id, state)
-                    integration_id,
-                    synchronization_date,
-                    state
-            FROM edi_synchronization
-            WHERE integration_id in %s
-                AND synchronization_date IS NOT NULL
-            ORDER BY integration_id, state, synchronization_date DESC
-            """,
-            (tuple(self.ids),),
-        )
-        sync_datas = self.env.cr.dictfetchall()
-
-        done_sync = {}
-        fail_sync = {}
-
-        for sync_data in sync_datas:
-
-            state = sync_data["state"]
-
-            if state not in ("done", "fail"):
+    def _set_status(self, synchronizations=None):
+        """Set the status of the integration based on the last synchronization.
+        Consider the status from the related synchronization which comes :
+        - either from parameter
+          (which is the case after an exception which can group multiple integrations)
+        - or on the cursor itself
+          (because we stored a reference to the synchronization there to make it available everywhere)
+        """
+        for integration in self:
+            synchronization = (
+                synchronizations
+                and synchronizations.filtered(lambda x, i=integration: x.integration_id == i)
+                or hasattr(integration.env.cr, "sync")
+                and integration.env.cr.sync
+            )
+            if not synchronization:
+                _logger.warning(
+                    _(
+                        "No synchronization related to the integration %s, impossible to set the status",
+                        integration.type,
+                    )
+                )
                 continue
+            synchronization = synchronization[:1]  # should be useless, but just in case
+            #   (and we take the 1st one because it's the most recent one)
 
-            dest = fail_sync if state == "fail" else done_sync
-            opp = done_sync if state == "fail" else fail_sync
-
-            integration_id = sync_data["integration_id"]
-            sync_date = fields.Datetime.from_string(sync_data["synchronization_date"])
-
-            # NOTE: Due to the SQL query, `done` state synchronization is always
-            #       before a possible failed one, so if the already succeeded
-            #       synchronization is older, we empty the dict.
-            if state == "fail" and integration_id in opp and opp[integration_id] <= sync_date:
-                opp[integration_id] = False
-
-            dest[integration_id] = sync_date
-
-        for record in self:
-
-            vals = {"last_sync_status": "No Sync Yet", "color": 4}
-
-            last_success_date = done_sync.get(record.id, False)
-            last_failure_date = fail_sync.get(record.id, False)
-
-            if last_success_date:
-                vals["last_success_date"] = last_success_date
-
-            if last_failure_date:
-                vals["last_failure_date"] = last_failure_date
-
-            if last_success_date or last_failure_date:
-
-                # NOTE: If the last synchronization is a success, we consider the
-                #       integration as succeeded
-                if last_success_date and (last_failure_date or datetime(1970, 1, 1)) <= last_success_date:
-                    vals.update({"last_sync_status": "Success", "color": 10})
-
-                # NOTE: If the last synchronization is a failure, we consider the
-                #       integration as failed
-                elif last_failure_date and (last_success_date or datetime(1970, 1, 1)) <= last_failure_date:
-                    vals.update({"last_sync_status": "Fail", "color": 1})
-
-            # NOTE: Reset values
-            else:
-                vals.update({"last_success_date": False, "last_failure_date": False})
-
-            record.write(vals)
+            integration.last_state = synchronization.state
+            if integration.last_state == "done":
+                integration.last_success_date = synchronization.synchronization_date
+            elif integration.last_state == "fail":
+                integration.last_failure_date = synchronization.synchronization_date
 
     @api.model_create_multi
     def create(self, values):
@@ -500,7 +467,7 @@ class Integration(models.Model):
             self.env.cr.activity = "Process"
             exceptions.extend(self._process_data(data=data, raise_error=raise_error))
         except Exception as e:
-            self._create_error_sync(e)
+            self.env.cr.sync = self._create_error_sync(e)
             self._safe_commit()
             exceptions.append(e)
         finally:
@@ -816,4 +783,4 @@ class Integration(models.Model):
 
                 # update status of integrations
                 integration_ids = env["edi.integration"].browse(integration_ids).exists()
-                integration_ids._set_status()
+                integration_ids._set_status(syncs)
