@@ -19,4 +19,4 @@ class ResConfigSettings(models.TransientModel):
             raise UserError(
                 _("An EDI archive or delete duration should go with actual states to consider for archiving")
             )
-        return super(ResConfigSettings, self).execute()
+        return super().execute()

@@ -55,7 +55,7 @@ class ConnectionFolder(models.Model):
         for f in os.listdir(config["in_folder"]):
             file_path = "%s/%s" % (config["in_folder"], f)
             if os.path.isfile(file_path):
-                with open(file_path, "r") as fd:
+                with open(file_path) as fd:
                     data.append({"filename": f, "content": fd.read()})
         return data
 

@@ -23,18 +23,14 @@ def integration(name):
     def decorator(fct):
         @wraps(fct)
         def wrapper(self, *args, **kwargs):
-
             self.env.flush_all()
-
             new_cr = Registry(self.env.cr.dbname).cursor()
             new_env = api.Environment(new_cr, SUPERUSER_ID, self.env.context)
-
             edi = new_env["edi.integration"].search(
                 [("name", "=", name), "|", ("active", "=", False), ("active", "=", True)], limit=1
             )
 
             if not edi:
-
                 edi = edi.create(
                     {
                         "integration_flow": "in",
@@ -45,7 +41,6 @@ def integration(name):
                         "active": False,
                     }
                 )
-
                 _logger.info("No integration found, a default one has been created: '%s' [%s]", name, edi.id)
 
             # NOTE inspired from _process_synchronization
@@ -73,9 +68,7 @@ def integration(name):
             )
 
             new_cr.commit()
-
             res = None
-
             try:
                 with self.env.cr.savepoint():
                     res = fct(self, *args, **kwargs)
@@ -89,7 +82,6 @@ def integration(name):
 
                 new_cr.commit()
                 new_cr.close()
-
             return res
 
         return wrapper

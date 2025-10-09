@@ -276,7 +276,7 @@ class FTPConnection(models.Model):
             with self.connect():
                 pass
         except Exception as e:
-            raise UserError(_("Connection Test Failed! Here is what we got instead:\n %s") % ustr(e))
+            raise UserError(_("Connection Test Failed! Here is what we got instead:\n %s") % ustr(e)) from e
         else:
             raise UserError(_("Connection Test Succeeded! Everything seems properly set up!"))
 
@@ -288,7 +288,7 @@ class FTPConnection(models.Model):
                 self._upload_file(server, filename, StringIO(content.encode()))
             except Exception as e:
                 _logger.error(e)
-                raise UserError(_("Send synchronization failed for file %s:\n%s") % (filename, ustr(e)))
+                raise UserError(_("Send synchronization failed for file %s:\n%s") % (filename, ustr(e))) from e
 
     def _ftp_fetch_files(self, *args, **kwargs):
         """Download the file into a temporary dictionnary
@@ -316,14 +316,14 @@ class FTPConnection(models.Model):
                     )
                 except Exception as e:
                     _logger.error(e)
-                    raise UserError(_("Fetch synchronization failed for file %s:\n%s") % (filename, ustr(e)))
+                    raise UserError(_("Fetch synchronization failed for file %s:\n%s") % (filename, ustr(e))) from e
         if hasattr(server, "encoding"):
             encoding = server.encoding
         else:
             encoding = "utf-8"
         if self.ftp_load_content:
             for res in result:
-                with open(res["file"], "r", encoding=encoding) as f:
+                with open(res["file"], encoding=encoding) as f:
                     res["content"] = f.read()
         return result
 
