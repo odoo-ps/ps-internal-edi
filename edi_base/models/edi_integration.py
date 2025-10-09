@@ -1,10 +1,9 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import json
 import logging
-import threading
 from datetime import datetime
 
-from odoo import _, api, fields, models
+from odoo import _, api, fields, models, tools
 from odoo.exceptions import UserError, ValidationError
 from odoo.modules.registry import Registry
 from odoo.tools.safe_eval import safe_eval
@@ -200,11 +199,9 @@ class Integration(models.Model):
 
         :return: True if should commit else False
         """
-        autocommit = not getattr(threading.current_thread(), "testing", False)
-        if "autocommit" in self.env.context:
-            # Context key as priority to decide
+        if "autocommit" in self.env.context:  # Context key as priority to decide
             return bool(self.env.context.get("autocommit"))
-        return autocommit
+        return not tools.config["test_enable"]
 
     @api.model
     def _safe_commit(self):
