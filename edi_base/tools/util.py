@@ -1,6 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-""" Util methods for edi_base """
+"""Util methods for edi_base"""
 
 
 def _chunks(iterable, n):

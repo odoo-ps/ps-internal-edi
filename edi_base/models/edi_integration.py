@@ -295,19 +295,13 @@ class Integration(models.Model):
 
     @api.model_create_multi
     def create(self, values):
-
         for vals in values:
             vals.update(self._default_cron_vals())
-
         integrations = super().create(values)
-
-        for integration, vals in zip(integrations, values):
-
+        for integration, vals in zip(integrations, values, strict=True):
             if "code" in vals:
                 continue
-
             integration.code = "model._process(%i)" % integration.id
-
         return integrations
 
     def unlink(self):
@@ -320,9 +314,7 @@ class Integration(models.Model):
         return res
 
     def _load_records(self, data_list, update=False):
-
         result = super()._load_records(data_list, update=update)
-
         if self._name != "edi.integration":
             return result
 
@@ -338,31 +330,26 @@ class Integration(models.Model):
         #       avoid the test to fail.
 
         IMD = self.env["ir.model.data"]
-
         crons = result.mapped("cron_id")
         server_actions = crons.mapped("ir_actions_server_id")
-
         server_action_imds = IMD.search([("model", "=", "ir.actions.server"), ("res_id", "in", server_actions.ids)])
         if len(server_action_imds) == len(result):
             return result
 
         server_action_imds_res_ids = server_action_imds.mapped("res_id")
-
         cron_imds = IMD.search([("model", "=", "ir.cron"), ("res_id", "in", crons.ids)])
-
         imd_data_list = []
         for server_action in server_actions:
             if server_action.id in server_action_imds_res_ids:
                 continue
 
-            cron = crons.filtered(lambda c: c.ir_actions_server_id == server_action)
-            imd = cron_imds.filtered(lambda imd: imd.res_id == cron.id)
+            cron = crons.filtered(lambda c, s=server_action: c.ir_actions_server_id == s)
+            imd = cron_imds.filtered(lambda imd, c=cron: imd.res_id == c.id)
             imd_data_list.append(
                 {"xml_id": f"{imd.module}.{imd.name}_ir_actions_server", "record": server_action, "noupdate": True}
             )
 
         IMD._update_xmlids(imd_data_list, update=update)
-
         return result
 
     def _read_parameter(self):
@@ -701,7 +688,9 @@ class Integration(models.Model):
                 self._handle_error(data, exc)
         except Exception as exc_2:
             self.env.cr.sync._report_error(self.env.cr.activity, exc_2)
-            raise ProcessIntegrationException("Fail to handle the exception (%s) due to %s" % (str(exc), str(exc_2)))
+            raise ProcessIntegrationException(
+                _("Fail to handle the exception (%s) due to %s", str(exc), str(exc_2))
+            ) from exc_2
 
     def _handle_success_execute_synchronization(self, data):
         """Handle the success of the synchronization execution

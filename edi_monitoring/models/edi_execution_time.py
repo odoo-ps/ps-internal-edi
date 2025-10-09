@@ -1,4 +1,5 @@
-""" Add the execution time on synchronizations """
+"""Add the execution time on synchronizations"""
+
 from odoo import api, fields, models
 
 

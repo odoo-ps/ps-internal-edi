@@ -1,4 +1,5 @@
-""" Add the file size on the synchronizations """
+"""Add the file size on the synchronizations"""
+
 import logging
 import os
 

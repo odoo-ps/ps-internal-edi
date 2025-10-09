@@ -320,7 +320,9 @@ class TestEdiINCases(TestEDICommonBase):
 
         edi = self.integration
 
-        with self.assertRaises(Exception, msg="The integration should raise an Exception"):
+        with self.assertRaisesRegex(
+            Exception, 'new row for relation "res_partner" violates check constraint "res_partner_check_name"'
+        ):
             edi.with_context(edi_raise_error=True).process_integration()
 
         with self.registry.cursor() as new_cr:
@@ -493,7 +495,7 @@ class TestEdiOUTCases(TestEDICommonBase):
         reader = csv.reader(open(filenames[0]), delimiter=",")
         header = reader.__next__()
         for i, line in enumerate(reader):
-            data = dict(zip(header, line))
+            data = dict(zip(header, line, strict=True))
             self.assertEqual(len(data.keys()), 2)
             self.assertEqual(data["name"], "EDI TEST %s" % str(i).zfill(3))
 
@@ -530,7 +532,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()
             for line in reader:
-                data = dict(zip(header, line))
+                data = dict(zip(header, line, strict=True))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
 
@@ -573,7 +575,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             self.assertGreaterEqual(remaining_files, 1)
             result[len(lines)] -= 1
             for line in lines:
-                data = dict(zip(header, line))
+                data = dict(zip(header, line, strict=True))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
         for value in result.values():
@@ -696,7 +698,7 @@ class TestEdiOUTCases(TestEDICommonBase):
         reader = csv.reader(open(filenames[0]), delimiter=",")
         header = reader.__next__()
         for i, line in enumerate(reader):
-            data = dict(zip(header, line))
+            data = dict(zip(header, line, strict=True))
             self.assertEqual(len(data.keys()), 2)
             self.assertEqual(data["name"], "EDI TEST %s" % str(i).zfill(3))
 
@@ -776,14 +778,12 @@ class TestEdiOUTCases(TestEDICommonBase):
 
     @mute_logger("odoo.sql_db")
     def test_export_partner_real_time_crash_raise(self):
-
         now = fields.Datetime.now()
-
         partner = self.Partner.create({"name": "EDI TEST raise"})
         self.new_env.cr.commit()
 
+        partner.write({"country_id": self.env.ref("base.be").id})
         with self.assertRaises(UserError):
-            partner.write({"country_id": self.env.ref("base.be").id})
             self.edi.with_context(autocommit=True)._process_realtime(data=partner, raise_error=True)
 
         # Check value has been properly written by business Code (the current cursor is not rolledback)
@@ -841,7 +841,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()
             for line in reader:
-                data = dict(zip(header, line))
+                data = dict(zip(header, line, strict=True))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
                 self.assertTrue("UPDATED" in data["name"])  # updated data have been synchronized
@@ -908,7 +908,7 @@ class TestEdiOUTCases(TestEDICommonBase):
             reader = csv.reader(open(fname), delimiter=",")
             header = reader.__next__()
             for line in reader:
-                data = dict(zip(header, line))
+                data = dict(zip(header, line, strict=True))
                 self.assertEqual(len(data.keys()), 2)
                 self.assertTrue("EDI TEST" in data["name"])
                 self.assertTrue("UPDATED" in data["name"])  # updated data have been synchronized
@@ -961,7 +961,6 @@ class TestEdiBase(TestEDICommonBase):
         """
         Test integration's initial status
         """
-
         self.integration._set_status()
 
         self.assertEqual(self.integration.last_sync_status, "No Sync Yet")

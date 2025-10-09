@@ -52,9 +52,7 @@ class TestEDICommon(TransactionCase):
     @classmethod
     @mute_logger("odoo.models.unlink")
     def _clean_connections(cls):
-
         with cls.registry.cursor() as cr:
-
             env = api.Environment(cr, cls.env.user.id, cls.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.connection")])
             env["edi.connection"].search([("id", "not in", imds.mapped("res_id"))]).unlink()
@@ -62,7 +60,6 @@ class TestEDICommon(TransactionCase):
     @classmethod
     @mute_logger("odoo.models.unlink")
     def _clean_integrations(cls):
-
         with cls.registry.cursor() as cr:
             env = api.Environment(cr, cls.env.user.id, cls.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
@@ -71,7 +68,6 @@ class TestEDICommon(TransactionCase):
             ).unlink()
 
     def setUp(self):
-
         super().setUp()
 
         # NOTE: We clean the created synchronizations between the execution of
@@ -82,7 +78,6 @@ class TestEDICommon(TransactionCase):
 
     @mute_logger("odoo.models.unlink")
     def _clean_synchronizations(self):
-
         with self.registry.cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
@@ -97,13 +92,12 @@ class TestEDICommon(TransactionCase):
             synchronizations.unlink()
 
     def _reset_integrations(self):
-
         with self.registry.cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
             imds = env["ir.model.data"].search([("model", "=", "edi.integration")])
             env["edi.integration"].with_context(active_test=False).search(
                 [("id", "not in", imds.mapped("res_id"))]
-            ).write({"last_sync_status": "No Sync Yet", "last_success_date": False, "last_failure_date": False})
+            ).write({"last_success_date": False, "last_failure_date": False})
 
 
 class TestEDICommonBase(TestEDICommon):
@@ -111,17 +105,23 @@ class TestEDICommonBase(TestEDICommon):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.folder_connection = cls.new_env["edi.connection"].with_context(mail_create_nolog=True).create(
-            {
-                "name": "Connection to folder",
-                "type": "api",
-                "configuration": json.dumps(
+        cls.folder_connection = (
+            cls.new_env["edi.connection"]
+            .with_context(mail_create_nolog=True)
+            .create(
+                [
                     {
-                        "in_folder": str(FOLDER_IN),
-                        "in_folder_done": str(FOLDER_IN_DONE),
-                        "in_folder_error": str(FOLDER_IN_ERROR),
-                        "out_folder": str(FOLDER_OUT),
+                        "name": "Connection to folder",
+                        "type": "api",
+                        "configuration": json.dumps(
+                            {
+                                "in_folder": str(FOLDER_IN),
+                                "in_folder_done": str(FOLDER_IN_DONE),
+                                "in_folder_error": str(FOLDER_IN_ERROR),
+                                "out_folder": str(FOLDER_OUT),
+                            }
+                        ),
                     }
-                ),
-            }
+                ]
+            )
         )
