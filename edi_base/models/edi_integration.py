@@ -79,7 +79,7 @@ class Integration(models.Model):
         string="EDI Type",
         tracking=True,
     )  # Add selection for your integration
-    parameter = fields.Text(string="Parameter", tracking=True)
+    parameter = fields.Text(string="Parameter", tracking=True, default="{}")
 
     synchronization_content_type = fields.Selection(
         selection=[("text", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON"), ("pdf", "PDF")],
@@ -321,7 +321,7 @@ class Integration(models.Model):
         :return: dict
         """
         self.ensure_one()
-        return json.loads(self.parameter)
+        return json.loads(self.parameter or "{}")
 
     def test_connection(self):
         """Should raise a UserError with status 'Success' or 'Fail'"""
