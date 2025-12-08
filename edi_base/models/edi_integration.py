@@ -74,16 +74,19 @@ class Integration(models.Model):
     )
     connection_id = fields.Many2one("edi.connection", required=True, string="Connection", tracking=True)
     type = fields.Selection(
-        selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")],
+        selection=[("generic", "Generic"), ("multi", "Call Sub Integration"), ("api", "RPC Api")],
         required=True,
         string="EDI Type",
         tracking=True,
+        default="generic",
     )  # Add selection for your integration
-    parameter = fields.Text(string="Parameter", tracking=True, default="{}")
+    parameter = fields.Text(
+        string="Parameter", tracking=True, default='{"fields": ["id", "name"], "csv_delimiter": " "}'
+    )
 
     synchronization_content_type = fields.Selection(
-        selection=[("text", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON"), ("pdf", "PDF")],
-        default="text",
+        selection=[("csv", "CSV"), ("json", "JSON"), ("pdf", "PDF"), ("text", "Text"), ("xml", "XML")],
+        default="json",
         required=True,
         string="Content Type",
         tracking=True,

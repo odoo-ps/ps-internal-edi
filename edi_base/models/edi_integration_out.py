@@ -1,6 +1,9 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import ast
+import csv
+import json
 import logging
+from io import StringIO
 
 from odoo import fields, models
 
@@ -201,4 +204,21 @@ class IntegrationOut(models.Model):
         :return: str
         """
         self.ensure_one()
-        return ""
+        data = ""
+
+        if self.type == "generic":
+            conf = self._read_parameter()
+            fields = conf.get("fields")
+            if fields:
+                exported_data = records.export_data(fields)["datas"]
+                if self.synchronization_content_type == "json":
+                    data_list = [dict(zip(fields, row, strict=True)) for row in exported_data]
+                    data = json.dumps(data_list, indent=4)
+                elif self.synchronization_content_type in ["text", "csv"]:
+                    content = StringIO()
+                    writer = csv.writer(content, delimiter=conf.get("csv_delimiter", ","))
+                    writer.writerow(fields)
+                    writer.writerows(exported_data)
+                    return content.getvalue()
+
+        return data
