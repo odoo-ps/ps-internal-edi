@@ -34,6 +34,11 @@ class FTPConnection(models.Model):
     ftp_load_content = fields.Boolean(
         "Load Content", default=True, help='Load the content of the file (for "in" flow)', tracking=True
     )
+    ftp_limit_in_files = fields.Integer(
+        "Max files to download",
+        default=0,
+        help='Download a maximum number of files (only for "IN" flow); 0 means no limit',
+    )
 
     @api.constrains("ftp_in_done_let", "integration_ids")
     def _check_let_in_folder_and_synchronization_creation(self):
@@ -341,14 +346,21 @@ class FTPConnection(models.Model):
         if not filenames or not integration_id:
             return filenames
 
+        # 1. filter by extension
         filenames = [
             filename
             for filename in filenames
             if filename.lower().endswith(integration_id.synchronization_content_type.lower())
         ]
+
+        # 2. filter by limit
+        if self.ftp_limit_in_files > 0:
+            filenames = filenames[: self.ftp_limit_in_files]
+
         if not filenames or not self.ftp_in_done_let:
             return filenames
 
+        # 3. filter by files that have already been processed
         # if we have to let the processed files on the server (in folder),
         # then we have to excluded them from the next synchros
         filenames_str = ", ".join(["('%s')" % filename for filename in filenames])

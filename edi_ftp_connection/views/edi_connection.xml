@@ -8,6 +8,7 @@
             <field name="configuration" position="after">
                 <field name="ftp_in_done_let" invisible="type != 'ftp'"/>
                 <field name="ftp_load_content" invisible="type != 'ftp'"/>
+                <field name="ftp_limit_in_files" invisible="type != 'ftp'"/>
             </field>
         </field>
     </record>
