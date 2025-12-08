@@ -11,6 +11,9 @@
             <field name="ftp_load_content" position="attributes">
                 <attribute name="invisible">type not in ['ftp', 'sftp']</attribute>
             </field>
+            <field name="ftp_limit_in_files" position="attributes">
+                <attribute name="invisible">type not in ['ftp', 'sftp']</attribute>
+            </field>
         </field>
     </record>
 </odoo>
