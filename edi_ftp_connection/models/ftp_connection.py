@@ -1,6 +1,7 @@
 import ftplib
 import logging
 import os
+import secrets
 import shutil
 import tempfile
 from io import BytesIO as StringIO
@@ -285,7 +286,10 @@ class FTPConnection(models.Model):
             try:
                 self.change_dir(server, server.out_folder)
                 self._manage_conflict(server, server.out_folder, filename)
-                self._upload_file(server, filename, StringIO(content.encode()))
+                uploading_file = f"{filename}.{secrets.token_urlsafe(8)}.filepart"  # with a token to avoid any conflict
+                self._upload_file(server, uploading_file, StringIO(content.encode()))
+                pwd = self.pwd(server)
+                self.rename(server, os.path.join(pwd, uploading_file), os.path.join(pwd, filename))
             except Exception as e:
                 _logger.error(e)
                 raise UserError(_("Send synchronization failed for file %s:\n%s") % (filename, ustr(e))) from e
