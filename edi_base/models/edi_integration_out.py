@@ -214,7 +214,7 @@ class IntegrationOut(models.Model):
                 if self.synchronization_content_type == "json":
                     data_list = [dict(zip(fields, row, strict=True)) for row in exported_data]
                     data = json.dumps(data_list, indent=4)
-                elif self.synchronization_content_type in ["text", "csv"]:
+                elif self.synchronization_content_type in ["txt", "csv"]:
                     content = StringIO()
                     writer = csv.writer(content, delimiter=conf.get("csv_delimiter", ","))
                     writer.writerow(fields)
