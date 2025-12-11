@@ -5,10 +5,7 @@
         <field name="model">edi.monitoring.report</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">edi_monitoring.report_template</field>
-        <field name="print_report_name">
-            '%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name,
-            object.create_date)
-        </field>
+        <field name="print_report_name">'%s - %s - %s' % (object.env['res.company'].search([], limit=1).name, object.monitoring_id.name, object.create_date)</field>
         <field name="binding_model_id" ref="model_edi_monitoring_report"/>
         <field name="binding_type">report</field>
     </record>
