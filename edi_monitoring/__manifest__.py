@@ -1,6 +1,6 @@
 {
     "name": "Odoo PS EDI Monitoring",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.0.2",
     "license": "OEEL-1",
     "summary": "Monitoring integrations & sending reports by email",
     "category": "Tools",
