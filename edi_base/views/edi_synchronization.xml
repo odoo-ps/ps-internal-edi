@@ -132,7 +132,7 @@
         <field name="name">edi.syncrhonization.kanban.view</field>
         <field name="model">edi.synchronization</field>
         <field name="arch" type="xml">
-            <kanban string="Synchronizations" create="0" delete="0">
+            <kanban string="Synchronizations" create="0" delete="0" highlight_color="color">
                 <field name="name"/>
                 <field name="name_short"/>
                 <field name="color"/>
@@ -141,76 +141,53 @@
                 <field name="synchronization_date"/>
                 <field name="company_id"/>
                 <templates>
-                    <t t-name="card">
-                        <div
-                            t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon oe_kanban_global_click"
-                        >
-                            <div class="o_project_kanban_main">
-                                <div class="o_dropdown_kanban dropdown" groups="base.group_user">
-                                    <a
-                                        role="button"
-                                        class="dropdown-toggle o-no-caret btn"
-                                        data-toggle="dropdown"
-                                        href="#"
-                                        aria-label="Dropdown menu"
-                                        title="Dropdown menu"
-                                    >
-                                        <span class="fa fa-ellipsis-v"/>
+                     <t t-name="menu" groups="base.group_user">
+                        <div class="container">
+                            <div class="row">
+                                <div class="col-12">
+                                    <a role="menuitem" type="object" name="open_integration" class="dropdown-item">
+                                        Open Integration
                                     </a>
-                                    <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
-                                        <a role="menuitem" type="object" name="open_integration" class="dropdown-item">
-                                            Open Integration
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="o_kanban_card_content">
-                                    <div class="o_kanban_primary_left">
-                                        <div class="o_primary">
-                                            <h5>
-                                                <t t-out="record.name_short.value"/>
-                                            </h5>
-                                            <div t-if="record.filename_short.raw_value">
-                                                <i>
-                                                    <field name="filename_short"/>
-                                                </i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <strong>
-                                            Status:
-                                            <t t-out="record.state.value"/>
-                                        </strong>
-                                    </div>
-                                    <div>
-                                        <span>
-                                            <i class="fa fa-calendar-plus-o" aria-label="Synchronization Date"/>
-                                            <field name="create_date"/>
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span>
-                                            <i class="fa fa-calendar-check-o" aria-label="Synchronization Date"/>
-                                            <field name="synchronization_date"/>
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span>
-                                            <i class="fa fa-file-o" aria-label="Content Type"/>
-                                            <field name="content_type"/>
-                                        </span>
-                                    </div>
-                                    <t t-if="record.company_id.value">
-                                        <div>
-                                            <strong>
-                                                Company:
-                                                <t t-out="record.company_id.value"/>
-                                            </strong>
-                                        </div>
-                                    </t>
                                 </div>
                             </div>
                         </div>
+                    </t>
+                    <t t-name="card">
+                        <main class="o_integration_kanban_main">
+                            <div>
+                                <field class="d-block fw-bold fs-5" name="name_short"/>
+                            </div>
+                            <hr class="mt4 mb4"/>
+                            <div class="row">
+                                <div class="col">
+                                    <div t-if="record.filename_short.raw_value">
+                                        <i>
+                                            <field name="filename_short"/>
+                                        </i>
+                                    </div>
+                                   <div id="status">
+                                        <strong>Status :</strong>
+                                        <field name="state"/>
+                                   </div>
+                                   <div id="create_date" title="Creation Date">
+                                       <i class="fa fa-calendar-plus-o me-2" aria-label="Creation Date"/>
+                                       <field name="create_date"/>
+                                   </div>
+                                   <div id="synchronization_date" title="Synchronization Date">
+                                        <i class="fa fa-calendar-check-o me-2" aria-label="Synchronization Date"/>
+                                        <field name="synchronization_date"/>
+                                   </div>
+                                    <div id="content_type" title="Content Type">
+                                        <i class="fa fa-file-o me-2" aria-label="Content Type"/>
+                                        <field name="content_type"/>
+                                   </div>
+                                    <div id="company_id" t-if="record.company_id.value" title="Company">
+                                        <strong>Company :</strong>
+                                        <t t-out="record.company_id.value"/>
+                                   </div>
+                                </div>
+                            </div>
+                        </main>
                     </t>
                 </templates>
             </kanban>
