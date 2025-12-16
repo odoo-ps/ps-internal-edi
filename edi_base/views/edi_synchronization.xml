@@ -156,28 +156,22 @@
                 <field name="synchronization_date"/>
                 <field name="company_id"/>
                 <templates>
+                    <t t-name="kanban-menu" groups="base.group_user">
+                        <div class="container">
+                            <div class="row">
+                                <div class="o_kanban_card_manage_section o_kanban_manage_view">
+                                    <a role="menuitem" type="object" name="open_integration" class="dropdown-item">
+                                        Open Integration
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
                     <t t-name="kanban-box">
                         <div
                             t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon oe_kanban_global_click"
                         >
                             <div class="o_project_kanban_main">
-                                <div class="o_dropdown_kanban dropdown" groups="base.group_user">
-                                    <a
-                                        role="button"
-                                        class="dropdown-toggle o-no-caret btn"
-                                        data-toggle="dropdown"
-                                        href="#"
-                                        aria-label="Dropdown menu"
-                                        title="Dropdown menu"
-                                    >
-                                        <span class="fa fa-ellipsis-v"/>
-                                    </a>
-                                    <div class="o_kanban_card_manage_pane dropdown-menu" role="menu">
-                                        <a role="menuitem" type="object" name="open_integration" class="dropdown-item">
-                                            Open Integration
-                                        </a>
-                                    </div>
-                                </div>
                                 <div class="o_kanban_card_content">
                                     <div class="o_kanban_primary_left">
                                         <div class="o_primary">
