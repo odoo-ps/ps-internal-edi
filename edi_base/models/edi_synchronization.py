@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import traceback
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class SynchronizationError(models.Model):
@@ -35,7 +35,7 @@ class Synchronization(models.Model):
 
     _name = "edi.synchronization"
     _description = "Synchronization"
-    _order = "create_date desc"
+    _order = "triggered_date desc, create_date desc, id desc"
 
     name = fields.Char(readonly=True, required=True)
     name_short = fields.Char(compute="_compute_name_short")
@@ -56,6 +56,13 @@ class Synchronization(models.Model):
     )
     res_id = fields.Integer(string="Resource ID")
     synchronization_date = fields.Datetime(readonly=True, string="Synchronized on", index=True)
+    triggered_date = fields.Char(
+        compute="_compute_triggered_date",
+        store=True,
+        index=True,
+        help="Moment when the integration execution started, "
+        "so all synchronizations related to a same execution will have the same value",
+    )
     content = fields.Text(readonly=True)
     error_ids = fields.One2many("edi.synchronization.error", "synchronization_id", string="synchronization_id")
     user_id = fields.Many2one(
@@ -77,6 +84,12 @@ class Synchronization(models.Model):
                 rec.filename_short = rec.filename
             else:
                 rec.filename_short = "%s..." % rec.filename[:max_size]
+
+    @api.depends("integration_id")
+    def _compute_triggered_date(self):
+        """Fill only when integration_id is changing, meaning "during synchronization creation only"."""
+        for sync in self:
+            sync.triggered_date = sync.integration_id.last_execution_date
 
     def open_integration(self):
         self.ensure_one()
