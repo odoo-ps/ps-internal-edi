@@ -4,6 +4,7 @@ import os
 import secrets
 import shutil
 import tempfile
+from datetime import datetime, timezone
 from io import BytesIO as StringIO
 
 from odoo import _, api, fields, models
@@ -433,16 +434,8 @@ class FTPConnection(models.Model):
         on_conflict = config.get("on_conflict", "raise")
         file_path = os.path.join(path, filename)
         if on_conflict == "rename":
-            self.rename(
-                server,
-                file_path,
-                "%s.%s.%s"
-                % (
-                    file_path,
-                    fields.Datetime.now().strftime("%Y%m%d%H%M%S"),
-                    config.get("on_conflict_rename_extension", "old"),
-                ),
-            )
+            now = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-utc")
+            self.rename(server, file_path, f"{file_path}-{now}.{config.get('on_conflict_rename_extension', 'old')}")
         elif on_conflict == "replace":
             self.delete_file(server, file_path)
         else:
