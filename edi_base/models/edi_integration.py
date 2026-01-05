@@ -373,24 +373,6 @@ class Integration(models.Model):
 
         return sync
 
-    def _create_error_sync(self, exception):
-        """
-        :param exception: exception
-        :return: edi.synchronization
-        """
-        self.ensure_one()
-        name = "%s - %s: %s" % (self.name, fields.Datetime.now(), "No Sync Error")
-        synchronization = self.env["edi.synchronization"].create(
-            {
-                "integration_id": self.id,
-                "name": name,
-                "filename": "%s.%s" % (name, self.synchronization_content_type),
-                "synchronization_date": fields.Datetime.now(),
-            }
-        )
-        synchronization._report_error(self.env.cr.activity, exception=exception)
-        return synchronization
-
     def _report_error(self, exception=None, message=None):
         """
         Method to use to report error that should not block the process but needs to be reported
@@ -469,10 +451,6 @@ class Integration(models.Model):
             # processing
             self.env.cr.activity = "Process"
             exceptions.extend(self._process_data(data=data, raise_error=raise_error))
-        except Exception as e:
-            self.env.cr.sync = self._create_error_sync(e)
-            self._safe_commit()
-            exceptions.append(e)
         finally:
             self.env.cr.activity = "Set Status"
             self._set_status()
