@@ -3,6 +3,7 @@ import ast
 import csv
 import json
 import logging
+from datetime import datetime, timezone
 from io import StringIO
 
 from odoo import fields, models
@@ -117,7 +118,27 @@ class IntegrationOut(models.Model):
         :return: str
         """
         self.ensure_one()
-        return "%s - %s: %s" % (self.name, fields.Datetime.now(), records.ids)
+        now = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-utc")
+        record_info = self._get_synchronization_name_out_record_info(records)
+        return self.env["ir.http"]._slugify(
+            f"{self.name}-{now}" + (record_info and f"-{record_info}" or ""), max_length=200
+        )
+
+    def _get_synchronization_name_out_record_info(self, records):
+        """Optional info to add to generated filenames to represent the current records.
+
+        Purpose is to try to ensure some traceability between a synchronization & a record,
+        to be able to find the record back.
+
+        By default, records IDS is provided, but it could also be :
+        - record names or any meaningful field
+        - or nothing, if not needed
+        - or only if synchronization_creation == 1 for ex.
+          (especially since we limit the length of the filename, so part of the info could be missing)
+
+        :return: list | str
+        """
+        return records.ids
 
     def _get_record_to_send(self):
         """Return the records that should be synchronized
