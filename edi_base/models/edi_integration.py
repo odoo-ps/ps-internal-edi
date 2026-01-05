@@ -3,6 +3,7 @@ import json
 import logging
 
 from odoo import _, api, fields, models, tools
+from odoo.api import NewId
 from odoo.exceptions import UserError, ValidationError
 from odoo.modules.registry import Registry
 from odoo.tools.safe_eval import safe_eval
@@ -130,8 +131,9 @@ class Integration(models.Model):
     synchronization_ids = fields.One2many("edi.synchronization", "integration_id")
     error_ids = fields.One2many("edi.synchronization.error", "integration_id")
     synchronization_count = fields.Integer(compute="_compute_synchronization_count")
+    execution_count = fields.Integer(compute="_compute_execution_count")
     last_execution_date = fields.Datetime(
-        string="Last Synchronization Date",
+        string="Last triggered Date",
         readonly=True,
         copy=False,
         help="Last time the integration has been triggered",
@@ -166,6 +168,27 @@ class Integration(models.Model):
     def _compute_synchronization_count(self):
         for rec in self:
             rec.synchronization_count = len(rec.synchronization_ids)
+
+    @api.depends("synchronization_ids")
+    def _compute_execution_count(self):
+        creating_ones = self.filtered(lambda x: isinstance(x.id, NewId))
+        if creating_ones:
+            creating_ones.execution_count = 0
+
+        existing_ones = self - creating_ones
+        if existing_ones:
+            self.env.cr.execute(
+                """
+                SELECT i.id, COUNT(DISTINCT s.triggered_date)
+                FROM edi_integration AS i
+                LEFT JOIN edi_synchronization AS s ON s.integration_id = i.id
+                WHERE i.id in %s
+                GROUP BY i.id
+                """,
+                (tuple(existing_ones.ids),),
+            )
+            for integration_id, count in self.env.cr.fetchall():
+                self.browse(integration_id).execution_count = count
 
     def _exec_method_based_on_flow(self, in_method, out_method, *args, **kwargs):
         """
@@ -240,13 +263,13 @@ class Integration(models.Model):
           (because we stored a reference to the synchronization there to make it available everywhere)
         """
         for integration in self:
-            synchronization = (
+            synchronizations = (
                 synchronizations
                 and synchronizations.filtered(lambda x, i=integration: x.integration_id == i)
-                or hasattr(integration.env.cr, "sync")
-                and integration.env.cr.sync
+                or hasattr(integration.env.cr, "all_syncs")
+                and integration.env.cr.all_syncs
             )
-            if not synchronization:
+            if not synchronizations:
                 _logger.warning(
                     _(
                         "No synchronization related to the integration %s, impossible to set the status",
@@ -254,14 +277,19 @@ class Integration(models.Model):
                     )
                 )
                 continue
-            synchronization = synchronization[:1]  # should be useless, but just in case
-            #   (and we take the 1st one because it's the most recent one)
 
-            integration.last_state = synchronization.state
-            if integration.last_state == "done":
-                integration.last_success_date = synchronization.synchronization_date
-            elif integration.last_state == "fail":
-                integration.last_failure_date = synchronization.synchronization_date
+            last_synchronizations = synchronizations.sorted("synchronization_date", reverse=True)
+            last_success = last_synchronizations.filtered(lambda x: x.state == "done")[:1]
+            last_failure = last_synchronizations.filtered(lambda x: x.state == "fail")[:1]
+            if last_success:
+                integration.last_success_date = last_success.synchronization_date
+            if last_failure:
+                integration.last_failure_date = last_failure.synchronization_date
+
+            if last_failure:  # globally failed if at least one failed
+                integration.last_state = last_failure.state
+            else:  # could be "new" or "done"
+                integration.last_state = last_synchronizations[:1].state
 
     @api.model_create_multi
     def create(self, values):
@@ -468,12 +496,14 @@ class Integration(models.Model):
         self.last_execution_date = fields.Datetime.now()
 
         exceptions = []
+        self.env.cr.all_syncs = self.env["edi.synchronization"]
         try:
             # processing
             self.env.cr.activity = "Process"
             exceptions.extend(self._process_data(data=data, raise_error=raise_error))
         except Exception as e:
             self.env.cr.sync = self._create_error_sync(e)
+            self.env.cr.all_syncs |= self.env.cr.sync
             self._safe_commit()
             exceptions.append(e)
         finally:
@@ -615,6 +645,7 @@ class Integration(models.Model):
         # commit it, so that the synchronization is created
         # even in case of timeout during the prosess
         self.env.cr.sync = self._create_synchronization(data)
+        self.env.cr.all_syncs |= self.env.cr.sync
         self._safe_commit()
 
         try:
