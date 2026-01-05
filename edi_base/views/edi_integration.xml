@@ -47,7 +47,20 @@
                                 <span class="o_stat_text">Synchronizations</span>
                             </div>
                         </button>
-
+                        <button
+                            type="object"
+                            name="open_synchronizations"
+                            icon="fa-cloud-upload"
+                            class="oe_stat_button"
+                            string="Executions"
+                            context="{'search_default_group_by_triggered_date': True}"
+                            invisible="synchronization_count == execution_count"
+                        >
+                            <div class="o_stat_info">
+                                <field name="execution_count" class="o_stat_value"/>
+                                <span class="o_stat_text">Executions</span>
+                            </div>
+                        </button>
                     </div>
                     <div class="oe_title">
                         <h3>

@@ -77,6 +77,7 @@
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                         <group name="right_group">
+                            <field name="triggered_date"/>
                             <field name="synchronization_date"/>
                         </group>
                     </group>
@@ -114,10 +115,12 @@
                 decoration-info="state=='new'"
                 decoration-muted="state=='cancel'"
                 decoration-danger="state=='fail'"
+                default_order="triggered_date desc, create_date desc, id desc"
             >
                 <field name="name"/>
                 <field name="content_type"/>
                 <field name="create_date"/>
+                <field name="triggered_date" optional="hide"/>
                 <field name="synchronization_date"/>
                 <field
                     name="company_id"
@@ -158,6 +161,7 @@
                     <filter name="group_by_type" string="Flow Type" context="{'group_by': 'synchronization_flow'}"/>
                     <filter name="group_by_content_type" string="Content Type" context="{'group_by': 'content_type'}"/>
                     <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_triggered_date" context="{'group_by': 'triggered_date'}"/>
                     <filter
                         name="group_by_synchronization_date"
                         string="Synchronization Date"
