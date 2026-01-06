@@ -129,6 +129,7 @@ class Integration(models.Model):
     # Status
     synchronization_ids = fields.One2many("edi.synchronization", "integration_id")
     error_ids = fields.One2many("edi.synchronization.error", "integration_id")
+    synchronization_count = fields.Integer(compute="_compute_synchronization_count")
     last_execution_date = fields.Datetime(
         string="Last Synchronization Date",
         readonly=True,
@@ -160,6 +161,11 @@ class Integration(models.Model):
             else:
                 flow_type = "unknown"
             integration.integration_flow_type = flow_type
+
+    @api.depends("synchronization_ids")
+    def _compute_synchronization_count(self):
+        for rec in self:
+            rec.synchronization_count = len(rec.synchronization_ids)
 
     def _exec_method_based_on_flow(self, in_method, out_method, *args, **kwargs):
         """
