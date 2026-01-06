@@ -41,7 +41,13 @@
                             icon="fa-cloud-upload"
                             class="oe_stat_button"
                             string="Synchronizations"
-                        />
+                        >
+                            <div class="o_stat_info">
+                                <field name="synchronization_count" class="o_stat_value"/>
+                                <span class="o_stat_text">Synchronizations</span>
+                            </div>
+                        </button>
+
                     </div>
                     <div class="oe_title">
                         <h3>
