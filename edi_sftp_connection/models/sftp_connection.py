@@ -113,6 +113,7 @@ class SFTPConnection(models.Model):
             private_key=key,
             cnopts=cnopts,
             port=config.get("port", 22),
+            log=config.get("paramiko_log", False),  # use 1 to enable debug logs
         )
 
         self.ftp_load_config(server, config)
