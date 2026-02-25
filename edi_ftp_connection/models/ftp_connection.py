@@ -115,9 +115,6 @@ class FTPConnection(models.Model):
         config = self._read_configuration()
         server = ftplib.FTP(host=config["host"], user=config["user"], passwd=config["password"])
 
-        if config.get("encoding"):
-            server.encoding = config["encoding"]
-
         if config.get("port"):
             server.port = int(config["port"])
 
@@ -234,6 +231,9 @@ class FTPConnection(models.Model):
         current_folder = self.pwd(server)
         if not current_folder.endswith("/"):
             current_folder += "/"
+
+        if config.get("encoding"):
+            server.encoding = config["encoding"]
 
         for folder, fallback_folder in [
             ("out_folder", "/"),
