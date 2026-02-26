@@ -414,10 +414,12 @@ class FTPConnection(models.Model):
                 current_path = os.path.join(server.in_folder, filename)
                 if status == "done":
                     if hasattr(server, "in_folder_done"):
+                        self._manage_conflict(server, server.in_folder_done, filename)
                         self.rename(server, current_path, os.path.join(server.in_folder_done, filename))
                     else:
                         self.delete_file(server, current_path)
                 elif hasattr(server, "in_folder_error"):
+                    self._manage_conflict(server, server.in_folder_error, filename)
                     self.rename(server, current_path, os.path.join(server.in_folder_error, filename))
 
     def _manage_conflict(self, server, path, filename):
