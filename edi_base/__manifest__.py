@@ -1,6 +1,6 @@
 {
     "name": "Odoo PS EDI Framework",
-    "version": "19.0.1.3.0",
+    "version": "19.0.1.3.1",
     "license": "OEEL-1",
     "summary": "Gateway between odoo and third party components",
     "category": "Tools",
