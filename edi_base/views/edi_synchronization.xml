@@ -91,7 +91,7 @@
                             <field
                                 name="error_ids"
                                 context="{
-                                'tree_view_ref': 'edi_base.synchronization_error_embedded_tree_view',
+                                'list_view_ref': 'edi_base.synchronization_error_embedded_tree_view',
                                 'sync_id': id
                             }"
                             />
