@@ -35,6 +35,7 @@ class Synchronization(models.Model):
 
     _name = "edi.synchronization"
     _description = "Synchronization"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "triggered_date desc, create_date desc, id desc"
 
     name = fields.Char(readonly=True, required=True)

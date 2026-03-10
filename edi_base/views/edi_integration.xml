@@ -77,6 +77,10 @@
                             <field name="synchronization_creation" invisible="has_sub_integration"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
+                        <group>
+                            <field name="binding_model_id" invisible="type != 'generic'"/>
+                            <field name="binding_model_name" invisible="1"/>
+                        </group>
                     </group>
                     <notebook>
                         <page name="sub_integration" string="Sub Integrations" invisible="not has_sub_integration">
@@ -103,8 +107,68 @@
                                     <field name="record_filter_id" invisible="integration_flow == 'in'"/>
                                 </group>
                             </group>
-                            <separator string="Integration Parameter"/>
-                            <field name="parameter"/>
+
+                            <!-- Generic Import Configuration -->
+                            <group
+                                string="Import Configuration"
+                                invisible="not(type == 'generic' and integration_flow == 'in')"
+                            >
+                                <div class="o_form_label">
+                                    <b>Record Uniqueness</b>
+                                </div>
+                                <div class="text-muted">
+                                    To update existing records, you must define a unique identifier. You can either:
+                                    <ul>
+                                        <li><b
+                                            >Use a business key:</b> Check "Is Identifier?" on one of the mapping lines below (e.g., a reference or code). This is the recommended way.</li>
+                                        <li><b
+                                            >Use Odoo's External ID:</b> If no identifier is checked, the system will look for a column named 'id' or 'xml_id' in your source file. If found, it will be used to update records. If not found, new records will always be created.</li>
+                                    </ul>
+                                </div>
+                                <field
+                                    name="record_path"
+                                    placeholder="e.g. response.orders or //orders/order"
+                                    invisible="synchronization_content_type not in ['json', 'xml']"
+                                />
+                                <field name="csv_delimiter"/>
+                                <field name="mapping_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="column_name"/>
+                                        <field name="is_identifier"/>
+                                        <field name="field_id" domain="[('model_id', '=', parent.binding_model_id)]"/>
+                                        <field name="field_ttype" column_invisible="True"/>
+                                        <field name="field_relation" column_invisible="True"/>
+                                        <field
+                                            name="lookup_method"
+                                            invisible="field_ttype not in ['many2one', 'many2many', 'one2many']"
+                                        />
+                                        <field
+                                            name="lookup_field_id"
+                                            domain="[('model', '=', field_relation)]"
+                                            invisible="lookup_method != 'field'"
+                                        />
+                                        <field name="on_lookup_failure" invisible="lookup_method != 'field'"/>
+                                    </list>
+                                </field>
+                            </group>
+
+                            <!-- Generic Export Configuration -->
+                            <group
+                                string="Export Configuration"
+                                invisible="not(type == 'generic' and integration_flow != 'in')"
+                            >
+                                <field name="renderer_type"/>
+                                <field name="export_id" invisible="renderer_type != 'tabular'"/>
+                                <field name="template_id" invisible="renderer_type != 'qweb'"/>
+                                <field
+                                    name="csv_delimiter"
+                                    invisible="renderer_type != 'tabular' or synchronization_content_type != 'csv'"
+                                />
+                            </group>
+
+                            <separator string="Integration Parameter" invisible="type == 'generic'"/>
+                            <field name="parameter" invisible="type == 'generic'"/>
                         </page>
                         <page name="cron" string="Cron Information">
                             <group>
