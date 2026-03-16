@@ -1,6 +1,6 @@
 {
     "name": "SFTP Connection for Odoo PS EDI Framework",
-    "version": "19.0.1.1.0",
+    "version": "19.3.1.1.0",
     "license": "OEEL-1",
     "summary": "",
     "category": "Tools",
