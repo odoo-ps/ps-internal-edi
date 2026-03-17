@@ -57,13 +57,13 @@ class Synchronization(models.Model):
         """
         # consider the configured duration
         config = self.env["ir.config_parameter"].sudo()
-        duration = int(config.get_param(duration_param, 0))
+        duration = config.get_int(duration_param)
         if not duration:
             return self
         domain = [("create_date", "<=", fields.Datetime.now() - timedelta(days=duration))]
 
         # only consider the configured states
-        states = [x for x in self._archive_states() if config.get_param("edi.archive.state.%s" % x, False)]
+        states = [x for x in self._archive_states() if config.get_str(f"edi.archive.state.{x}", False)]
         if not states:  # just a security, but should never happen thanks to check on settings side
             return self
         domain += self._archive_states_domain(states)
