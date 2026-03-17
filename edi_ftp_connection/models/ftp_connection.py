@@ -9,7 +9,7 @@ from io import BytesIO as StringIO
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import ustr
+from odoo.tools import exception_to_unicode
 
 
 _logger = logging.getLogger(__name__)
@@ -307,7 +307,9 @@ class FTPConnection(models.Model):
             with self.connect():
                 pass
         except Exception as e:
-            raise UserError(_("Connection Test Failed! Here is what we got instead:\n %s") % ustr(e)) from e
+            raise UserError(
+                _("Connection Test Failed! Here is what we got instead:\n %s") % exception_to_unicode(e)
+            ) from e
         else:
             raise UserError(_("Connection Test Succeeded! Everything seems properly set up!"))
 
@@ -322,7 +324,9 @@ class FTPConnection(models.Model):
                 self.rename(server, os.path.join(pwd, uploading_file), os.path.join(pwd, filename))
             except Exception as e:
                 _logger.error(e)
-                raise UserError(_("Send synchronization failed for file %s:\n%s") % (filename, ustr(e))) from e
+                raise UserError(
+                    _("Send synchronization failed for file %s:\n%s") % (filename, exception_to_unicode(e))
+                ) from e
 
     def _ftp_fetch_files(self, *args, **kwargs):
         """Download the file into a temporary dictionnary
@@ -350,7 +354,9 @@ class FTPConnection(models.Model):
                     )
                 except Exception as e:
                     _logger.error(e)
-                    raise UserError(_("Fetch synchronization failed for file %s:\n%s") % (filename, ustr(e))) from e
+                    raise UserError(
+                        _("Fetch synchronization failed for file %s:\n%s") % (filename, exception_to_unicode(e))
+                    ) from e
         if hasattr(server, "encoding"):
             encoding = server.encoding
         else:
