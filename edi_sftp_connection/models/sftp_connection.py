@@ -2,6 +2,7 @@
 import io
 import logging
 import os
+import stat
 from base64 import decodebytes
 
 import pysftp
@@ -144,10 +145,7 @@ class SFTPConnection(models.Model):
         if not self.type == "sftp":
             return super().file_exists(server, path, filename)
 
-        for file in self.list_files(server, path):
-            if file == filename:
-                return True
-        return False
+        return server.exists(os.path.join(path, filename))
 
     @api.model
     def delete_file(self, server, path):
@@ -171,19 +169,27 @@ class SFTPConnection(models.Model):
         server.rename(old, new)
 
     @api.model
-    def list_files(self, server, path=False):
+    def list_files(self, server, path=False, filename=False):
         if not self.type == "sftp":
-            return super().list_files(server, path)
+            return super().list_files(server, path, filename=filename)
 
         if path:
             self.change_dir(server, path)
 
-        names = server.listdir()
         filenames = []
-        for name in names:
-            if not server.isfile(name):
-                continue
-            filenames.append(name)
+        if filename:  # Fallback to single file check for SFTP if a filename is provided
+            if server.exists(filename):
+                # Retrieve the attributes of the single file to verify it's a file
+                try:
+                    attr = server.stat(filename)
+                    if stat.S_ISREG(attr.st_mode):
+                        filenames.append(filename)
+                except Exception:
+                    pass
+        else:
+            for attr in server.listdir_attr():
+                if stat.S_ISREG(attr.st_mode):
+                    filenames.append(attr.filename)
         return filenames
 
     @api.model
