@@ -154,14 +154,32 @@ class FTPConnection(models.Model):
 
     @api.model
     def file_exists(self, server, path, filename):
-        """Check if the file exists"""
+        """Check if the file exists
+        Optimized by checking the size of the file (SIZE command) using its full path.
+        If the server does not support SIZE, fallback to list_files (which handles NLST).
+        """
         if not self.type == "ftp":
             return super().file_exists(server, path, filename)
 
-        for file in self.list_files(server, path):
-            if file == filename:
-                return True
-        return False
+        try:
+            # SIZE command: very fast, does not open a data connection
+            full_path = os.path.join(path, filename) if path else filename
+            server.size(full_path)
+            return True
+        except ftplib.error_perm as e:
+            # error_perm is raised for 5xx responses.
+            # 500/502 means command not implemented/recognized.
+            if str(e).startswith(("500", "502")):
+                try:
+                    # Fallback NLST command: delegate to list_files which handles the path
+                    return filename in self.list_files(server, path=path, filename=filename)
+                except Exception:
+                    return False
+            else:
+                # 550 means the command is supported, but the file doesn't exist
+                return False
+        except Exception:
+            return False
 
     @api.model
     def delete_file(self, server, path):
@@ -185,13 +203,19 @@ class FTPConnection(models.Model):
         server.rename(old, new)
 
     @api.model
-    def list_files(self, server, path=False):
+    def list_files(self, server, path=False, filename=False):
         if not self.type == "ftp":
             return super().list_files(server, path)
 
         if path:
             self.change_dir(server, path)
-        names = getattr(server, "mlst", server.nlst)()
+
+        list_func = getattr(server, "mlst", server.nlst)
+        if filename:
+            names = list_func(filename)
+        else:
+            names = list_func()
+
         filenames = []
         for name in names:
             if not self._ftp_is_valid_filename(name):
