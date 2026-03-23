@@ -26,7 +26,7 @@ from odoo.addons.test_http.tests.test_common import TestHttpBase
 FILE_IN = Path(FOLDER_IN, "partner.csv")
 
 
-@tagged("edi_decorator")
+@tagged("post_install", "-at_install", "ps_internal_edi")
 class TestEdiApiCases(TestEDICommonBase):
     def setUp(self):
         super().setUp()
@@ -113,7 +113,7 @@ class TestEdiApiCases(TestEDICommonBase):
             self.assertEqual(len(sync.error_ids), 1)
 
 
-@tagged("post_install", "-at_install", "edi_decorator")
+@tagged("post_install", "-at_install", "ps_internal_edi")
 class TestEdiApiCasesXMLRPC(TestHttpBase):
     @classmethod
     def setUpClass(cls):
@@ -152,7 +152,7 @@ class TestEdiApiCasesXMLRPC(TestHttpBase):
             self.assertIn("Contacts require a name", body["message"])
 
 
-@tagged("edi_in")
+@tagged("post_install", "-at_install", "ps_internal_edi")
 class TestEdiINCases(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
@@ -389,7 +389,7 @@ class TestEdiINCases(TestEDICommonBase):
                 self.assertTrue(sync.error_ids.description, "")
 
 
-@tagged("edi_out")
+@tagged("post_install", "-at_install", "ps_internal_edi")
 class TestEdiOUTCases(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
@@ -938,7 +938,7 @@ class TestEdiOUTCases(TestEDICommonBase):
                 self.assertEqual(len(s.error_ids), 0)
 
 
-@tagged("edi_base")
+@tagged("post_install", "-at_install", "ps_internal_edi")
 class TestEdiBase(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
