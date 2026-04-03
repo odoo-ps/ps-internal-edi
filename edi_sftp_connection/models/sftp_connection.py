@@ -182,12 +182,14 @@ class SFTPConnection(models.Model):
                 # Retrieve the attributes of the single file to verify it's a file
                 try:
                     attr = server.stat(filename)
-                    if stat.S_ISREG(attr.st_mode):
+                    if stat.S_ISREG(attr.st_mode) and self._ftp_is_valid_filename(filename):
                         filenames.append(filename)
                 except Exception:
                     pass
         else:
             for attr in server.listdir_attr():
+                if not self._ftp_is_valid_filename(attr.filename):
+                    continue
                 if stat.S_ISREG(attr.st_mode):
                     filenames.append(attr.filename)
         return filenames
