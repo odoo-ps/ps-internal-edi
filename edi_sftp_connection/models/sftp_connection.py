@@ -208,3 +208,16 @@ class SFTPConnection(models.Model):
 
         server.get(filename, os.path.join(directory, filename))
         return os.path.join(directory, filename)
+
+    @api.model
+    def _get_remote_file_size(self, server, file_path):
+        """Return the size in bytes of a remote file
+
+        :param server: pysftp.Connection
+        :param file_path: str
+        :return: int or None
+        """
+        try:
+            return server.stat(file_path).st_size
+        except Exception:
+            return None
