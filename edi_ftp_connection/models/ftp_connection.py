@@ -248,10 +248,14 @@ class FTPConnection(models.Model):
         #       files and folders, we expect files to have a '.' on its name,
         #       obviously that is a rather random heuristic.
         fname, _, extension = filename.rpartition(".")
-        if not fname or extension in ["bak", "old"]:
+        if not fname or extension in self._get_invalid_file_extensions():
             return False
 
         return True
+
+    @api.model
+    def _get_invalid_file_extensions(self):
+        return ["bak", "old"]
 
     #####################################################################
     #   Generic methods between FTP connection and other based on FTP   #
