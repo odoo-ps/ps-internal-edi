@@ -380,7 +380,7 @@ class Integration(models.Model):
     def open_synchronizations(self):
         self.ensure_one()
 
-        action_dict = self.env.ref("edi_base.synchronizations_act_window").read([])[0]
+        action_dict = self.env["ir.actions.actions"]._for_xml_id("edi_base.synchronizations_act_window")
         ctx = safe_eval(action_dict.pop("context", "{}"))
         ctx.update({"default_integration_id": self.id})
 
