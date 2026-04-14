@@ -484,6 +484,7 @@ class Integration(models.Model):
             # so that everything is committed simultaneously
             new_cr = Registry(self.env.cr.dbname).cursor()
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
+            prev_env = self.env
             self = self.with_env(new_env)
 
         # integration is executed in priority in the context of its company
@@ -513,6 +514,7 @@ class Integration(models.Model):
             self._safe_commit()
             if autocommit:
                 new_cr.close()
+                self = self.with_env(prev_env)
 
             # logging + traceback
             if not self.env.context.get("no_exception_log"):
