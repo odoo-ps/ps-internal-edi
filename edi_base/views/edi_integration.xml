@@ -98,8 +98,10 @@
                                     <field name="record_filter_id" invisible="integration_flow == 'in'"/>
                                 </group>
                             </group>
-                            <separator string="Integration Parameter"/>
-                            <field name="parameter"/>
+                            <group>
+                                <separator string="Integration Parameter"/>
+                                <field name="parameter"/>
+                            </group>
                         </page>
                         <page name="cron" string="Cron Information">
                             <group>
