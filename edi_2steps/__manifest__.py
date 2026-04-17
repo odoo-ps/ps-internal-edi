@@ -1,0 +1,22 @@
+{
+    "name": "Odoo PS EDI 2 Steps",
+    "version": "19.0.1.0.0",
+    "license": "OEEL-1",
+    "summary": "Process integrations in 2 steps by using an intermediate table",
+    "category": "Tools",
+    "website": "https://www.odoo.com",
+    "author": "Odoo PS",
+    "depends": ["edi_base"],
+    "data": [
+        "security/ir_rules.xml",
+        "security/ir.model.access.csv",
+        "data/ir_action_server.xml",
+        "views/edi_integration_views.xml",
+        "views/edi_synchronization_views.xml",
+        "views/edi_table_record_views.xml",
+    ],
+    "auto_install": False,
+    "installable": True,
+    "pre_init_hook": "pre_init",
+    "cloc_exclude": ["**/*"],
+}

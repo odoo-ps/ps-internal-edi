@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_edi_table_record_user_all,access_edi_table_record_user_all,model_edi_table_record,base.group_user,1,0,0,0
+access_edi_table_record_erp_manager_all,access_edi_table_record_erp_manager_all,model_edi_table_record,base.group_system,1,1,1,1

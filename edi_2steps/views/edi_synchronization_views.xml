@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="synchronization_form_view" model="ir.ui.view">
+        <field name="name">edi.synchronization.form.inherit.edi.2steps</field>
+        <field name="model">edi.synchronization</field>
+        <field name="inherit_id" ref="edi_base.synchronization_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    class="oe_stat_button"
+                    type="object"
+                    name="open_updated_edi_table_records"
+                    icon="fa-thin fa-database"
+                    invisible="updated_edi_table_record_count == 0"
+                >
+                    <field name="updated_edi_table_record_count" widget="statinfo" string="Updated EDI 2-steps Queue"/>
+                </button>
+                <button
+                    class="oe_stat_button"
+                    type="object"
+                    name="open_processed_edi_table_records"
+                    icon="fa-thin fa-database"
+                    invisible="processed_edi_table_record_count == 0"
+                >
+                    <field name="processed_edi_table_record_count" widget="statinfo" string="Processed EDI 2-steps Queue"/>
+                </button>
+            </xpath>
+            <xpath expr="//group[@name='right_group']" position="inside">
+                <field name="edi_table_operation" invisible="not edi_table_operation"/>
+            </xpath>
+        </field>
+    </record>
+    <record id="synchronization_list_view_edi_table" model="ir.ui.view">
+        <field name="name">edi.synchronization.tree.view.edi.table</field>
+        <field name="model">edi.synchronization</field>
+        <field name="inherit_id" ref="edi_base.synchronization_list_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="edi_table_operation" optional="show"/>
+                <field name="updated_edi_table_record_count" optional="hide"/>
+                <field name="processed_edi_table_record_count" optional="hide"/>
+            </field>
+        </field>
+    </record>
+    <record id="synchronization_search_view_edi_table" model="ir.ui.view">
+        <field name="name">edi.syncrhonization.search.view.edi.table</field>
+        <field name="model">edi.synchronization</field>
+        <field name="inherit_id" ref="edi_base.synchronization_search_view"/>
+        <field name="arch" type="xml">
+            <group position="inside">
+                <filter
+                    name="group_by_edi_table_operation"
+                    string="EDI 2-steps Operation"
+                    context="{'group_by': 'edi_table_operation'}"
+                />
+            </group>
+        </field>
+    </record>
+</odoo>

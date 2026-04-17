@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_process_edi_table_record" model="ir.actions.server">
+        <field name="name">Process</field>
+        <field name="model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_process()</field>
+    </record>
+    <record id="action_cancel_edi_table_record" model="ir.actions.server">
+        <field name="name">Cancel</field>
+        <field name="model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_cancel()</field>
+    </record>
+    <record id="action_clear_edi_table_record" model="ir.actions.server">
+        <field name="name">Clear</field>
+        <field name="model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_clear()</field>
+    </record>
+    <record id="action_reset_edi_table_record" model="ir.actions.server">
+        <field name="name">Reset</field>
+        <field name="model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_model_id" ref="edi_2steps.model_edi_table_record"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_reset()</field>
+    </record>
+</odoo>

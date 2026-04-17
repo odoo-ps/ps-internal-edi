@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="integration_form_view" model="ir.ui.view">
+        <field name="name">edi.integration.form.inherit.edi.2steps</field>
+        <field name="model">edi.integration</field>
+        <field name="inherit_id" ref="edi_base.integration_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[@name='configuration']/group/group[1]" position="inside">
+                <field name="edi_table_cron_id" invisible="1"/>
+                <field name="use_edi_table"/>
+            </xpath>
+            <!-- Add actions -->
+            <xpath expr="//header" position="inside">
+                <button
+                    type="object"
+                    name="process_integration"
+                    string="Process EDI 2-steps Queue"
+                    class="oe_highlight"
+                    context="{'edi_raise_error': True, 'process_edi_table': True}"
+                    invisible="not use_edi_table"
+                />
+                <button
+                    type="object"
+                    name="check_edi_table_cron_id"
+                    string="Create EDI 2-steps CRON"
+                    invisible="not use_edi_table or edi_table_cron_id"
+                />
+            </xpath>
+            <!-- Add EDI 2-steps Queue Records Button -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    class="oe_stat_button"
+                    type="object"
+                    name="open_edi_table_records"
+                    icon="fa-thin fa-database"
+                    invisible="not use_edi_table"
+                >
+                    <field name="edi_table_records_to_process_count" widget="statinfo" string="EDI 2-steps Queue"/>
+                </button>
+            </xpath>
+            <!-- Add EDI 2-steps Page -->
+            <xpath expr="//notebook" position="inside">
+                <page string="EDI 2-steps Queue" name="edi_table" invisible="not use_edi_table">
+                    <group>
+                        <group name="edi_table_configuration" string="Configuration">
+                            <field name="edi_table_synchronization_creation"/>
+                            <field name="edi_table_match_identifier"/>
+                            <field name="edi_table_record_clear_content"/>
+                        </group>
+                        <group
+                            name="edi_table_cron_information"
+                            string="Processing CRON (second step)"
+                            invisible="not edi_table_cron_id"
+                        >
+                            <label for="edi_table_interval_number" string="Execute Every"/>
+                            <div>
+                                <field name="edi_table_interval_number" class="oe_inline"/>
+                                <field name="edi_table_interval_type" class="oe_inline"/>
+                            </div>
+                            <field name="edi_table_lastcall" string="Last Cron Execution Date" readonly="1"/>
+                            <field name="edi_table_nextcall" string="Next Execution Date"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+    <record id="integration_kanban_view_edi_table" model="ir.ui.view">
+        <field name="name">edi.integration.kanban.edi.table</field>
+        <field name="model">edi.integration</field>
+        <field name="inherit_id" ref="edi_base.integration_kanban_view"/>
+        <field name="arch" type="xml">
+            <!-- Add EDI Records Button -->
+            <xpath expr="//kanban//a[@name='open_synchronizations']" position="after">
+                <field name="use_edi_table" invisible="1"/>
+                <a
+                    invisible="not use_edi_table"
+                    role="menuitem"
+                    type="object"
+                    name="open_edi_table_records"
+                    class="dropdown-item"
+                >
+                    Open EDI 2-steps Queue
+                </a>
+            </xpath>
+            <!-- Add actions -->
+            <xpath expr="//kanban//a[@name='process_integration']" position="after">
+                <field name="use_edi_table" invisible="1"/>
+                <a
+                    invisible="not use_edi_table"
+                    role="menuitem"
+                    type="object"
+                    name="process_integration"
+                    class="dropdown-item"
+                    context="{'edi_raise_error': True, 'process_edi_table': True}"
+                >
+                    Process EDI 2-steps Queue
+                </a>
+            </xpath>
+        </field>
+    </record>
+</odoo>

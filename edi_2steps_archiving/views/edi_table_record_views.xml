@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="edi_table_record_search_view" model="ir.ui.view">
+        <field name="name">edi.table.record.search.view.inherit.edi.2steps.archiving</field>
+        <field name="model">edi.table.record</field>
+        <field name="inherit_id" ref="edi_2steps.edi_table_record_search_view"/>
+        <field name="arch" type="xml">
+            <field name="company_id" position="after">
+                <filter
+                    name="active_inactive"
+                    string="Active &amp; Inactive"
+                    domain="['|', ('active', '=', True), ('active', '=', False)]"
+                />
+                <filter name="active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+                <separator/>
+            </field>
+        </field>
+    </record>
+</odoo>
