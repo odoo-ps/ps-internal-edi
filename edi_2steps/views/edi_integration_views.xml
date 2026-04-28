@@ -6,7 +6,6 @@
         <field name="inherit_id" ref="edi_base.integration_form_view"/>
         <field name="arch" type="xml">
             <xpath expr="//notebook/page[@name='configuration']/group/group[1]" position="inside">
-                <field name="edi_table_cron_id" invisible="1"/>
                 <field name="use_edi_table"/>
             </xpath>
             <!-- Add actions -->
@@ -72,7 +71,6 @@
         <field name="arch" type="xml">
             <!-- Add EDI Records Button -->
             <xpath expr="//kanban//a[@name='open_synchronizations']" position="after">
-                <field name="use_edi_table" invisible="1"/>
                 <a
                     invisible="not use_edi_table"
                     role="menuitem"
@@ -85,7 +83,6 @@
             </xpath>
             <!-- Add actions -->
             <xpath expr="//kanban//a[@name='process_integration']" position="after">
-                <field name="use_edi_table" invisible="1"/>
                 <a
                     invisible="not use_edi_table"
                     role="menuitem"

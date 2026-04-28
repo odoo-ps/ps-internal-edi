@@ -1,6 +1,6 @@
 {
     "name": "Odoo PS EDI 2 Steps",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "license": "OEEL-1",
     "summary": "Process integrations in 2 steps by using an intermediate table",
     "category": "Tools",
