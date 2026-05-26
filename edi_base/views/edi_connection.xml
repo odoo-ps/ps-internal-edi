@@ -27,6 +27,15 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Endpoints">
+                            <field name="endpoint_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="method"/>
+                                    <field name="path"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Integrations">
                             <field name="integration_ids"/>
                         </page>

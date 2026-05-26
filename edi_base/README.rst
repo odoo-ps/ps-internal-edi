@@ -3,14 +3,15 @@ Framework edi_base
 ==================
 
 --------------
-The 3 concepts
+The 4 concepts
 --------------
 
-This module provides a framework for integrations between Odoo and other information systems. 3 main concepts are
-represented, corresponding to 3 questions I have to answer when developing a data exchange between systems :
+This module provides a framework for integrations between Odoo and other information systems. 4 main concepts are
+represented, corresponding to 4 questions I have to answer when developing a data exchange between systems :
 
 -   **What** data to exchange : an integration
 -   **How** exchange the data : a connection
+-   **Where** exactly to send/receive : an endpoint *(optional, for API connections)*
 -   **When** the data are sent : a synchronization
 
 Connection
@@ -21,6 +22,56 @@ The connection allows to handle the communication between Odoo & the external so
 -   connect
 -   send or receive the data
 -   disconnect
+
+Endpoint
+========
+
+An endpoint represents a specific route on a connection. While a connection holds the credentials and the base URL of a
+third-party system, a single connection can expose several endpoints (e.g. one for orders, one for products, one for
+stock levels).
+
+This concept is **optional** and only relevant for API connections. FTP/SFTP connections do not need endpoints.
+
+Configuring an endpoint
+-----------------------
+
+``data / edi.xml`` :
+
+.. code-block:: xml
+
+    <record id="my_api_orders_endpoint" model="edi.endpoint">
+        <field name="name">Orders</field>
+        <field name="connection_id" ref="my_api_connection"/>
+        <field name="method">POST</field>
+        <field name="path">/api/v1/orders</field>
+    </record>
+
+    <record id="my_out_integration" model="edi.integration">
+        <field name="name">Send Orders</field>
+        <field name="type">my_type</field>
+        <field name="integration_flow">out</field>
+        <field name="connection_id" ref="my_api_connection"/>
+        <field name="endpoint_id" ref="my_api_orders_endpoint"/>
+        ...
+    </record>
+
+The endpoint is then accessible inside the integration methods via ``self.endpoint_id``:
+
+.. code-block:: python
+
+    def _get_content(self, records):
+        if self.type != "my_type":
+            return super()._get_content(records)
+
+        endpoint = self.endpoint_id
+        # use endpoint.method, endpoint.path to build the request
+        ...
+
+Constraints
+-----------
+
+-   ``endpoint_id`` must belong to the integration's ``connection_id`` (validated at save).
+-   Changing ``connection_id`` on an integration clears ``endpoint_id`` automatically if it no longer matches.
 
 Synchronization
 ===============

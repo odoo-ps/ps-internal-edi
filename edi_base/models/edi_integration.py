@@ -74,6 +74,14 @@ class Integration(models.Model):
         tracking=True,
     )
     connection_id = fields.Many2one("edi.connection", required=True, string="Connection", tracking=True)
+    endpoint_id = fields.Many2one(
+        "edi.endpoint",
+        string="Endpoint",
+        ondelete="restrict",
+        domain="[('connection_id', '=', connection_id)]",
+        help="Optional endpoint for this integration. Must belong to the selected connection.",
+        tracking=True,
+    )
     type = fields.Selection(
         selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")],
         required=True,
@@ -209,6 +217,23 @@ class Integration(models.Model):
                 self.integration_flow,
             )
         )
+
+    @api.constrains("endpoint_id", "connection_id")
+    def _check_endpoint_connection(self):
+        for rec in self:
+            if rec.endpoint_id and rec.endpoint_id.connection_id != rec.connection_id:
+                raise ValidationError(
+                    _(
+                        "Endpoint '%s' does not belong to connection '%s'.",
+                        rec.endpoint_id.name,
+                        rec.connection_id.name,
+                    )
+                )
+
+    @api.onchange("connection_id")
+    def _onchange_connection_id_endpoint(self):
+        if self.endpoint_id and self.endpoint_id.connection_id != self.connection_id:
+            self.endpoint_id = False
 
     @api.model
     def _get_in_flow_type(self):

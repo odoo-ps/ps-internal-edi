@@ -95,6 +95,11 @@
                                     <field name="synchronization_content_type"/>
                                     <field name="write_content_on_sync"/>
                                     <field name="connection_id"/>
+                                    <field
+                                        name="endpoint_id"
+                                        domain="[('connection_id', '=', connection_id)]"
+                                        invisible="not connection_id"
+                                    />
                                     <field name="record_filter_id" invisible="integration_flow == 'in'"/>
                                 </group>
                             </group>

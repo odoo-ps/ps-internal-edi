@@ -1099,3 +1099,76 @@ class TestEdiBase(TestEDICommonBase):
             self.assertEqual(integration.last_state, "fail")
             self.assertEqual(integration.last_success_date, now)
             self.assertTrue(integration.last_failure_date)
+
+
+@tagged("post_install", "-at_install", "ps_internal_edi")
+class TestEdiEndpointCases(TestEDICommonBase):
+    """Test edi.endpoint model and its integration with edi.integration"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.endpoint = cls.new_env["edi.endpoint"].create(
+            {
+                "name": "Test API Endpoint",
+                "connection_id": cls.folder_connection.id,
+                "method": "POST",
+                "path": "/api/v1/partners",
+            }
+        )
+        cls.new_cr.commit()
+
+    def test_endpoint_pipeline_out(self):
+        """Integration with endpoint set runs the OUT pipeline normally"""
+        filter_ = self.new_env["ir.filters"].create(
+            {
+                "name": "EDI Endpoint Test Filter",
+                "model_id": "res.partner",
+                "domain": '[["name","ilike","EDI EP TEST"]]',
+            }
+        )
+
+        edi = self.Integration.with_context(autocommit=True, no_exception_log=True).create(
+            {
+                "name": "Export Partner Endpoint",
+                "type": "api",
+                "integration_flow": "out",
+                "synchronization_creation": 0,
+                "synchronization_content_type": "csv",
+                "connection_id": self.folder_connection.id,
+                "endpoint_id": self.endpoint.id,
+                "record_filter_id": filter_.id,
+                "parameter": json.dumps({"fields": ["id", "name"]}),
+                "active": False,
+            }
+        )
+        self.new_cr.commit()
+
+        self.addCleanup(self._cleanup_endpoint_test, edi, filter_)
+
+        now = fields.Datetime.now()
+        self.new_env["res.partner"].create([{"name": f"EDI EP TEST {i}"} for i in range(3)])
+        self.new_env.cr.commit()
+
+        edi.process_integration()
+
+        with self.registry.cursor() as new_cr:
+            new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
+            integration = new_env["edi.integration"].browse(edi.id)
+            self.assertEqual(integration.last_state, "done")
+            self.assertEqual(integration.endpoint_id.id, self.endpoint.id)
+            sync = new_env["edi.synchronization"].search(
+                [("integration_id", "=", edi.id), ("synchronization_date", ">=", now)]
+            )
+            self.assertEqual(len(sync), 1)
+            self.assertEqual(sync.state, "done")
+
+    @mute_logger("odoo.models.unlink")
+    def _cleanup_endpoint_test(self, edi, filter_):
+        with self.registry.cursor() as cr:
+            env = api.Environment(cr, self.env.user.id, self.env.context)
+            env["edi.synchronization"].search([("integration_id", "=", edi.id)]).unlink()
+            env["res.partner"].search([("name", "ilike", "EDI EP TEST")]).unlink()
+            edi.with_env(env).write({"record_filter_id": False})
+            edi.with_env(env).unlink()
+            filter_.with_env(env).unlink()

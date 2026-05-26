@@ -20,6 +20,7 @@ class Connection(models.Model):
     configuration = fields.Text(tracking=True)
     company_id = fields.Many2one("res.company", tracking=True)
     integration_ids = fields.One2many("edi.integration", "connection_id", readonly=True, context={"active_test": False})
+    endpoint_ids = fields.One2many("edi.endpoint", "connection_id", string="Endpoints")
 
     @api.model_create_multi
     def create(self, vals_list):
