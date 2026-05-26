@@ -1,6 +1,6 @@
 {
     "name": "Odoo PS EDI Framework Tests",
-    "version": "19.3.1.0.1",
+    "version": "19.4.1.0.1",
     "license": "OEEL-1",
     "summary": "",
     "category": "Tools",
