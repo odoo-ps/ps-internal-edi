@@ -87,8 +87,6 @@ In Flows Methods
         """Allow the integration to redefine the first step (conversion of data into edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._prepare_in_edi_table(data)
         ....
 
         :param data: list of dict
@@ -110,8 +108,6 @@ In Flows Methods
         """Allow the integration to redefine the second step (process edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._process_in_edi_table(data)
         ....
 
         :param data: list of dict
@@ -137,8 +133,6 @@ Out Flows Methods
         """Allow the integration to redefine the first step (conversion of records into edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._prepare_out_edi_table(data)
         ....
 
         :param records: recordset
@@ -157,8 +151,6 @@ Out Flows Methods
         """Allow the integration to redefine the second step (processing of a edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._process_out_edi_table(data)
         ....
 
         :param data: recordset edi.table.record

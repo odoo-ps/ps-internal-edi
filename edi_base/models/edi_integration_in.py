@@ -100,8 +100,6 @@ class IntegrationIn(models.Model):
         """Return the name of the synchronization (in flow)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._get_synchronization_name_in(data)
         ....
 
         :param data: list of dict
@@ -116,8 +114,6 @@ class IntegrationIn(models.Model):
         Can be overrided if needed
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._get_in_content()
         ....
 
         :return: list of dict
@@ -135,8 +131,6 @@ class IntegrationIn(models.Model):
         """Called after the processing of each synchronization
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._clean(data, status)
         ....
 
         :param data: list of dict
@@ -161,8 +155,6 @@ class IntegrationIn(models.Model):
         """Allow the integration to redefine the processing of the content
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._process_content(data)
         ....
 
 

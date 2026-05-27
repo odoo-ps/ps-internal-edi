@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from io import BytesIO as StringIO
 
 from odoo import _, api, fields, models
+from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import ustr
 
@@ -54,48 +55,37 @@ class FTPConnection(models.Model):
     #             Methods overridden from edi_base                      #
     #####################################################################
 
+    @IntegrationCheck(["ftp"])
     def test(self):
         """Try to connect to the server"""
         self.ensure_one()
-        if not self.type == "ftp":
-            return super().test()
-
         self._ftp_test_connection()
 
+    @IntegrationCheck(["ftp"])
     def _send_synchronization(self, filename, content, *args, **kwargs):
         """Override to upload the file"""
         self.ensure_one()
-        if not self.type == "ftp":
-            return super()._send_synchronization(filename, content, *args, **kwargs)
-
         return self._ftp_send_file(filename, content, *args, **kwargs)
 
+    @IntegrationCheck(["ftp"])
     def _fetch_synchronizations(self, *args, **kwargs):
         """Override to download the file from the FTP server"""
         self.ensure_one()
-        if not self.type == "ftp":
-            return super()._fetch_synchronizations(*args, **kwargs)
-
         return self._ftp_fetch_files(*args, **kwargs)
 
+    @IntegrationCheck(["ftp"])
     def _clean_synchronization_in(self, data, status, *args, **kwargs):
-        if not self.type == "ftp":
-            return super()._clean_synchronization_in(data, status, *args, **kwargs)
-
         self._clean_local_file(data, *args, **kwargs)
         self._clean(data.get("filename"), status, "in", *args, **kwargs)
 
+    @IntegrationCheck(["ftp"])
     def _clean_synchronization_out(self, filename, status, *args, **kwargs):
-        if not self.type == "ftp":
-            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
-
         self._clean(filename, status, "out", *args, **kwargs)
 
+    @IntegrationCheck(["ftp"])
     def _get_default_configuration(self):
         """Provide a configuration template for this type of connection"""
         self.ensure_one()
-        if self.type != "ftp":
-            return super()._get_default_configuration()
         return {
             "host": "host",
             "user": "user",
@@ -114,11 +104,10 @@ class FTPConnection(models.Model):
     #    by a connection based on FTP                                   #
     #####################################################################
 
+    @IntegrationCheck(["ftp"])
     def connect(self):
         """Open a connection"""
         self.ensure_one()
-        if not self.type == "ftp":
-            return super().connect()
 
         config = self._read_configuration()
         server = ftplib.FTP(host=config["host"], user=config["user"], passwd=config["password"])
@@ -132,35 +121,29 @@ class FTPConnection(models.Model):
         self.ftp_load_config(server, config)
         return server
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def pwd(self, server):
         """Get the current directory"""
-        if not self.type == "ftp":
-            return super().pwd(server)
-
         return server.pwd()
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def dir_exists(self, server, path):
         """Check if the directory exists"""
-        if not self.type == "ftp":
-            return super().dir_exists(server, path)
-
         try:
             server.cwd(path)
             return True
         except Exception:
             return False
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def file_exists(self, server, path, filename):
         """Check if the file exists
         Optimized by checking the size of the file (SIZE command) using its full path.
         If the server does not support SIZE, fallback to list_files (which handles NLST).
         """
-        if not self.type == "ftp":
-            return super().file_exists(server, path, filename)
-
         try:
             # SIZE command: very fast, does not open a data connection
             full_path = os.path.join(path, filename) if path else filename
@@ -181,32 +164,24 @@ class FTPConnection(models.Model):
         except Exception:
             return False
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def delete_file(self, server, path):
-        if not self.type == "ftp":
-            return super().delete_file(server, path)
-
         server.delete(path)
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def change_dir(self, server, path):
-        if not self.type == "ftp":
-            return super().change_dir(server, path)
-
         server.cwd(path)
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def rename(self, server, old, new):
-        if not self.type == "ftp":
-            return super().rename(server, old, new)
-
         server.rename(old, new)
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def list_files(self, server, path=False, filename=False):
-        if not self.type == "ftp":
-            return super().list_files(server, path)
-
         if path:
             self.change_dir(server, path)
 
@@ -223,18 +198,14 @@ class FTPConnection(models.Model):
             filenames.append(name)
         return filenames
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def _upload_file(self, server, filename, binary_content):
-        if not self.type == "ftp":
-            return super()._upload_file(server, filename, binary_content)
-
         server.storbinary("STOR %s" % filename, binary_content)
 
+    @IntegrationCheck(["ftp"])
     @api.model
     def _download_file(self, server, directory, filename):
-        if not self.type == "ftp":
-            return super()._download_file(server, directory, filename)
-
         with open(os.path.join(directory, filename), "wb") as file:
             server.retrbinary("RETR %s" % filename, file.write)
             return file.name

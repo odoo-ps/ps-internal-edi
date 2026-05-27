@@ -70,8 +70,6 @@ class IntegrationIn(models.Model):
         """Return the name of the table record (in flow)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._get_edi_table_record_name_in(records)
         ....
 
         :param data: list of dict
@@ -151,8 +149,6 @@ class IntegrationIn(models.Model):
         """Allow the integration to redefine the first step (conversion of data into edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._prepare_in_edi_table(data)
         ....
 
         :param data: list of dict
@@ -170,8 +166,6 @@ class IntegrationIn(models.Model):
         """Allow the integration to redefine the second step (process edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._process_in_edi_table(data)
         ....
 
         :param data: list of dict

@@ -1,7 +1,8 @@
 import os
 import os.path
 
-from odoo import _, models
+from odoo import models
+from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
 from odoo.exceptions import UserError
 
 
@@ -19,35 +20,29 @@ class ConnectionFolder(models.Model):
             "out_folder": "<PATH HERE>",
         }
 
+    @IntegrationCheck(["api"])
     def test(self):
         self.ensure_one()
-        if not self.type == "api":
-            return super().test()
-
         config = self._read_configuration()
         for fname in [config["in_folder"], config["out_folder"], config["in_folder_done"], config["in_folder_error"]]:
             path = "%s/test" % fname
             with open(path, "w") as in_f:
                 in_f.write("Test")
             os.remove(path)
-        raise UserError(_("Connection Successful"))
+        raise UserError(self.env._("Connection Successful"))
 
+    @IntegrationCheck(["api"])
     def _send_synchronization(self, filename, content, *args, **kwargs):
         self.ensure_one()
-        if not self.type == "api":
-            return super()._send_synchronization(filename, content, *args, **kwargs)
-
         config = self._read_configuration()
         self._check_folder(config["out_folder"])
         path = "%s/%s" % (config["out_folder"], filename)
         with open(path, "w") as out_file:
             out_file.write(content)
 
+    @IntegrationCheck(["api"])
     def _fetch_synchronizations(self, *args, **kwargs):
         self.ensure_one()
-        if not self.type == "api":
-            return super()._fetch_synchronizations(*args, **kwargs)
-
         config = self._read_configuration()
         self._check_folder(config["in_folder"])
         data = []
@@ -58,23 +53,17 @@ class ConnectionFolder(models.Model):
                     data.append({"filename": f, "content": fd.read()})
         return data
 
+    @IntegrationCheck(["api"])
     def _clean_synchronization_in(self, data, status, *args, **kwargs):
-        if self.type != "api":
-            return super()._clean_synchronization_in(data, status, *args, **kwargs)
-
         return self._clean_synchronization(data.get("filename"), status, "in", *args, **kwargs)
 
+    @IntegrationCheck(["api"])
     def _clean_synchronization_out(self, filename, status, *args, **kwargs):
-        if self.type != "api":
-            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
-
         return self._clean_synchronization(filename, status, "out", *args, **kwargs)
 
+    @IntegrationCheck(["api"])
     def _clean_synchronization(self, filename, status, flow_type, *args, **kwargs):
         self.ensure_one()
-        if not self.type == "api":
-            return super()._clean_synchronization(filename, status, flow_type, *args, **kwargs)
-
         config = self._read_configuration()
         if flow_type == "out":
             self._check_folder(config["out_folder"])

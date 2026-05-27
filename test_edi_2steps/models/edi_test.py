@@ -4,6 +4,7 @@ from ast import literal_eval
 from io import StringIO
 
 from odoo import fields, models
+from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
 
 _logger = logging.getLogger(__name__)
 
@@ -13,10 +14,8 @@ class TestIntegration(models.Model):
 
     type = fields.Selection(selection_add=[("api_2steps", "API 2 steps")], ondelete={"api_2steps": "cascade"})
 
+    @IntegrationCheck(["api_2steps"])
     def _prepare_in_edi_table(self, data):
-        if self.type != "api_2steps":
-            return super()._prepare_in_edi_table(data)
-
         result = []
         for d in data:
             content = d.get("content")
@@ -45,30 +44,24 @@ class TestIntegration(models.Model):
                 })
         return result
 
+    @IntegrationCheck(["api_2steps"])
     def _process_in_edi_table(self, data):
-        if self.type != "api_2steps":
-            return super()._process_in_edi_table(data)
-
         vals_list = []
         for d in data:
             vals_list.extend(literal_eval(d.get("content", [])))
 
         return self.env["res.partner"].create(vals_list)
 
+    @IntegrationCheck(["api_2steps"])
     def _get_record_to_send(self):
-        if self.type != "api_2steps":
-            return super()._get_record_to_send()
-
         conf = self._read_parameter()
         if "filter" not in conf:
             return super()._get_record_to_send()
         domain = conf["filter"]
         return self.env["res.partner"].search(domain)
 
+    @IntegrationCheck(["api_2steps"])
     def _prepare_out_edi_table(self, records):
-        if self.type != "api_2steps":
-            return super()._prepare_out_edi_table()
-
         if len(records) == 1 and "error" in records.name:
             self._report_error("Export Partner", message="Cannot export the partner")
             return [{
@@ -89,10 +82,8 @@ class TestIntegration(models.Model):
             } for record in records]
         }]
 
+    @IntegrationCheck(["api_2steps"])
     def _process_out_edi_table(self, records):
-        if self.type != "api_2steps":
-            return super()._process_out_edi_table(records)
-
         content = StringIO()
         writer = csv.writer(content)
 

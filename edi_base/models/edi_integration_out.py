@@ -107,8 +107,6 @@ class IntegrationOut(models.Model):
         """Return the name of the synchronization (out flow)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._get_synchronization_name_out(records)
         ....
 
         :param records: recordset
@@ -141,8 +139,6 @@ class IntegrationOut(models.Model):
         """Return the records that should be synchronized
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._get_record_to_send()
         ....
 
         :return: recordset to synchronize (use to generate the content)
@@ -162,8 +158,6 @@ class IntegrationOut(models.Model):
         Filename can be accessed by self.env.cr.sync.filename
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._send_content(content, records)
         ....
 
         :param content: str
@@ -193,8 +187,6 @@ class IntegrationOut(models.Model):
         Filename can be accessed by self.env.cr.sync.filename
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._postprocess(response, content, records)
         ....
 
         :param response: any (value returned by self.connection_id._send_synchronization)
@@ -212,8 +204,6 @@ class IntegrationOut(models.Model):
         """Return the content that should be sent
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._get_content(records)
         ....
 
         Can use self._report_error

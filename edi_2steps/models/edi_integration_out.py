@@ -83,8 +83,6 @@ class IntegrationOut(models.Model):
         """Return the name of the table record (out flow)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._get_table_record_name_out(records)
         ....
 
         :param records: recordset
@@ -151,8 +149,6 @@ class IntegrationOut(models.Model):
         Filename can be accessed by self.env.cr.sync.filename
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._postprocess_edi_table(send_result, content, records)
         ....
 
         :param send_result: any (value returned by self.connection_id._send_synchronization)
@@ -170,8 +166,6 @@ class IntegrationOut(models.Model):
         """Allow the integration to redefine the first step (conversion of records into edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._prepare_out_edi_table(data)
         ....
 
         :param records: recordset
@@ -186,8 +180,6 @@ class IntegrationOut(models.Model):
         """Allow the integration to redefine the second step (processing of a edi.table.record)
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._process_out_edi_table(data)
         ....
 
         :param data: recordset edi.table.record

@@ -2,6 +2,7 @@
 import json
 
 from odoo import _, api, fields, models
+from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import ormcache
 
@@ -42,8 +43,6 @@ class Connection(models.Model):
         Should raise an exception with Success or Failed message
 
         To implement in each connection
-        if not self.type == 'My type':
-            return super().test()
         ....
         """
         raise NotImplementedError("No test method implemented for this type of connection")
@@ -53,8 +52,6 @@ class Connection(models.Model):
         Send the content to the third party component (out flows)
 
         To implement in each connection
-        if not self.type == 'My type':
-            return super()._send_synchronization(filename, content, *args, **kwargs)
         ....
 
         :param filename: str
@@ -66,8 +63,6 @@ class Connection(models.Model):
         """Fetch the content to process (in flows)
 
         To implement in each connection
-        if not self.type == 'My type':
-            return super()._fetch_synchronizations(*args, **kwargs)
         ....
 
         :return: list of dict
@@ -83,8 +78,6 @@ class Connection(models.Model):
         """Clean the synchronization (in flows)
 
         To implement in each connection
-        if not self.type == 'My type':
-            return super()._clean_synchronization_in(data, status, *args, **kwargs)
         ....
 
         :param data: dict (returned from _fetch_synchronizations)
@@ -100,8 +93,6 @@ class Connection(models.Model):
         """Clean the synchronization (out flows)
 
         To implement in each connection
-        if not self.type == 'My type':
-            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
         ....
 
         :param filename: str
@@ -120,8 +111,6 @@ class Connection(models.Model):
 
         To implement in each connection
         self.ensure_one()
-        if not self.type == 'My type':
-            return super()._get_default_configuration()
         ....
 
         :return: dict
@@ -167,9 +156,7 @@ class ConnectionApi(models.Model):
 
     type = fields.Selection(selection_add=[("api", "Rpc Api")], ondelete={"api": "cascade"})
 
+    @IntegrationCheck(["api"])
     def test(self):
         self.ensure_one()
-        if not self.type == "api":
-            return super().test()
-
         raise UserError(_("Not applicable for this type of connection"))

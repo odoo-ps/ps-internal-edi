@@ -9,7 +9,7 @@ import pysftp
 from paramiko import RSAKey
 
 from odoo import api, fields, models
-
+from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
 
 _logger = logging.getLogger(__name__)
 
@@ -25,48 +25,37 @@ class SFTPConnection(models.Model):
     #             Methods overridden from edi_base                      #
     #####################################################################
 
+    @IntegrationCheck(["sftp"])
     def test(self):
         """Try to connect to the server"""
         self.ensure_one()
-        if not self.type == "sftp":
-            return super().test()
-
         self._ftp_test_connection()
 
+    @IntegrationCheck(["sftp"])
     def _send_synchronization(self, filename, content, *args, **kwargs):
         """Override to upload the file"""
         self.ensure_one()
-        if not self.type == "sftp":
-            return super()._send_synchronization(filename, content, *args, **kwargs)
-
         return self._ftp_send_file(filename, content, *args, **kwargs)
 
+    @IntegrationCheck(["sftp"])
     def _fetch_synchronizations(self, *args, **kwargs):
         """Override to download the file from the FTP server"""
         self.ensure_one()
-        if not self.type == "sftp":
-            return super()._fetch_synchronizations(*args, **kwargs)
-
         return self._ftp_fetch_files(*args, **kwargs)
 
+    @IntegrationCheck(["sftp"])
     def _clean_synchronization_in(self, data, status, *args, **kwargs):
-        if not self.type == "sftp":
-            return super()._clean_synchronization_in(data, status, *args, **kwargs)
-
         self._clean_local_file(data, *args, **kwargs)
         self._clean(data.get("filename"), status, "in", *args, **kwargs)
 
+    @IntegrationCheck(["sftp"])
     def _clean_synchronization_out(self, filename, status, *args, **kwargs):
-        if not self.type == "sftp":
-            return super()._clean_synchronization_out(filename, status, *args, **kwargs)
-
         self._clean(filename, status, "out", *args, **kwargs)
 
+    @IntegrationCheck(["sftp"])
     def _get_default_configuration(self):
         """Provide a configuration template for this type of connection"""
         self.ensure_one()
-        if self.type != "sftp":
-            return super()._get_default_configuration()
         return {
             "host": "host",
             "host_key": "",
@@ -87,11 +76,10 @@ class SFTPConnection(models.Model):
     #    by a connection based on SFTP                                  #
     #####################################################################
 
+    @IntegrationCheck(["sftp"])
     def connect(self):
         """Open a connection"""
         self.ensure_one()
-        if not self.type == "sftp":
-            return super().connect()
 
         config = self._read_configuration()
 
@@ -119,60 +107,46 @@ class SFTPConnection(models.Model):
         self.ftp_load_config(server, config)
         return server
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def pwd(self, server):
         """Get the current directory"""
-        if not self.type == "sftp":
-            return super().pwd(server)
-
         return server.pwd
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def dir_exists(self, server, path):
         """Check if the directory exists"""
-        if not self.type == "sftp":
-            return super().dir_exists(server, path)
-
         try:
             server.cwd(path)
             return True
         except Exception:
             return False
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def file_exists(self, server, path, filename):
         """Check if the file exists"""
-        if not self.type == "sftp":
-            return super().file_exists(server, path, filename)
-
         return server.exists(os.path.join(path, filename))
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def delete_file(self, server, path):
-        if not self.type == "sftp":
-            return super().delete_file(server, path)
-
         server.remove(path)
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def change_dir(self, server, path):
-        if not self.type == "sftp":
-            return super().change_dir(server, path)
-
         server.chdir(path)
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def rename(self, server, old, new):
-        if not self.type == "sftp":
-            return super().rename(server, old, new)
-
         server.rename(old, new)
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def list_files(self, server, path=False, filename=False):
-        if not self.type == "sftp":
-            return super().list_files(server, path, filename=filename)
-
         if path:
             self.change_dir(server, path)
 
@@ -192,17 +166,13 @@ class SFTPConnection(models.Model):
                     filenames.append(attr.filename)
         return filenames
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def _upload_file(self, server, filename, binary_content):
-        if not self.type == "sftp":
-            return super()._upload_file(server, filename, binary_content)
-
         server.putfo(binary_content, filename)
 
+    @IntegrationCheck(["sftp"])
     @api.model
     def _download_file(self, server, directory, filename):
-        if not self.type == "sftp":
-            return super()._download_file(server, directory, filename)
-
         server.get(filename, os.path.join(directory, filename))
         return os.path.join(directory, filename)

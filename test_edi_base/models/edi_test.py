@@ -3,6 +3,7 @@ import logging
 from io import StringIO
 
 from odoo import api, models
+from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
 
 from odoo.addons.edi_base.models.decorator import integration
 
@@ -35,20 +36,16 @@ class TestIntegration(models.Model):
 
     _inherit = "edi.integration"
 
+    @IntegrationCheck(["api"])
     def _get_record_to_send(self):
-        if self.type != "api":
-            return super()._get_record_to_send()
-
         conf = self._read_parameter()
         if "filter" not in conf:
             return super()._get_record_to_send()
         domain = conf["filter"]
         return self.env["res.partner"].search(domain)
 
+    @IntegrationCheck(["api"])
     def _get_content(self, records):
-        if self.type != "api":
-            return super()._get_content(records)
-
         if len(records) == 1 and "error" in records.name:
             self._report_error("Export Partner", message="Cannot export the partner")
             return "Error: wrong partner"
@@ -72,10 +69,8 @@ class TestIntegration(models.Model):
         writer.writerows(rows)
         return content.getvalue()
 
+    @IntegrationCheck(["api"])
     def _process_content(self, data):
-        if self.type != "api":
-            return super()._process_content(data)
-
         for d in data:
 
             content = d.get("content")

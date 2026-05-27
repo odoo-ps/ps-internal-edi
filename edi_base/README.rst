@@ -106,6 +106,7 @@ Example "out" flow
 
     from odoo import _, fields, models
     from odoo.exceptions import UserError, ValidationError
+    from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
 
 
     class APITestConnection(models.Model):
@@ -117,30 +118,25 @@ Example "out" flow
             selection_add=[("api_test", "API Test")], ondelete={"api_test": "cascade"}
         )
 
+        @IntegrationCheck(["api_test"])
         def _get_default_configuration(self):
             """Inherited method with specific useful default parameters."""
             self.ensure_one()
-            if self.type != "api_test":
-                return super()._get_default_configuration()
-
             return {"url": "<url>", "username": "<username>", "password": "<password>"}
 
+        @IntegrationCheck(["api_test"])
         def _api_test_get_session(self):
             """Specific method to this API Test connection, defining how to connect."""
             self.ensure_one()
-            if self.type != "api_test":
-                raise ValueError(_("This method must be called by the connection of type api_test"))
-
             session = requests.Session()
             session.auth = (
             self._get_configuration_value("username", True), self._get_configuration_value("password", True))
             return session
 
+        @IntegrationCheck(["api_test"])
         def test(self):
             """Inherited method with specific behavior for the "Test" button, assuming HTTP API."""
             self.ensure_one()
-            if self.type != "api_test":
-                return super().test()
 
             with self._api_test_get_session() as session:
                 try:
@@ -160,10 +156,9 @@ Example "out" flow
 
                 # TODO but you should probably adapt this depending on the specific API to define what's OK & what's not...
 
+        @IntegrationCheck(["api_test"])
         def _send_synchronization(self, filename, content, *args, **kwargs):
             self.ensure_one()
-            if self.type != "api_test":
-                return super()._send_synchronization(filename, content, *args, **kwargs)
 
             with self._api_test_get_session() as session:
                 response = session.post(self._get_configuration_value("url", True), json=content)
@@ -232,30 +227,26 @@ except that we need to redefine ``_fetch_synchronizations`` instead of ``_send_s
             selection_add=[("api_test", "API Test")], ondelete={"api_test": "cascade"}
         )
 
+        @IntegrationCheck(["api_test"])
         def _get_default_configuration(self):
             """Inherited method with specific useful default parameters."""
             self.ensure_one()
-            if self.type != "api_test":
-                return super()._get_default_configuration()
-
             return {"url": "<url>", "username": "<username>", "password": "<password>"}
 
+        @IntegrationCheck(["api_test"])
         def _api_test_get_session(self):
             """Specific method to this API Test connection, defining how to connect."""
             self.ensure_one()
-            if self.type != "api_test":
-                raise ValueError(_("This method must be called by the connection of type api_test"))
 
             session = requests.Session()
             session.auth = (
             self._get_configuration_value("username", True), self._get_configuration_value("password", True))
             return session
 
+        @IntegrationCheck(["api_test"])
         def test(self):
             """Inherited method with specific behavior for the "Test" button, assuming HTTP API."""
             self.ensure_one()
-            if self.type != "api_test":
-                return super().test()
 
             with self._api_test_get_session() as session:
                 try:
@@ -275,10 +266,9 @@ except that we need to redefine ``_fetch_synchronizations`` instead of ``_send_s
 
                 # TODO but you should probably adapt this depending on the specific API to define what's OK & what's not...
 
+        @IntegrationCheck(["api_test"])
         def _fetch_synchronizations(self, *args, **kwargs):
             self.ensure_one()
-            if self.type != "api_test":
-                return super()._fetch_synchronizations(*args, **kwargs)
 
             with self._api_test_get_session() as session:
                 response = session.get(self._get_configuration_value("url", True), json={})
@@ -298,10 +288,8 @@ except that we need to redefine ``_fetch_synchronizations`` instead of ``_send_s
         # please note that the integration is agnostic regarding the connector (could be API, FTP...)
         type = fields.Selection(selection_add=[("test_in", "Test In")], ondelete={"test_in": "cascade"})
 
+        @IntegrationCheck(["test_in"])
         def _process_content(self, data):
-            if self.type != "test_in":
-                return super()._process_content(data)
-
             # since synchronization_creation = 1, data will be a list with one dictionary (file)
             for d in data:
                 filename = d.get("filename")
@@ -376,14 +364,25 @@ Other useful options
 
     The type field is required, and corresponds to a unique name for an integration. As many integrations can define or
     redefine methods with a same name, it allows to be sure that you execute a method only for a specific type.
-    So a check on the type is a required security when you define a method on an integration. For example :
+    So a check on the type is a required security when you define a method on an integration.
+    This can be achieved by using the `IntegrationCheck` decorator which will call the super method if the record's type
+    is different from the expected type (passed as first argument to the decorator). For example :
 
     .. code-block:: python
 
+        @IntegrationCheck(["get_products_from_xx_software"])
         def _process_content(self, data):
-              if self.type != 'get_products_from_xx_software':
-                  return super()._process_content(data)
               # then I can write my code
+
+    If needed, an exception can be raised if such method is not expected to be used by another integration. For example:
+
+    .. code-block:: python
+
+        @IntegrationCheck(["get_products_from_xx_software"], raise_if_wrong_integration=True)
+        def _process_content(self, data):
+              # then I can write my code
+
+    If called by a wrong integration, this will raise an error stating: "This method can only be called in the integration of type get_products_from_xx_software!"
 
 
 -   **synchronization_creation field :**

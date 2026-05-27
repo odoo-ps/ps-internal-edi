@@ -373,8 +373,6 @@ class Integration(models.Model):
         """Can be use to handle an error at the end of each synchronization.
 
         To implement in each integration
-        if not self.type == 'My type':
-            return super()._handle_error(data, exc)
         ....
 
         Extended to handle edi.table.record processing errors
