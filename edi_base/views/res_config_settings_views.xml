@@ -23,6 +23,13 @@
         <field name="context">{'module' : 'edi_base', 'bin_size': False}</field>
     </record>
     <menuitem
+        id="root_menu"
+        name="EDI"
+        sequence="98"
+        groups="base.group_system"
+        web_icon="edi_base,static/description/icon.png"
+    />
+    <menuitem
         id="configuration_menu"
         name="Configuration"
         parent="edi_base.root_menu"
