@@ -63,8 +63,8 @@ class IntegrationOut(models.Model):
         finally:
             if content:
                 # force the write of the content on the synchronization
-                if self.write_content_on_sync:
-                    self.env.cr.sync._write_content(content)
+                if self.store_sent_content:
+                    self.env.cr.sync._write_sent(content)
 
     def _get_out_data(self):
         """Return the data to process for out flow

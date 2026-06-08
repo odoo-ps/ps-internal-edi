@@ -79,14 +79,15 @@
                         <group name="right_group">
                             <field name="triggered_date"/>
                             <field name="synchronization_date"/>
+                            <field name="content_type"/>
                         </group>
                     </group>
-                    <notebook invisible="not error_ids and not content">
-                        <page string="Content" invisible="not content">
-                            <group>
-                                <field name="content_type"/>
-                                <field name="content" invisible="content_type == 'pdf'"/>
-                            </group>
+                    <notebook invisible="not error_ids and not received_content and not sent_content">
+                        <page string="Sent" invisible="not sent_content">
+                            <field name="sent_content"/>
+                        </page>
+                        <page string="Received" invisible="not received_content or content_type == 'pdf'">
+                            <field name="received_content"/>
                         </page>
                         <page string="Failures" invisible="not error_ids">
                             <field
@@ -139,7 +140,8 @@
             <search string="Synchronization File">
                 <field name="name" filter_domain="['|', ('name', 'ilike', self), ('filename', 'ilike', self)]"/>
                 <field name="integration_id"/>
-                <field name="content"/>
+                <field name="sent_content"/>
+                <field name="received_content"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <filter
                     name="in_synchronizations"
