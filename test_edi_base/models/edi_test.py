@@ -59,8 +59,7 @@ class TestIntegration(models.Model):
             time.sleep(30)
 
         if len(records) == 1 and "raise" in records.name:
-            # Generate an error that break an sql constraint
-            self.env["res.partner"].create({"name": False})
+            raise Exception("Simulated crash in _get_content")
 
         content = StringIO()
         writer = csv.writer(content)
@@ -81,7 +80,7 @@ class TestIntegration(models.Model):
             content = d.get("content")
             # Code to test when something go wrong
             if content == "raise":
-                self.env["res.partner"].create({"name": False})
+                raise Exception("Simulated crash in _process_content")
 
             if content.strip() == "time":
                 import time

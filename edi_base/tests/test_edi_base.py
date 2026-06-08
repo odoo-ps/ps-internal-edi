@@ -1,8 +1,10 @@
 from odoo import Command
+from odoo.tests.common import tagged
 
 from .test_edi_common import TestEDICommonBase
 
 
+@tagged("post_install", "-at_install")
 class TestEdiBase(TestEDICommonBase):
     def test_sub_integration_ids(self):
         """
@@ -14,7 +16,7 @@ class TestEdiBase(TestEDICommonBase):
                 "name": "Test edi parent integration",
                 "type": "api",
                 "integration_flow": "out",
-                "connection_id": self.folder_connection.id,
+                "connection_id": self.mock_connection.id,
                 "has_sub_integration": True,
                 "sub_integration_ids": [
                     Command.create(
@@ -22,7 +24,7 @@ class TestEdiBase(TestEDICommonBase):
                             "name": "Test edi integration",
                             "type": "api",
                             "integration_flow": "out",
-                            "connection_id": self.folder_connection.id,
+                            "connection_id": self.mock_connection.id,
                             "record_filter_id": record_filter_id.id,
                             "active": False,
                         }

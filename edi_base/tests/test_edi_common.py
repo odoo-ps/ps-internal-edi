@@ -1,20 +1,6 @@
-import json
-from pathlib import Path
-
 from odoo import api
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
-
-
-FOLDER_EDI = Path("/tmp/edi")
-
-
-FOLDER_IN = Path(FOLDER_EDI, "in")
-FOLDER_IN_DONE = Path(FOLDER_IN, "done")
-FOLDER_IN_ERROR = Path(FOLDER_IN, "error")
-
-
-FOLDER_OUT = Path(FOLDER_EDI, "out")
 
 
 class TestEDICommon(TransactionCase):
@@ -105,23 +91,8 @@ class TestEDICommonBase(TestEDICommon):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.folder_connection = (
+        cls.mock_connection = (
             cls.new_env["edi.connection"]
             .with_context(mail_create_nolog=True)
-            .create(
-                [
-                    {
-                        "name": "Connection to folder",
-                        "type": "api",
-                        "configuration": json.dumps(
-                            {
-                                "in_folder": str(FOLDER_IN),
-                                "in_folder_done": str(FOLDER_IN_DONE),
-                                "in_folder_error": str(FOLDER_IN_ERROR),
-                                "out_folder": str(FOLDER_OUT),
-                            }
-                        ),
-                    }
-                ]
-            )
+            .create([{"name": "Mock connection", "type": "api"}])
         )
