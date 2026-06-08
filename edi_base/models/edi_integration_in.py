@@ -38,8 +38,12 @@ class IntegrationIn(models.Model):
             "synchronization_date": fields.Datetime.now(),
         }
 
-        if self.write_content_on_sync:
-            vals["content"] = "\n\n".join([d.get("content") or "" for d in data])
+        if self.store_received_content:
+            vals["received_content"] = "\n\n".join([d.get("content") or "" for d in data])
+
+        sent_parts = [d.get("sent_content") for d in data if d.get("sent_content")]
+        if sent_parts and self.store_sent_content:
+            vals["sent_content"] = sent_parts[0]
 
         return self.env["edi.synchronization"].create(vals)
 

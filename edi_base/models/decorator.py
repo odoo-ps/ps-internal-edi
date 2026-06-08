@@ -52,7 +52,7 @@ def integration(name):
                     "name": "%s @%s" % (edi.name, time.time()),
                     "integration_id": edi.id,
                     "synchronization_date": fields.Datetime.now(),
-                    "content": """
+                    "received_content": """
                     Function
                     \t%s.%s
                     Args
