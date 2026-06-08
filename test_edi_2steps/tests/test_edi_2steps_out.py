@@ -1,20 +1,15 @@
 import csv
 import json
 from ast import literal_eval
-from pathlib import Path
+from io import StringIO
+from unittest.mock import patch
 
 from odoo import api, fields
-from odoo.addons.edi_base.tests.test_edi_common import (
-    FOLDER_EDI,
-    FOLDER_IN,
-    FOLDER_OUT,
-    TestEDICommonBase,
-)
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 
-FILE_IN = Path(FOLDER_IN, "partner.csv")
+from odoo.addons.edi_base.tests.test_edi_common import TestEDICommonBase
 
 
 @tagged("post_install", "-at_install", "ps_internal_edi")
@@ -27,42 +22,48 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
         cls.filter = cls.new_env["ir.filters"].create(
             {"name": "Export Partner", "model_id": "res.partner", "domain": '[["name", "ilike", "EDI TEST"]]'}
         )
-        cls.integration = cls.Integration.with_context(autocommit=True, no_exception_log=True).create({
-            "name": "Export Partner all",
-            "type": "api_2steps",
-            "integration_flow": "out",
-            "synchronization_creation": 0,  # all
-            "synchronization_content_type": "csv",
-            "connection_id": cls.folder_connection.id,
-            "record_filter_id": cls.filter.id,
-            "parameter": json.dumps({"fields": ["id", "name"]}),
-            "active": False,
-            "use_edi_table": True,
-        })
-        cls.edi_one = cls.Integration.with_context(autocommit=True, no_exception_log=True).create({
-            "name": "Export Partner one",
-            "type": "api_2steps",
-            "integration_flow": "out",
-            "synchronization_creation": 1,  # one
-            "synchronization_content_type": "csv",
-            "connection_id": cls.folder_connection.id,
-            "record_filter_id": cls.filter.id,
-            "parameter": json.dumps({"fields": ["id", "name"]}),
-            "active": False,
-            "use_edi_table": True,
-        })
-        cls.edi_multi = cls.Integration.with_context(autocommit=True, no_exception_log=True).create({
-            "name": "Export Partner multi",
-            "type": "api_2steps",
-            "integration_flow": "out",
-            "synchronization_creation": 3,  # multi
-            "synchronization_content_type": "csv",
-            "connection_id": cls.folder_connection.id,
-            "record_filter_id": cls.filter.id,
-            "parameter": json.dumps({"fields": ["id", "name"]}),
-            "active": False,
-            "use_edi_table": True,
-        })
+        cls.integration = cls.Integration.with_context(autocommit=True, no_exception_log=True).create(
+            {
+                "name": "Export Partner all",
+                "type": "api_2steps",
+                "integration_flow": "out",
+                "synchronization_creation": 0,  # all
+                "synchronization_content_type": "csv",
+                "connection_id": cls.mock_connection.id,
+                "record_filter_id": cls.filter.id,
+                "parameter": json.dumps({"fields": ["id", "name"]}),
+                "active": False,
+                "use_edi_table": True,
+            }
+        )
+        cls.edi_one = cls.Integration.with_context(autocommit=True, no_exception_log=True).create(
+            {
+                "name": "Export Partner one",
+                "type": "api_2steps",
+                "integration_flow": "out",
+                "synchronization_creation": 1,  # one
+                "synchronization_content_type": "csv",
+                "connection_id": cls.mock_connection.id,
+                "record_filter_id": cls.filter.id,
+                "parameter": json.dumps({"fields": ["id", "name"]}),
+                "active": False,
+                "use_edi_table": True,
+            }
+        )
+        cls.edi_multi = cls.Integration.with_context(autocommit=True, no_exception_log=True).create(
+            {
+                "name": "Export Partner multi",
+                "type": "api_2steps",
+                "integration_flow": "out",
+                "synchronization_creation": 3,  # multi
+                "synchronization_content_type": "csv",
+                "connection_id": cls.mock_connection.id,
+                "record_filter_id": cls.filter.id,
+                "parameter": json.dumps({"fields": ["id", "name"]}),
+                "active": False,
+                "use_edi_table": True,
+            }
+        )
         cls.new_cr.commit()
 
         cls.country = cls.env.ref("base.be")
@@ -80,14 +81,6 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
             integrations.with_env(env).write({"record_filter_id": False})
             filters.with_env(env).unlink()
 
-    def _clean_fs(self):
-        if FOLDER_OUT.exists():
-            for f in FOLDER_OUT.iterdir():
-                f.unlink(missing_ok=True)
-            FOLDER_OUT.rmdir()
-        if FOLDER_EDI.exists():
-            FOLDER_EDI.rmdir()
-
     def _clean_synchronizations(self):
         with self.registry.cursor() as cr:
             env = api.Environment(cr, self.env.user.id, self.env.context)
@@ -96,7 +89,14 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
     def setUp(self):
         super().setUp()
-        self.addCleanup(self._clean_fs)
+        self._sent_items = []
+        patcher = patch.object(
+            type(self.mock_connection),
+            "_send_synchronization",
+            lambda conn_self, filename, content, *a, **kw: self._sent_items.append((filename, content)),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.addCleanup(self._clean_partners)
 
     @mute_logger("odoo.models.unlink")
@@ -112,16 +112,18 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
         self.integration.process_integration()
 
-        self.assertFalse(FOLDER_OUT.exists(), "No file should be exported in the first step of the integration")
+        self.assertEqual(self._sent_items, [], "No file should be exported in the first step of the integration")
 
         with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             table_records = new_env["edi.table.record"].search([("create_date", ">=", now)])
             self.assertEqual(len(table_records), 1, "The integration should create 1 table record")
 
-            self.assertCountEqual(literal_eval(table_records[:1].content), [
-                {"id": partner.id, "name": partner.name} for partner in partners
-            ], f"The content of the table record should be the content of {len(partners)} partners")
+            self.assertCountEqual(
+                literal_eval(table_records[:1].content),
+                [{"id": partner.id, "name": partner.name} for partner in partners],
+                f"The content of the table record should be the content of {len(partners)} partners",
+            )
 
             integration = new_env["edi.integration"].browse(self.integration.id)
             self.assertEqual(integration.last_state, "done")
@@ -131,7 +133,11 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
             self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
             self.assertEqual(sync.state, "done", "The synchronization should be 'done'")
-            self.assertEqual(sync.content, table_records[:1].content, "Content should be the same between the synchronization and the table record")
+            self.assertEqual(
+                sync.sent_content,
+                table_records[:1].content,
+                "Content should be the same between the synchronization and the table record",
+            )
             self.assertEqual(len(sync.error_ids), 0, "No error should have happened during the synchronization")
 
         # Trigger second step
@@ -149,13 +155,15 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
             self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
             self.assertEqual(sync.state, "done", "The synchronization should be 'done'")
             csv_content = "\r\n".join(["id,name"] + [f"{partner.id},{partner.name}" for partner in partners]) + "\r\n"
-            self.assertEqual(sync.content, csv_content, "The synchronization content should be the CSV content of the partners")
+            self.assertEqual(
+                sync.sent_content, csv_content, "The synchronization content should be the CSV content of the partners"
+            )
             self.assertEqual(len(sync.error_ids), 0, "No error should have happened during the synchronization")
 
-        filenames = [fname for fname in FOLDER_OUT.iterdir()]
-        self.assertEqual(len(filenames), 1)
+        outputs = self._sent_items
+        self.assertEqual(len(outputs), 1)
 
-        reader = csv.reader(open(filenames[0]), delimiter=",")
+        reader = csv.reader(StringIO(outputs[0][1]), delimiter=",")
         header = reader.__next__()
         for i, line in enumerate(reader):
             data = dict(zip(header, line, strict=True))
@@ -170,18 +178,21 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
         self.edi_one.process_integration()
 
-        self.assertFalse(FOLDER_OUT.exists(), "No file should be exported in the first step of the integration")
+        self.assertEqual(self._sent_items, [], "No file should be exported in the first step of the integration")
 
         with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             table_records = new_env["edi.table.record"].search([("create_date", ">=", now)])
-            self.assertEqual(len(table_records), len(partners),
-                             f"The integration should create {len(partners)} table records (1 per partner)")
+            self.assertEqual(
+                len(table_records),
+                len(partners),
+                f"The integration should create {len(partners)} table records (1 per partner)",
+            )
 
             for table_record in table_records:
                 table_record_content = literal_eval(table_record.content)
                 partner_id = table_record_content[0]["id"]
-                partner = partners.filtered(lambda p: p.id == partner_id)
+                partner = partners.filtered(lambda p, pid=partner_id: p.id == pid)
                 self.assertEqual(table_record_content, [{"id": partner.id, "name": partner.name}])
 
             integration = new_env["edi.integration"].browse(self.edi_one.id)
@@ -190,7 +201,9 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
             synchronizations = table_records.updated_by_sync_ids
 
-            self.assertEqual(len(synchronizations), len(partners), f"The integration should create {len(partners)} synchronization")
+            self.assertEqual(
+                len(synchronizations), len(partners), f"The integration should create {len(partners)} synchronization"
+            )
             for sync in synchronizations:
                 self.assertEqual(sync.state, "done", "The synchronization should be 'done'")
                 self.assertEqual(len(sync.error_ids), 0, "No error should have happened during the synchronization")
@@ -207,16 +220,18 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
             synchronizations = table_records.processed_by_sync_ids
 
-            self.assertEqual(len(synchronizations), len(partners), f"The integration should create {len(partners)} synchronization")
+            self.assertEqual(
+                len(synchronizations), len(partners), f"The integration should create {len(partners)} synchronization"
+            )
             for sync in synchronizations:
                 self.assertEqual(sync.state, "done", "The synchronization should be 'done'")
                 self.assertEqual(len(sync.error_ids), 0, "No error should have happened during the synchronization")
 
-        filenames = [fname for fname in FOLDER_OUT.iterdir()]
-        self.assertEqual(len(filenames), 20)
+        outputs = self._sent_items
+        self.assertEqual(len(outputs), 20)
 
-        for fname in filenames:
-            reader = csv.reader(open(fname), delimiter=",")
+        for _, content in outputs:
+            reader = csv.reader(StringIO(content), delimiter=",")
             header = reader.__next__()
             for line in reader:
                 data = dict(zip(header, line, strict=True))
@@ -231,22 +246,24 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
         self.edi_multi.process_integration()
 
-        self.assertFalse(FOLDER_OUT.exists(), "No file should be exported in the first step of the integration")
+        self.assertEqual(self._sent_items, [], "No file should be exported in the first step of the integration")
         nb_records = round(len(partners) / self.edi_multi.synchronization_creation)
 
         with self.registry.cursor() as new_cr:
             new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
             table_records = new_env["edi.table.record"].search([("create_date", ">=", now)])
-            self.assertEqual(len(table_records), nb_records,
-                             f"The integration should create {nb_records} table records (3 per partner)")
+            self.assertEqual(
+                len(table_records),
+                nb_records,
+                f"The integration should create {nb_records} table records (3 per partner)",
+            )
 
             for table_record in table_records:
                 table_record_content = literal_eval(table_record.content)
                 partner_ids = [p["id"] for p in table_record_content]
-                content_partners = partners.filtered(lambda p: p.id in partner_ids)
+                content_partners = partners.filtered(lambda p, pids=partner_ids: p.id in pids)
                 self.assertCountEqual(
-                    table_record_content,
-                    [{"id": partner.id, "name": partner.name} for partner in content_partners]
+                    table_record_content, [{"id": partner.id, "name": partner.name} for partner in content_partners]
                 )
 
             integration = new_env["edi.integration"].browse(self.edi_multi.id)
@@ -255,8 +272,9 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
             synchronizations = table_records.updated_by_sync_ids
 
-            self.assertEqual(len(synchronizations), nb_records,
-                             f"The integration should create {nb_records} synchronization")
+            self.assertEqual(
+                len(synchronizations), nb_records, f"The integration should create {nb_records} synchronization"
+            )
             for sync in synchronizations:
                 self.assertEqual(sync.state, "done", "The synchronization should be 'done'")
                 self.assertEqual(len(sync.error_ids), 0, "No error should have happened during the synchronization")
@@ -273,19 +291,19 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
             synchronizations = table_records.processed_by_sync_ids
 
-            self.assertEqual(len(synchronizations), nb_records,
-                             f"The integration should create {nb_records} synchronization")
+            self.assertEqual(
+                len(synchronizations), nb_records, f"The integration should create {nb_records} synchronization"
+            )
             for sync in synchronizations:
                 self.assertEqual(sync.state, "done", "The synchronization should be 'done'")
-                self.assertEqual(len(sync.error_ids), 0,
-                                 "No error should have happened during the synchronization")
+                self.assertEqual(len(sync.error_ids), 0, "No error should have happened during the synchronization")
 
-        filenames = [fname for fname in FOLDER_OUT.iterdir()]
-        self.assertEqual(len(filenames), nb_records)
+        outputs = self._sent_items
+        self.assertEqual(len(outputs), nb_records)
 
         result = {2: 1, 3: 6}
-        for fname in filenames:
-            reader = csv.reader(open(fname), delimiter=",")
+        for _, content in outputs:
+            reader = csv.reader(StringIO(content), delimiter=",")
             header = reader.__next__()
             lines = list(reader)
             remaining_files = result.get(len(lines), 0)
@@ -318,14 +336,13 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
                 integration.last_success_date, now, "The integration should be updated after the initial date"
             )
 
-            sync = new_env["edi.synchronization"].search([
-                ("integration_id", "=", self.integration.id),
-                ("synchronization_date", ">=", now)
-            ])
+            sync = new_env["edi.synchronization"].search(
+                [("integration_id", "=", self.integration.id), ("synchronization_date", ">=", now)]
+            )
 
             self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
             self.assertEqual(sync.state, "done", "The synchronization should be in 'done'")
-            self.assertEqual(sync.content, "[]", "The synchronization's content should be set")
+            self.assertEqual(sync.sent_content, "[]", "The synchronization's content should be set")
             self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
             self.assertEqual(
                 sync.error_ids.description,
@@ -359,7 +376,7 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
             self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
             self.assertEqual(sync.state, "fail", "The synchronization should be in 'fail'")
-            self.assertFalse(sync.content, "The synchronization's content should not be set")
+            self.assertFalse(sync.sent_content, "The synchronization's content should not be set")
             self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
             self.assertIn(
                 """new row for relation "res_partner" violates check constraint "res_partner_check_name"\n""",
@@ -395,7 +412,7 @@ class TestEdi2StepsOutCases(TestEDICommonBase):
 
             self.assertEqual(len(sync), 1, "The integration should create 1 synchronization")
             self.assertEqual(sync.state, "fail", "The synchronization should be in 'fail'")
-            self.assertFalse(sync.content, "The synchronization's content should not be set")
+            self.assertFalse(sync.sent_content, "The synchronization's content should not be set")
             self.assertEqual(len(sync.error_ids), 1, "The synchronization should have 1 error linked to it")
             self.assertIn(
                 """new row for relation "res_partner" violates check constraint "res_partner_check_name"\n""",
