@@ -3,453 +3,359 @@ Framework edi_base
 ==================
 
 --------------
-The 3 concepts
+The 4 concepts
 --------------
 
-This module provides a framework for integrations between Odoo and other information systems. 3 main concepts are
-represented, corresponding to 3 questions I have to answer when developing a data exchange between systems :
+This module provides a framework for data exchange between Odoo and external systems.
+Four objects answer four questions:
 
--   **What** data to exchange : an integration
--   **How** exchange the data : a connection
--   **When** the data are sent : a synchronization
+-   **What** data to exchange → ``edi.integration``
+-   **How** to exchange it → ``edi.connection``
+-   **Where** exactly (which route) → ``edi.endpoint`` *(optional, API only)*
+-   **What happened** → ``edi.synchronization``
 
 Connection
 ==========
 
-The connection allows to handle the communication between Odoo & the external software to :
+Holds credentials and communication logic for a third-party system. The built-in ``type="api"``
+connection covers most REST APIs without writing any connection code: configure ``api_auth_type``
+and the framework handles authentication automatically.
 
--   connect
--   send or receive the data
--   disconnect
+For FTP/SFTP, dedicated modules (``edi_ftp_connection``, ``edi_sftp_connection``) are available.
+
+Endpoint
+========
+
+An endpoint is one specific route on a connection (e.g. ``POST /api/v1/orders``).
+A single connection can have multiple endpoints.
+
+When an integration has ``api_endpoint_id`` set:
+
+- **IN flow**: the framework calls the endpoint automatically and passes the response to
+  ``_process_content``.
+- **OUT flow**: the framework calls the endpoint with the content returned by ``_get_content``.
+  The API response is stored in ``received_content`` for traceability.
+
+Without ``api_endpoint_id``, the legacy ``_fetch_synchronizations`` / ``_send_synchronization``
+path is used (FTP/SFTP, custom connectors). Both paths coexist — no breaking change.
 
 Synchronization
 ===============
 
-Synchronizations are just a log information. Each time the cron task related to the integration tried to connect & send
-or retrieve data, a synchronization related to the same integration was logged, with some useful information (ok, error,
-error message,...)
+A log record created for each execution. Key fields:
+
+-   ``received_content``: what was received from the external system (IN: data fetched, OUT: API response)
+-   ``sent_content``: what was sent to the external system (OUT: payload, IN: query payload if any)
+-   ``state``: ``done`` / ``fail``
+-   ``error_ids``: detailed error messages
 
 Integration
 ===========
 
-This data model is the main concept of integrations.
+Orchestrates the flow. Inherits ``ir.cron`` (scheduling is built-in).
+The ``type`` field is a required discriminator — always guard your method overrides with it.
 
-It allows configuring :
+------------
+How to start
+------------
 
--   **the flow :** out (from Odoo to xx) / in (from xx to Odoo)
--   **the content type :** XML, JSON,...
--   **a filter :** a link to an ir.filter, allowing to target some specific records of a data model that has to be sent
-    (so basically in an "out" flow you can for ex. target all products with a specific domain, if you want to send these)
--   **cron information :** an integration inherits from a ir.cron, so you can define the frequency of the synchronizations
--   **a connection :** a link to a connection record
--   **some synchronizations :** link to synchronizations
+Decide your setup by answering those questions:
 
-How to start a new integration
-==============================
+1. **REST API?**
 
-2 things to add in a new or existing module :
+   use built-in ``type="api"`` connection, configure an endpoint,
+   implement business logic on the integration :
 
--   XML data to create a new record for a connection, an integration, and an ir.filter (if "out" flow)
--   Python class that inherits a connection & integration, & redefine useful methods :
+   - IN :
+      - Build request : ``_build_in_payload``
+      - Parse response : ``_process_content``
+   - OUT :
+      - Build payload : ``_get_content``
 
+2. **FTP or SFTP?**
 
-Example "out" flow
-==================
+   use ``edi_ftp_connection`` or ``edi_sftp_connection``,
+   implement business logic on the integration :
 
-``data / edi.xml`` :
+   - IN : ``_process_content``
+   - OUT : ``_get_content``
 
-.. code-block:: xml
+3. **New custom protocol?**
 
-    <data noupdate="1">
-        <record id="api_test_connection" model="edi.connection">
-            <field name="name">API Test Connection</field>
-            <field name="type">api_test</field>
-            <field name="configuration"><![CDATA[
-    {
-    "url": "http://localhost",
-    "username": "<username>",
-    "password": "<password>",
-    }
-        ]]></field>
-        </record>
-    </data>
+   implement ``_fetch_synchronizations`` / ``_send_synchronization``
+   on a new connection type. See the reference table at the bottom of this file.
 
-    <!-- Out flow -->
-    <data>
-        <record id="test_out_filter" model="ir.filters">
-            <field name="name">Records to send through Test Out Integration</field>
-            <field name="model_id">my.beautiful.datamodel</field>
-            <field name="domain">[["should_be_synchronized","=",True]]</field>
-        </record>
-    </data>
-    <data noupdate="1">
-        <record id="test_out_integration" model="edi.integration">
-            <field name="name">Test Out Integration</field>
-            <field name="type">test_out</field>
-            <field name="integration_flow">out</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">days</field>
-            <field name="synchronization_content_type">json</field>
-            <field name="synchronization_creation">1</field> <!-- 1 record = 1 synchronization in this example, don't hesitate to batch  -->
-            <field name="connection_id" ref="api_test_connection"/>
-            <field name="record_filter_id" ref="test_out_filter"/>
-            <field name="active" eval="False"/> <!-- archived by default to avoid automatic cron execution during the dev !-->
-        </record>
-    </data>
+The examples below cover the most common API cases.
 
-``models / edi.py`` :
+--------------------------------
+Example 1 — IN flow with API Key
+--------------------------------
 
-.. code-block:: python
+Scenario: pull a list of orders from a REST API secured with an API key.
+The API returns a JSON array; each order is processed as a separate synchronization.
 
-    import requests
-
-
-    from odoo import _, fields, models
-    from odoo.exceptions import UserError, ValidationError
-
-
-    class APITestConnection(models.Model):
-        _inherit = "edi.connection"
-
-        # specific type so inherited methods can rely on it
-        # please note that the type can be agnostic regarding the flow (in or out), because same connector can be reused
-        type = fields.Selection(
-            selection_add=[("api_test", "API Test")], ondelete={"api_test": "cascade"}
-        )
-
-        def _get_default_configuration(self):
-            """Inherited method with specific useful default parameters."""
-            self.ensure_one()
-            if self.type != "api_test":
-                return super()._get_default_configuration()
-
-            return {"url": "<url>", "username": "<username>", "password": "<password>"}
-
-        def _api_test_get_session(self):
-            """Specific method to this API Test connection, defining how to connect."""
-            self.ensure_one()
-            if self.type != "api_test":
-                raise ValueError(_("This method must be called by the connection of type api_test"))
-
-            session = requests.Session()
-            session.auth = (
-            self._get_configuration_value("username", True), self._get_configuration_value("password", True))
-            return session
-
-        def test(self):
-            """Inherited method with specific behavior for the "Test" button, assuming HTTP API."""
-            self.ensure_one()
-            if self.type != "api_test":
-                return super().test()
-
-            with self._api_test_get_session() as session:
-                try:
-                    # try with an HTTP GET just to validate the credentials
-                    response = session.get(self._get_configuration_value("url", True))
-                except Exception as e:
-                    raise ValidationError(_("Connection Test Failed, url is invalid.\nThe following error occurred :\n%s", e))
-
-                if response.ok:
-                    raise UserError(_("Connection Test Succeeded, everything seems properly set up!"))
-
-                if response.status_code in [401, 403]:
-                    raise UserError(_("Connection Test Failed, the credentials are invalid."))
-
-                raise UserError(_("Connection Test Failed :\nCode : %s\n\nContent : %s",
-                                  response.status_code, response.text))
-
-                # TODO but you should probably adapt this depending on the specific API to define what's OK & what's not...
-
-        def _send_synchronization(self, filename, content, *args, **kwargs):
-            self.ensure_one()
-            if self.type != "api_test":
-                return super()._send_synchronization(filename, content, *args, **kwargs)
-
-            with self._api_test_get_session() as session:
-                response = session.post(self._get_configuration_value("url", True), json=content)
-                if not response.ok:
-                    raise ValidationError(_("Code : %s\n\nContent : %s", response.status_code, response.text))
-                return response
-
-Example "in" flow
-=================
-
-Please note that the connection is the same than for the "out flow".
-
-``data / edi.xml`` :
-
-.. code-block:: xml
-
-    <data noupdate="1">
-        <record id="api_test_connection" model="edi.connection">
-            <field name="name">API Test Connection</field>
-            <field name="type">api_test</field>
-            <field name="configuration"><![CDATA[
-    {
-    "url": "http://localhost",
-    "username": "<username>",
-    "password": "<password>"
-    }
-        ]]></field>
-        </record>
-    </data>
-
-    <!-- In flow -->
-    <data noupdate="1">
-        <record id="test_in_integration" model="edi.integration">
-            <field name="name">Test In Integration</field>
-            <field name="type">test_in</field>
-            <field name="integration_flow">in</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">days</field>
-            <field name="synchronization_content_type">json</field>
-            <field name="synchronization_creation">1</field>
-            <field name="connection_id" ref="api_test_connection"/>
-            <field name="active" eval="False"/> <!-- archived by default to avoid automatic cron execution during the dev !-->
-        </record>
-    </data>
-
-``models / edi.py`` :
-
-Please note that the connection is the same than for the "out flow",
-except that we need to redefine ``_fetch_synchronizations`` instead of ``_send_synchronization``.
-
-.. code-block:: python
-
-    import requests
-
-
-    from odoo import _, fields, models
-    from odoo.exceptions import UserError, ValidationError
-
-
-    class APITestConnection(models.Model):
-        _inherit = "edi.connection"
-
-        # specific type so inherited methods can rely on it
-        # please note that the type can be agnostic regarding the flow (in or out), because same connector can be reused
-        type = fields.Selection(
-            selection_add=[("api_test", "API Test")], ondelete={"api_test": "cascade"}
-        )
-
-        def _get_default_configuration(self):
-            """Inherited method with specific useful default parameters."""
-            self.ensure_one()
-            if self.type != "api_test":
-                return super()._get_default_configuration()
-
-            return {"url": "<url>", "username": "<username>", "password": "<password>"}
-
-        def _api_test_get_session(self):
-            """Specific method to this API Test connection, defining how to connect."""
-            self.ensure_one()
-            if self.type != "api_test":
-                raise ValueError(_("This method must be called by the connection of type api_test"))
-
-            session = requests.Session()
-            session.auth = (
-            self._get_configuration_value("username", True), self._get_configuration_value("password", True))
-            return session
-
-        def test(self):
-            """Inherited method with specific behavior for the "Test" button, assuming HTTP API."""
-            self.ensure_one()
-            if self.type != "api_test":
-                return super().test()
-
-            with self._api_test_get_session() as session:
-                try:
-                    # try with an HTTP GET just to validate the credentials
-                    response = session.get(self._get_configuration_value("url", True))
-                except Exception as e:
-                    raise ValidationError(_("Connection Test Failed, url is invalid.\nThe following error occurred :\n%s", e))
-
-                if response.ok:
-                    raise UserError(_("Connection Test Succeeded, everything seems properly set up!"))
-
-                if response.status_code in [401, 403]:
-                    raise UserError(_("Connection Test Failed, the credentials are invalid."))
-
-                raise UserError(_("Connection Test Failed :\nCode : %s\n\nContent : %s",
-                                  response.status_code, response.text))
-
-                # TODO but you should probably adapt this depending on the specific API to define what's OK & what's not...
-
-        def _fetch_synchronizations(self, *args, **kwargs):
-            self.ensure_one()
-            if self.type != "api_test":
-                return super()._fetch_synchronizations(*args, **kwargs)
-
-            with self._api_test_get_session() as session:
-                response = session.get(self._get_configuration_value("url", True), json={})
-                if not response.ok:
-                    raise ValidationError(_("Code : %s\n\nContent : %s", response.status_code, response.text))
-                return [
-                    {
-                        "filename": response.url, # key not important for API, more for FTP, but should be there anyway
-                        "content": response.text}
-                ]
-
-
-    class TestInIntegration(models.Model):
-        _inherit = "edi.integration"
-
-        # specific type so inherited methods can rely on it
-        # please note that the integration is agnostic regarding the connector (could be API, FTP...)
-        type = fields.Selection(selection_add=[("test_in", "Test In")], ondelete={"test_in": "cascade"})
-
-        def _process_content(self, data):
-            if self.type != "test_in":
-                return super()._process_content(data)
-
-            # since synchronization_creation = 1, data will be a list with one dictionary (file)
-            for d in data:
-                filename = d.get("filename")
-                content = d.get("content")
-                # Process the content & probably search / create / update / delete records
-
-            return "done" # don't forget this one, otherwise it's considered as error...
-
----------------------
-More development info
----------------------
-
-About Connection
+``data/edi.xml``
 ================
 
-Do I use one ? Do I create one ?
+.. code-block:: xml
 
-Create a new type of connection
--------------------------------
+    <!-- Connection: built-in type="api", no Python needed -->
+    <record id="acme_connection" model="edi.connection">
+        <field name="name">ACME API</field>
+        <field name="type">api</field>
+        <field name="api_auth_type">api_key</field>
+    </record>
 
-For example if you need to connect through an API then you need to define a new type of connection and handle the
-communication as described by the API documentation of the external tool. The data model Connection provides a bunch of
-methods that you can redefine to take care of that.
+    <!-- Endpoint: the actual route. The API key lives here. -->
+    <record id="acme_orders_endpoint" model="edi.endpoint">
+        <field name="name">ACME Orders</field>
+        <field name="connection_id" ref="acme_connection"/>
+        <field name="method">GET</field>
+        <field name="url">https://api.acme.com/v1/orders</field>
+        <field name="api_key">MY_SECRET_KEY</field>
+    </record>
 
-Or use an existing one
-----------------------
+    <!-- Integration: link to connection + endpoint -->
+    <record id="acme_orders_in" model="edi.integration">
+        <field name="name">Import ACME Orders</field>
+        <field name="type">acme_orders_in</field>
+        <field name="integration_flow">in</field>
+        <field name="synchronization_content_type">json</field>
+        <field name="response_content_type">json</field>  <!-- enables JSON pretty-print in UI -->
+        <field name="synchronization_creation">1</field>
+        <field name="connection_id" ref="acme_connection"/>
+        <field name="api_endpoint_id" ref="acme_orders_endpoint"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="False"/>
+    </record>
 
-If you need to exchange data through FTP or SFTP, then 2 modules edi_ftp_connection and edi_sftp_connection have already
-been developed. you just have to depend on these modules to be able to use their connections.
+``models/acme_integration.py``
+==============================
 
-Then all you have to configure is the details of the connection (url / login / password,...) See these modules for more
-information.
+.. code-block:: python
 
-About Integration
-=================
+    import json
+    from odoo import fields, models
 
-The data model Integration provides a bunch of methods that can be redefined. Most methods have a default behaviour, and
-just 2 **must** be redefined :
 
-For an "out" flow : ``_get_content_(self, records)``
-----------------------------------------------------
+    class AcmeOrdersIn(models.Model):
+        _inherit = "edi.integration"
 
-This method takes some records as input (basically the ones from the ir.filter defined), and the purpose is to convert
-the records to something else, like a JSON or XML data.
+        type = fields.Selection(
+            selection_add=[("acme_orders_in", "ACME - Import Orders")],
+            ondelete={"acme_orders_in": "cascade"},
+        )
 
-A string with the converted data can be returned by the method.
+        # --- Optional: pass query parameters (pagination, date filter…) ---
+        def _build_in_payload(self):
+            if self.type != "acme_orders_in":
+                return super()._build_in_payload()
+            # GET params appended to the URL
+            return {"since": str(self.last_success_date or "2000-01-01"), "limit": 100}
 
-For an "in" flow : ``_process_content(self, data)``
----------------------------------------------------
+        # --- Optional: split a multi-item response into one sync per order ---
+        def _api_wrap_response(self, raw_text):
+            if self.type != "acme_orders_in":
+                return super()._api_wrap_response(raw_text)
+            orders = json.loads(raw_text).get("orders", [])
+            return [
+                {"filename": f"order_{o['id']}", "content": json.dumps(o)}
+                for o in orders
+            ]
 
-This method takes a list of dictionary as input (basically the ones returned by the \_fetch_content method of the
-connection, should always contains the key filename and content).
+        # --- Required: process the received content ---
+        def _process_content(self, data):
+            if self.type != "acme_orders_in":
+                return super()._process_content(data)
+            for d in data:
+                order = json.loads(d["content"])
+                self.env["sale.order"].create_or_update_from_acme(order)
+            return "done"
 
-The content is for example a string representing a JSON or XML data.
 
-The purpose is to convert this data, and impact the database (by create, update,...)
+--------------------------------
+Example 2 — OUT flow with OAuth2
+--------------------------------
 
-Other methods can be redefined & usage
---------------------------------------
+Scenario: push stock levels to a REST API that requires OAuth2 client credentials.
 
--   **``_get_synchronization_name_out`` :** set a specific name for a file to send
--   **``_postprocess`` :** make something special at the end of an "out" process (change a status of processed
-    records,...)
--   **``_clean`` :** make something special at the end of an "in" process
--   **``_handle_error`` :** make something special at the end of an "in/out" process in case an error occured during the
-    synchronization (change a status of processed records,...)
+``data/edi.xml``
+================
+
+.. code-block:: xml
+
+    <!-- Connection: OAuth2 auth type -->
+    <record id="wms_connection" model="edi.connection">
+        <field name="name">WMS API</field>
+        <field name="type">api</field>
+        <field name="api_auth_type">oauth2</field>
+    </record>
+
+    <!-- Token endpoint: called once to get the Bearer token -->
+    <record id="wms_token_endpoint" model="edi.endpoint">
+        <field name="name">WMS Token</field>
+        <field name="connection_id" ref="wms_connection"/>
+        <field name="role">token</field>
+        <field name="method">POST</field>
+        <field name="url">https://wms.example.com/oauth/token</field>
+        <field name="grant_type">client_credentials</field>
+        <field name="client_id">MY_CLIENT_ID</field>
+        <field name="client_secret">MY_CLIENT_SECRET</field>
+    </record>
+
+    <!-- Resource endpoint: the business route -->
+    <record id="wms_stock_endpoint" model="edi.endpoint">
+        <field name="name">WMS Stock Update</field>
+        <field name="connection_id" ref="wms_connection"/>
+        <field name="method">POST</field>
+        <field name="url">https://wms.example.com/api/v2/stock</field>
+    </record>
+
+    <!-- Filter: which products to send -->
+    <record id="wms_stock_filter" model="ir.filters">
+        <field name="name">WMS - Products to sync</field>
+        <field name="model_id">product.product</field>
+        <field name="domain">[["type", "=", "product"]]</field>
+    </record>
+
+    <!-- Integration: batches of 50 products per synchronization -->
+    <record id="wms_stock_out" model="edi.integration">
+        <field name="name">Export Stock to WMS</field>
+        <field name="type">wms_stock_out</field>
+        <field name="integration_flow">out</field>
+        <field name="synchronization_content_type">json</field>
+        <field name="synchronization_creation">50</field>
+        <field name="connection_id" ref="wms_connection"/>
+        <field name="api_endpoint_id" ref="wms_stock_endpoint"/>
+        <field name="record_filter_id" ref="wms_stock_filter"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="False"/>
+    </record>
+
+``models/wms_integration.py``
+=============================
+
+.. code-block:: python
+
+    import json
+    from odoo import fields, models
+
+
+    class WmsStockOut(models.Model):
+        _inherit = "edi.integration"
+
+        type = fields.Selection(
+            selection_add=[("wms_stock_out", "WMS - Export Stock")],
+            ondelete={"wms_stock_out": "cascade"},
+        )
+
+        # --- Required: serialize records into the API payload ---
+        def _get_content(self, records):
+            if self.type != "wms_stock_out":
+                return super()._get_content(records)
+            return json.dumps([
+                {"sku": p.default_code, "qty": p.qty_available}
+                for p in records
+            ])
+
+        # --- Optional: post-process after successful send ---
+        def _postprocess(self, response, content, records):
+            if self.type != "wms_stock_out":
+                return super()._postprocess(response, content, records)
+            records.write({"wms_last_sync": fields.Datetime.now()})
+
+
+------------------------
+Reference: key overrides
+------------------------
+
+Integration — IN flow
+=====================
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Method
+     - When to override
+   * - ``_process_content(data)``
+     - **Required.** Process the received data. ``data`` is a list of ``{filename, content}`` dicts.
+       Return ``"done"``.
+   * - ``_build_in_payload()``
+     - Return a dict of query parameters to pass to the API (e.g. pagination, date filter).
+       Default: no parameters.
+   * - ``_api_wrap_response(raw_text)``
+     - Split a multi-item API response into individual items (one dict per entity).
+       The framework then batches those items into synchronizations based on ``synchronization_creation``.
+       Default: the whole response as a single item.
+   * - ``_get_synchronization_name_in(data)``
+     - Override to customize the synchronization record name. Default: integration name + date + filenames.
+   * - ``_clean(data, status)``
+     - Called after each synchronization. Override for post-IN cleanup.
+
+Integration — OUT flow
+======================
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Method
+     - When to override
+   * - ``_get_content(records)``
+     - **Required.** Serialize the recordset into the payload (string or dict).
+       This is the only override needed in the vast majority of cases.
+   * - ``_build_out_payload(content)``
+     - Advanced hook, rarely needed. Override only if the integration must support
+       both API and FTP/SFTP and the API requires a different envelope than the raw
+       ``_get_content`` output. Default: pass content as-is.
+   * - ``_postprocess(response, content, records)``
+     - Called after each successful send. Use to update record status, write sync dates, etc.
+   * - ``_get_record_to_send()``
+     - Override if the default filter-based record selection does not fit.
+   * - ``_get_synchronization_name_out(records)``
+     - Override to customize the synchronization record name. Default: integration name + date + record IDs.
+   * - ``_handle_error(data, exc)``
+     - Called when a synchronization fails. Default: clean up and report.
+
+Connection — custom type (legacy / FTP)
+========================================
+
+Only needed when **not** using the built-in ``type="api"`` connection:
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Method
+     - Purpose
+   * - ``_fetch_synchronizations()``
+     - Return ``[{"filename": …, "content": …}, …]`` — used by IN flows without an endpoint.
+   * - ``_send_synchronization(filename, content)``
+     - Send content to the remote system — used by OUT flows without an endpoint.
+   * - ``_clean_synchronization_in(data, status)``
+     - Called after each IN sync (e.g. move processed file to an archive folder).
+   * - ``_clean_synchronization_out(filename, status)``
+     - Called after each OUT sync (e.g. delete a sent file on error).
+   * - ``_get_default_configuration()``
+     - Return the JSON template shown in the UI when the connection type is selected.
+   * - ``test()``
+     - Implement the "Test Connection" button behavior.
 
 Other useful options
---------------------
+====================
 
--   **type of an integration :**
+-   **``synchronization_creation``**: controls batching.
+    ``1`` = one record/file per sync, ``0`` = all in one sync, ``n`` = batches of n.
 
-    The type field is required, and corresponds to a unique name for an integration. As many integrations can define or
-    redefine methods with a same name, it allows to be sure that you execute a method only for a specific type.
-    So a check on the type is a required security when you define a method on an integration. For example :
+-   **``store_received_content`` / ``store_sent_content``**: toggle whether content is
+    persisted on the synchronization record (default: both True).
 
-    .. code-block:: python
+-   **``_process_realtime(data)``**: call this instead of ``process_integration()`` when
+    triggering from a button or automation rule. It flushes the current cursor first and
+    can accept an explicit recordset (OUT) or data list (IN).
 
-        def _process_content(self, data):
-              if self.type != 'get_products_from_xx_software':
-                  return super()._process_content(data)
-              # then I can write my code
-
-
--   **synchronization_creation field :**
-
-    Since version 2.0, this field is now used for "in/out" flows (not only "out" flows).
-
-    It allows to specify how many "data" you want to process by synchronization.
-
-    Field values:
-
-    -   1: one piece of data by synchronization (default value)
-    -   0: all data into one synchronization
-    -   n: n piece of data by synchronization
-
-    Data type:
-
-    -   For "in" flow:
-
-        "data" is a list of dictionary.
-
-        The field synchronization_creation commands the number of dictionary in the list.
-
-        In case of ftp connection, it allows to process multiple files per synchronization, or one file per
-        synchronization,...
-
-        For example if you have 20 files to process via FTP:
-
-        -   1: will process one file per synchronization and thus it will generate 20 synchronizations
-        -   0: will process all files into one synchronization and thus it will generate 1 synchronization
-        -   8: will process at most 8 files per synchronization. it will generate 3 synchronizations - first
-            synchronization: 8 files - second synchronization: 8 files - third synchronization: 4 files
-
-    -   For "out" flow:
-
-        "data" is a recordset.
-
-        The field synchronization_creation commands the number of records in the recordset.
-
-        In case of ftp connection, it allows to create one file per record, one file with all records,...
-
-        For example if you have 20 products to send via FTP :
-
-        -   1: will process one product per synchronization and thus generate 20 synchronizations and 20 files
-        -   0: will process all products into one synchronization and thus generate 1 synchronization and 1 file
-        -   8: will process at most 8 products per synchronization. it will generate 3 synchronizations and 3 files -
-            first synchronization: 8 products - second synchronization: 8 products - third synchronization: 4 products
-
--   **method ``_process_realtime()`` :**
-
-    Since version 2.0, this method is now used for "in/out" flows (not only "out" flows).
-
-    By default, the process is started by a cron task. But sometimes you want to deliver something immediately
-    (through an action called from a button for ex.).
-
-    In this case my action can call the method ``_process_realtime()``, which will also call the same edi methods.
-
-    If no data is provided, the integration will automatically fetch the data to synchronize by itself.
-
-    If data are provided, the integration will only process the given data.
-
-    The data you have to provide depends on the integration flow type:
-
-    -   "in" flow: list of dict
-    -   "out" flow: recordset
-
-Want to go deeper ?
--------------------
-
-Then have a look at the code, it's quite well documented.
+-   **``_on_synchronizations_done(exceptions)``**: hook called once after all
+    synchronizations have completed. Use for pagination state, global counters, etc.
