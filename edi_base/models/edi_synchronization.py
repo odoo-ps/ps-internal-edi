@@ -1,4 +1,5 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+import json
 import traceback
 
 from odoo import api, fields, models
@@ -64,7 +65,8 @@ class Synchronization(models.Model):
         help="Moment when the integration execution started, "
         "so all synchronizations related to a same execution will have the same value",
     )
-    content = fields.Text(readonly=True)
+    received_content = fields.Text(readonly=True)
+    sent_content = fields.Text(readonly=True)
     error_ids = fields.One2many("edi.synchronization.error", "synchronization_id", string="synchronization_id")
     user_id = fields.Many2one(
         "res.users", string="Trigger User", help="User that trigger the synchronization or call the API"
@@ -130,12 +132,35 @@ class Synchronization(models.Model):
         self.write({"state": "fail", "error_ids": [(0, 0, {"activity": activity, "description": description})]})
         self.flush_recordset(fnames=["state", "error_ids", "content_type"])
 
-    def _write_content(self, content):
+    @staticmethod
+    def _serialize_content(value):
+        """Serialize a value for storage in a Text field.
+
+        - dict/list: serialized to indented JSON (readable in UI)
+        - str/None: stored as-is (CSV, XML, plain text must not be transformed)
+
+        :param value: dict | list | str | None
+        :return: str
         """
-        :param content: str
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, default=str, indent=2)
+        return str(value or "")
+
+    def _write_sent(self, content):
+        """Store what was sent to the external system (OUT: payload, FTP OUT: file content).
+
+        :param content: dict | list | str | None
         """
-        self.write({"content": content})
-        self.flush_recordset(fnames=["content"])
+        self.write({"sent_content": self._serialize_content(content)})
+        self.flush_recordset(fnames=["sent_content"])
+
+    def _write_received(self, content):
+        """Store what was received from the external system (OUT: API response, FTP IN: file content).
+
+        :param content: dict | list | str | None
+        """
+        self.write({"received_content": self._serialize_content(content)})
+        self.flush_recordset(fnames=["received_content"])
 
     def _done(self):
         self.write({"state": "done"})

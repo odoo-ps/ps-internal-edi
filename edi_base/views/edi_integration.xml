@@ -98,7 +98,8 @@
                             <group>
                                 <group>
                                     <field name="synchronization_content_type"/>
-                                    <field name="write_content_on_sync"/>
+                                    <field name="store_received_content"/>
+                                    <field name="store_sent_content"/>
                                     <field name="connection_id"/>
                                     <field name="record_filter_id" invisible="integration_flow == 'in'"/>
                                 </group>
@@ -144,7 +145,8 @@
                 />
                 <field name="synchronization_creation" optional="hide"/>
                 <field name="synchronization_content_type" optional="hide"/>
-                <field name="write_content_on_sync" optional="hide"/>
+                <field name="store_received_content" optional="hide"/>
+                <field name="store_sent_content" optional="hide"/>
                 <field name="last_state" optional="show"/>
                 <field name="last_execution_date" optional="hide"/>
             </list>

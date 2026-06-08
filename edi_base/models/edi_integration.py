@@ -89,10 +89,18 @@ class Integration(models.Model):
         string="Content Type",
         tracking=True,
     )
-    write_content_on_sync = fields.Boolean(
-        string="Write Content On Synchronizations",
+    store_received_content = fields.Boolean(
+        string="Store Received Content",
         default=True,
-        help="Allows you to decide if the content should be written on the synchronizations.",
+        help="Store what was received from the external system on each synchronization record "
+        "(IN: data received, OUT: API response).",
+        tracking=True,
+    )
+    store_sent_content = fields.Boolean(
+        string="Store Sent Content",
+        default=True,
+        help="Store what was sent to the external system on each synchronization record "
+        "(OUT: payload sent, IN: query payload).",
         tracking=True,
     )
 
