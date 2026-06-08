@@ -1,5 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+import json
 import logging
+import xml.dom.minidom
 
 from odoo import fields, models
 
@@ -10,16 +12,18 @@ _logger = logging.getLogger(__name__)
 class IntegrationIn(models.Model):
     """Implementation of process in
 
-    _get_in_content  #DEFAULT
-    _prepare_data_for_sync (divide list of data into smaller list of data based on synchronization_creation field)
+    _get_in_content             #DEFAULT — do not override
+      └── _build_in_payload     #OPTIONAL — query params sent to the API
+      └── _api_wrap_response    #OPTIONAL — splits raw response into [{filename, content}, ...]
+    _prepare_data_for_sync      batches items into synchronization groups (driven by synchronization_creation)
 
-    for each list of data (sync)
+    for each group (sync):
         try:
-            _get_synchronization_name_in: #DEFAULT
-            _process_content  #TO IMPLEMENT
-            _clean   #DEFAULT
+            _get_synchronization_name_in  #DEFAULT
+            _process_content              #TO IMPLEMENT
+            _clean                        #DEFAULT
         except:
-            _handle_error  #DEFAULT
+            _handle_error                 #DEFAULT
     """
 
     _inherit = "edi.integration"
@@ -133,7 +137,52 @@ class IntegrationIn(models.Model):
             }
         """
         self.ensure_one()
+        if self.api_endpoint_id:
+            payload = self._build_in_payload()
+            raw_text = self._api_call(payload)
+            items = self._api_wrap_response(raw_text)
+            if payload:
+                payload_str = json.dumps(payload, default=str, indent=2)
+                for item in items:
+                    item.setdefault("sent_content", payload_str)
+            return items
         return self.connection_id._fetch_synchronizations()
+
+    def _build_in_payload(self):
+        """Return the query payload to pass to the API call (IN flow).
+
+        Override to add query parameters, filters, pagination, etc.
+
+        :return: dict | str | False
+        """
+        self.ensure_one()
+        return False
+
+    def _api_wrap_response(self, raw_text):
+        """Convert raw API response text into the standard IN data format.
+
+        Override to split a single response into multiple items (one per synchronization)
+        or to customize filename extraction.
+
+        Default: wraps the entire response as a single item, using the endpoint name
+        as the filename. JSON responses are pretty-printed when response_content_type='json'.
+
+        :param raw_text: str — raw response text returned by _api_call
+        :return: list of dict with 'filename' and 'content' keys
+        """
+        self.ensure_one()
+        content = raw_text or ""
+        if self.response_content_type == "json":
+            try:
+                content = json.dumps(json.loads(raw_text), indent=2)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        elif self.response_content_type == "xml":
+            try:
+                content = xml.dom.minidom.parseString(raw_text).toprettyxml(indent="  ")
+            except Exception:
+                pass
+        return [{"filename": self.api_endpoint_id.name, "content": content}]
 
     def _clean(self, data, status):
         """Called after the processing of each synchronization

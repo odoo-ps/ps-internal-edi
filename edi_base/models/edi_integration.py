@@ -13,6 +13,13 @@ from ..tools.util import _chunks
 
 _logger = logging.getLogger(__name__)
 
+_CONTENT_TYPE_MAP = {
+    "json": "application/json",
+    "xml": "application/xml",
+    "csv": "text/csv",
+    "text": "text/plain",
+}
+
 
 class ProcessIntegrationException(Exception):
     def __init__(self, name, value=None):
@@ -74,10 +81,20 @@ class Integration(models.Model):
         tracking=True,
     )
     connection_id = fields.Many2one("edi.connection", required=True, string="Connection", tracking=True)
+    api_auth_type = fields.Selection(related="connection_id.api_auth_type")
+    connection_type = fields.Selection(related="connection_id.type")
+    api_endpoint_id = fields.Many2one(
+        "edi.endpoint",
+        ondelete="restrict",
+        domain="[('connection_id', '=', connection_id), ('role', '=', 'resource')]",
+        help="Optional resource endpoint for this integration. Must belong to the selected connection.",
+        tracking=True,
+    )
     type = fields.Selection(
+        # TODO probably add unicity constraint ?
         selection=[("multi", "Call Sub Integration"), ("api", "RPC Api")],
         required=True,
-        string="EDI Type",
+        string="Unique Type",
         tracking=True,
     )  # Add selection for your integration
     parameter = fields.Text(string="Parameter", tracking=True)
@@ -86,7 +103,7 @@ class Integration(models.Model):
         selection=[("text", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON"), ("pdf", "PDF")],
         default="text",
         required=True,
-        string="Content Type",
+        string="Data Format",
         tracking=True,
     )
     store_received_content = fields.Boolean(
@@ -102,6 +119,13 @@ class Integration(models.Model):
         help="Store what was sent to the external system on each synchronization record "
         "(OUT: payload sent, IN: query payload).",
         tracking=True,
+    )
+    response_content_type = fields.Selection(
+        selection=[("text", "Text"), ("csv", "CSV"), ("xml", "XML"), ("json", "JSON")],
+        string="Response Content Type",
+        tracking=True,
+        help="Format of the API response (IN: data received, OUT: acknowledgement). "
+        "Used for pretty-printing in synchronization records.",
     )
 
     # Cron inheritance
@@ -198,6 +222,20 @@ class Integration(models.Model):
             for integration_id, count in self.env.cr.fetchall():
                 self.browse(integration_id).execution_count = count
 
+    def _api_call(self, payload=None):
+        headers = {}
+        # Set Content-Type for OUT flows sending raw string content (JSON/dict payloads
+        # already get Content-Type: application/json automatically from requests).
+        if self.integration_flow_type == "out" and isinstance(payload, str):
+            ct = _CONTENT_TYPE_MAP.get(self.synchronization_content_type)
+            if ct:
+                headers["Content-Type"] = ct
+        return self.connection_id._api_call(
+            endpoint=self.api_endpoint_id,
+            payload=payload,
+            headers=headers or None,
+        )
+
     def _exec_method_based_on_flow(self, in_method, out_method, *args, **kwargs):
         """
         Execute the method based on the flow type
@@ -217,6 +255,23 @@ class Integration(models.Model):
                 self.integration_flow,
             )
         )
+
+    @api.constrains("api_endpoint_id", "connection_id")
+    def _check_endpoint_connection(self):
+        for rec in self:
+            if rec.api_endpoint_id and rec.api_endpoint_id.connection_id != rec.connection_id:
+                raise ValidationError(
+                    rec.env._(
+                        "Endpoint '%s' does not belong to connection '%s'.",
+                        rec.api_endpoint_id.name,
+                        rec.connection_id.name,
+                    )
+                )
+
+    @api.onchange("connection_id")
+    def _onchange_connection_id_endpoint(self):
+        if self.api_endpoint_id and self.api_endpoint_id.connection_id != self.connection_id:
+            self.api_endpoint_id = False
 
     @api.model
     def _get_in_flow_type(self):
@@ -554,7 +609,24 @@ class Integration(models.Model):
         data = self._get_data(data=data)
 
         # process all the data to synchronize
-        return self._process_synchronizations(data=data, raise_error=raise_error)
+        exceptions = self._process_synchronizations(data=data, raise_error=raise_error)
+        self._on_synchronizations_done(exceptions)
+        return exceptions
+
+    def _on_synchronizations_done(self, exceptions):
+        """Hook called after all synchronizations have been processed.
+
+        Override to persist pagination cursors, update state fields, etc.
+        The exceptions list contains any errors raised during processing.
+
+        To implement in each integration:
+        if self.type != 'my_type':
+            return super()._on_synchronizations_done(exceptions)
+        ...
+
+        :param exceptions: list of exceptions raised during synchronization processing
+        """
+        self.ensure_one()
 
     def _get_data(self, data=None):
         """Get the data to synchronize
