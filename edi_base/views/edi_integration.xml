@@ -98,9 +98,15 @@
                             <group>
                                 <group>
                                     <field name="synchronization_content_type"/>
+                                    <field
+                                        name="response_content_type"
+                                        string="API Response Format"
+                                        invisible="integration_flow != 'in' or connection_type != 'api'"
+                                    />
                                     <field name="store_received_content"/>
                                     <field name="store_sent_content"/>
                                     <field name="connection_id"/>
+                                    <field name="api_endpoint_id" invisible="not api_auth_type"/>
                                     <field name="record_filter_id" invisible="integration_flow == 'in'"/>
                                 </group>
                             </group>

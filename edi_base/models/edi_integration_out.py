@@ -11,17 +11,18 @@ _logger = logging.getLogger(__name__)
 
 class IntegrationOut(models.Model):
     """Implementation of process out
-    _get_record to send #DEFAULT
-    _prepare_data_for_sync (divide recorset into smaller recordset based on synchronization_creation field)
 
-    for each recordset (sync)
+    _get_record_to_send         #DEFAULT
+    _prepare_data_for_sync      (divide recordset into smaller recordsets based on synchronization_creation)
+
+    for each recordset (sync):
         try:
-            _get_synchronization_name_out: #DEFAULT
-            _get_content  #TO IMPLEMENT
-            _send_content  #DEFAULT
-            _postprocess #DEFAULT
+            _get_synchronization_name_out  #DEFAULT
+            _get_content                   #TO IMPLEMENT
+            _send_content                  #DEFAULT — dispatches to API or FTP, do not override
+            _postprocess                   #DEFAULT
         except:
-            _handle_error  #DEFAULT
+            _handle_error                  #DEFAULT
     """
 
     _inherit = "edi.integration"
@@ -162,11 +163,16 @@ class IntegrationOut(models.Model):
 
         :param content: str
         :param records: recordset
-        :return: any (return of self.connection_id._send_synchronization)
+        :return: any (return of self.connection_id._send_synchronization or _call)
         """
         self.ensure_one()
 
-        res = self.connection_id._send_synchronization(self.env.cr.sync.filename, content)
+        if self.api_endpoint_id:
+            res = self._api_call(self._build_out_payload(content))
+            if self.store_received_content:
+                self.env.cr.sync._write_received(res)
+        else:
+            res = self.connection_id._send_synchronization(self.env.cr.sync.filename, content)
         self._clean_synchronization(records, "done")
         return res
 
@@ -195,6 +201,23 @@ class IntegrationOut(models.Model):
         """
         self.ensure_one()
         return
+
+    def _build_out_payload(self, content):
+        """Transform content before sending to the API (OUT flow).
+
+        Override to wrap the content in a JSON envelope or apply any
+        pre-send transformation.
+
+        To implement in each integration
+        if not self.type == 'My type':
+            return super()._build_out_payload(content)
+        ....
+
+        :param content: str — content produced by _get_content
+        :return: str | dict | list — payload passed to _api_call
+        """
+        self.ensure_one()
+        return content
 
     ################################
     # To implement for process out #
