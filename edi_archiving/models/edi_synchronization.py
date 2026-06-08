@@ -77,10 +77,10 @@ class Synchronization(models.Model):
             self.env.ref("base.autovacuum_job")._trigger(at=fields.Datetime.now() + timedelta(minutes=1))
 
     def action_archive(self):
-        """Free some space if the content sent or received was stored"""
+        """Free some space by clearing stored content when archiving"""
         if not self:
             return
-        self.content = False
+        self.write({"received_content": False, "sent_content": False})
         return super().action_archive()
 
 
