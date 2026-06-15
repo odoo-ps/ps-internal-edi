@@ -342,7 +342,6 @@ class TestEdiEndpointCases(TestEDICommonBase):
                 "connection_id": self.mock_connection.id,
                 "api_endpoint_id": self.endpoint.id,
                 "record_filter_id": filter_.id,
-                "parameter": json.dumps({"fields": ["id", "name"]}),
                 "active": False,
             }
         )
@@ -355,7 +354,9 @@ class TestEdiEndpointCases(TestEDICommonBase):
         self.new_env.cr.commit()
 
         mock_resp = self._mock_http_response(json_data={"status": "ok"})
-        with patch("requests.Session.request", return_value=mock_resp):
+        with patch.object(type(edi), "_get_content", return_value="id,name\n1,Test\n"), patch(
+            "requests.Session.request", return_value=mock_resp
+        ):
             edi.process_integration()
 
         with self.registry.cursor() as new_cr:
