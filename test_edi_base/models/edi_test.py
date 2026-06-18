@@ -37,14 +37,6 @@ class TestIntegration(models.Model):
     _inherit = "edi.integration"
 
     @IntegrationCheck(["api"])
-    def _get_record_to_send(self):
-        conf = self._read_parameter()
-        if "filter" not in conf:
-            return super()._get_record_to_send()
-        domain = conf["filter"]
-        return self.env["res.partner"].search(domain)
-
-    @IntegrationCheck(["api"])
     def _get_content(self, records):
         if len(records) == 1 and "error" in records.name:
             self._report_error("Export Partner", message="Cannot export the partner")
