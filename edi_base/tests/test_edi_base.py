@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from odoo import Command, api, fields
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import ValidationError
 from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 
@@ -51,7 +51,7 @@ class TestEdiEndpoint(TestEDICommonBase):
             {
                 "name": "Test Endpoint",
                 "connection_id": self.mock_connection.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/endpoints/endpoint",
             }
         )
@@ -74,7 +74,7 @@ class TestEdiEndpoint(TestEDICommonBase):
             {
                 "name": "Endpoint on other connection",
                 "connection_id": other_connection.id,
-                "method": "GET",
+                "method": "get",
                 "url": "https://fake.url/endpoints/endpoint",
             }
         )
@@ -95,7 +95,7 @@ class TestEdiEndpoint(TestEDICommonBase):
             {
                 "name": "Valid Endpoint",
                 "connection_id": self.mock_connection.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/endpoints/endpoint",
             }
         )
@@ -188,7 +188,7 @@ class TestEdiAuth(TestEDICommonBase):
             {
                 "name": "Token EP",
                 "connection_id": other_conn.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/endpoints/token",
             }
         )
@@ -229,7 +229,7 @@ class TestEdiApiCallBehavior(TestEDICommonBase):
             {
                 "name": "Test Endpoint",
                 "connection_id": cls.mock_connection.id,
-                "method": "GET",
+                "method": "get",
                 "url": "https://fake.url/api",
             }
         )
@@ -242,7 +242,7 @@ class TestEdiApiCallBehavior(TestEDICommonBase):
             {
                 "name": "Public EP",
                 "connection_id": cls.public_conn.id,
-                "method": "GET",
+                "method": "get",
                 "url": "https://fake.url/public",
             }
         )
@@ -306,7 +306,7 @@ class TestEdiEndpointCases(TestEDICommonBase):
             {
                 "name": "Test API Endpoint",
                 "connection_id": cls.mock_connection.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/endpoints/endpoint",
             }
         )
@@ -378,7 +378,7 @@ class TestEdiEndpointCases(TestEDICommonBase):
             {
                 "name": "Test GET Endpoint",
                 "connection_id": self.mock_connection.id,
-                "method": "GET",
+                "method": "get",
                 "url": "https://fake.url/api/v1/data",
             }
         )
@@ -465,7 +465,7 @@ class TestEdiEndpointCases(TestEDICommonBase):
             {
                 "name": "ApiKey Endpoint",
                 "connection_id": conn.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/apikey",
                 "api_key": "secret123",
             }
@@ -519,7 +519,7 @@ class TestEdiEndpointCases(TestEDICommonBase):
             {
                 "name": "Basic Endpoint",
                 "connection_id": conn.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/basic",
                 "username": "testuser",
                 "password": "testpass",
@@ -586,7 +586,7 @@ class TestEdiEndpointCases(TestEDICommonBase):
             {
                 "name": "OAuth2 Resource Endpoint",
                 "connection_id": conn.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/resource",
             }
         )
@@ -634,7 +634,7 @@ class TestEdiEndpointCases(TestEDICommonBase):
             {
                 "name": "Query Payload Endpoint",
                 "connection_id": self.mock_connection.id,
-                "method": "POST",
+                "method": "post",
                 "url": "https://fake.url/api/query",
             }
         )
@@ -687,7 +687,7 @@ class TestEdiEndpointCases(TestEDICommonBase):
             {
                 "name": "Split Endpoint",
                 "connection_id": self.mock_connection.id,
-                "method": "GET",
+                "method": "get",
                 "url": "https://fake.url/api/items",
             }
         )
@@ -765,6 +765,10 @@ class TestEdiOAuth2(TestEDICommonBase):
         self.assertEqual(token, "FAKE_TOKEN_123")
         self.assertEqual(conn.api_token, "FAKE_TOKEN_123")
 
-        with self.assertRaises(UserError) as cm:
+        with patch.object(type(conn.env["bus.bus"]), "_sendone") as mock_sendone:
             conn.test()
-        self.assertIn("Authentication succeeded", str(cm.exception))
+        mock_sendone.assert_called_once()
+        _, notif_type, payload = mock_sendone.call_args[0]
+        self.assertEqual(notif_type, "simple_notification")
+        self.assertIn("Authentication succeeded", payload["message"])
+        self.assertEqual(payload["type"], "success")

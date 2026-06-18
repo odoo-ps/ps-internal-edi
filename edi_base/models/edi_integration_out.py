@@ -12,17 +12,17 @@ _logger = logging.getLogger(__name__)
 class IntegrationOut(models.Model):
     """Implementation of process out
 
-    _get_record_to_send         #DEFAULT
+    _get_record_to_send         #GENERIC
     _prepare_data_for_sync      (divide recordset into smaller recordsets based on synchronization_creation)
 
     for each recordset (sync):
         try:
-            _get_synchronization_name_out  #DEFAULT
+            _get_synchronization_name_out  #GENERIC
             _get_content                   #TO IMPLEMENT
-            _send_content                  #DEFAULT — dispatches to API or FTP, do not override
-            _postprocess                   #DEFAULT
+            _send_content                  #GENERIC — dispatches to API or FTP, do not override
+            _postprocess                   #GENERIC
         except:
-            _handle_error                  #DEFAULT
+            _handle_error                  #GENERIC
     """
 
     _inherit = "edi.integration"
@@ -163,7 +163,7 @@ class IntegrationOut(models.Model):
 
         :param content: str
         :param records: recordset
-        :return: any (return of self.connection_id._send_synchronization or _call)
+        :return: any (return of self.connection_id._send_synchronization or _api_call)
         """
         self.ensure_one()
 

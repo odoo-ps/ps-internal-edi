@@ -12,18 +12,18 @@ _logger = logging.getLogger(__name__)
 class IntegrationIn(models.Model):
     """Implementation of process in
 
-    _get_in_content             #DEFAULT — do not override
+    _get_in_content             #GENERIC — do not override
       └── _build_in_payload     #OPTIONAL — query params sent to the API
       └── _api_wrap_response    #OPTIONAL — splits raw response into [{filename, content}, ...]
     _prepare_data_for_sync      batches items into synchronization groups (driven by synchronization_creation)
 
     for each group (sync):
         try:
-            _get_synchronization_name_in  #DEFAULT
+            _get_synchronization_name_in  #GENERIC
             _process_content              #TO IMPLEMENT
-            _clean                        #DEFAULT
+            _clean                        #GENERIC
         except:
-            _handle_error                 #DEFAULT
+            _handle_error                 #GENERIC
     """
 
     _inherit = "edi.integration"
@@ -45,7 +45,7 @@ class IntegrationIn(models.Model):
         if self.store_received_content:
             vals["received_content"] = "\n\n".join([d.get("content") or "" for d in data])
 
-        sent_parts = [d.get("sent_content") for d in data if d.get("sent_content")]
+        sent_parts = [d["sent_content"] for d in data if d.get("sent_content")]
         if sent_parts and self.store_sent_content:
             vals["sent_content"] = sent_parts[0]
 

@@ -45,8 +45,8 @@ class Endpoint(models.Model):
     scope = fields.Char()
 
     method = fields.Selection(
-        [("GET", "GET"), ("POST", "POST"), ("PUT", "PUT"), ("PATCH", "PATCH"), ("DELETE", "DELETE")],
-        default="POST",
+        [("get", "GET"), ("post", "POST"), ("put", "PUT"), ("patch", "PATCH"), ("delete", "DELETE")],
+        default="post",
         required=True,
         string="HTTP Method",
         tracking=True,

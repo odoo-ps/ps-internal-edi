@@ -164,7 +164,7 @@ class ConnectionApi(models.Model):
     _inherit = "edi.connection"
     _description = "EDI Connection"
 
-    type = fields.Selection(selection_add=[("api", "API REST")], ondelete={"api": "cascade"})
+    type = fields.Selection(selection_add=[("api", "HTTP API")], ondelete={"api": "cascade"})
     api_endpoint_ids = fields.One2many("edi.endpoint", "connection_id", string="Endpoints")
     api_auth_type = fields.Selection(
         [
@@ -213,15 +213,20 @@ class ConnectionApi(models.Model):
         """Default HTTP implementation for API connections.
 
         Uses _api_get_session(endpoint) for authentication (dispatches on api_auth_type).
-        GET  → payload sent as query params
-        POST/PUT/PATCH → payload sent as JSON body (or raw if str)
+        GET
+            → payload sent as query params
+        POST/PUT/PATCH
+            → dict/list sent as JSON body
+            → str sent as raw body
+              for XML/CSV/pre-serialized JSON — caller sets Content-Type via `headers=` when needed
+            → None → no body
 
         Always returns response.text (raw string). Callers are responsible for
         parsing the content based on the expected format.
         """
         self.ensure_one()
 
-        if endpoint.method == "GET":
+        if endpoint.method in ("get", "delete"):
             req_kwargs = {"params": payload}
         elif isinstance(payload, (dict, list)):
             req_kwargs = {"json": payload}
@@ -232,7 +237,7 @@ class ConnectionApi(models.Model):
             req_kwargs["headers"] = headers
 
         with self._api_get_session(endpoint) as session:
-            fn = getattr(session, endpoint.method.lower())
+            fn = getattr(session, endpoint.method)
             try:
                 response = fn(endpoint.url, timeout=API_DEFAULT_TIMEOUT, **req_kwargs)
                 response.raise_for_status()
@@ -337,6 +342,14 @@ class ConnectionApi(models.Model):
         if self.api_auth_type == "oauth2":
             self.api_reset_token()
             self._api_get_token()
-            raise UserError(self.env._("Authentication succeeded — token obtained."))
+            # raise UserError(self.env._("Authentication succeeded — token obtained."))
+            return self.env["bus.bus"]._sendone(
+                self.env.user.partner_id,
+                "simple_notification",
+                {
+                    "type": "success",
+                    "message": self.env._("Authentication succeeded — token obtained."),
+                },
+            )
 
         raise UserError(_("Not applicable for this type of connection"))
