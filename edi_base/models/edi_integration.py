@@ -418,7 +418,7 @@ class Integration(models.Model):
         :return: dict
         """
         self.ensure_one()
-        return json.loads(self.parameter)
+        return json.loads(self.parameter) if self.parameter else {}
 
     def test_connection(self):
         """Should raise a UserError with status 'Success' or 'Fail'"""
