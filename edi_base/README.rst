@@ -3,40 +3,65 @@ Framework edi_base
 ==================
 
 --------------
-The 4 concepts
+The 3 concepts
 --------------
 
 This module provides a framework for data exchange between Odoo and external systems.
-Four objects answer four questions:
+Three objects answer three questions:
 
 -   **What** data to exchange → ``edi.integration``
 -   **How** to exchange it → ``edi.connection``
--   **Where** exactly (which route) → ``edi.endpoint`` *(optional, API only)*
 -   **What happened** → ``edi.synchronization``
 
 Connection
 ==========
 
 Holds credentials and communication logic for a third-party system. The built-in ``type="api"``
-connection covers most REST APIs without writing any connection code: configure ``api_auth_type``
-and the framework handles authentication automatically.
+connection covers most REST APIs without writing any connection code:
+
+-   ``url``: base URL shared by all integrations, e.g. ``https://api.example.com``
+-   ``api_auth_type``: authentication strategy — Public, API Key, Basic Auth, or OAuth2
+
+Auth credentials live directly on the connection:
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - Auth type
+     - Fields used
+   * - ``api_key``
+     - ``key``
+   * - ``basic``
+     - ``username``, ``password``
+   * - ``oauth2``
+     - ``username``, ``password``, ``grant_type``, ``client_id``, ``client_secret``, ``scope``,
+       ``token_path`` (relative path)
+
+The framework handles authentication automatically; ``api_token`` and ``api_token_expires``
+cache the obtained OAuth2 token.
 
 For FTP/SFTP, dedicated modules (``edi_ftp_connection``, ``edi_sftp_connection``) are available.
 
-Endpoint
-========
+Integration
+===========
 
-An endpoint is one specific route on a connection (e.g. ``POST /api/v1/orders``).
-A single connection can have multiple endpoints.
+Orchestrates the flow. Inherits ``ir.cron`` (scheduling is built-in).
+The ``type`` field is a required discriminator — always guard your method overrides with it.
 
-When an integration has ``api_endpoint_id`` set:
+For API connections, two fields configure the resource endpoint:
 
-- **IN flow**: the framework calls the endpoint automatically and passes the response to
-  ``_process_content``.
+-   ``path``: relative URL path for this integration's endpoint, e.g. ``/v1/orders``
+-   ``method``: HTTP method (GET, POST, …)
+
+When ``connection_type == 'api'`` and ``path`` is set:
+
+- **IN flow**: the framework calls ``connection.url + path`` automatically and passes the
+  response to ``_process_content``.
 - **OUT flow**: the framework calls the endpoint with the content returned by ``_get_content``.
   The API response is stored in ``received_content`` for traceability.
 
-Without ``api_endpoint_id``, the legacy ``_fetch_synchronizations`` / ``_send_synchronization``
+Without ``path``, the fallback ``_fetch_synchronizations`` / ``_send_synchronization``
 path is used (FTP/SFTP, custom connectors). Both paths coexist — no breaking change.
 
 Synchronization
@@ -49,12 +74,6 @@ A log record created for each execution. Key fields:
 -   ``state``: ``done`` / ``fail``
 -   ``error_ids``: detailed error messages
 
-Integration
-===========
-
-Orchestrates the flow. Inherits ``ir.cron`` (scheduling is built-in).
-The ``type`` field is a required discriminator — always guard your method overrides with it.
-
 ------------
 How to start
 ------------
@@ -63,8 +82,9 @@ Decide your setup by answering those questions:
 
 1. **REST API?**
 
-   use built-in ``type="api"`` connection, configure an endpoint,
-   implement business logic on the integration :
+   use built-in ``type="api"`` connection, configure ``url`` and auth fields,
+   set ``path`` + ``method`` on each integration,
+   implement business logic on the integration:
 
    - IN :
       - Build request : ``_build_in_payload``
@@ -99,23 +119,16 @@ The API returns a JSON array; each order is processed as a separate synchronizat
 
 .. code-block:: xml
 
-    <!-- Connection: built-in type="api", no Python needed -->
+    <!-- Connection: built-in type="api". API key lives on the connection. -->
     <record id="acme_connection" model="edi.connection">
         <field name="name">ACME API</field>
         <field name="type">api</field>
+        <field name="url">https://api.acme.com</field>
         <field name="api_auth_type">api_key</field>
+        <field name="key">MY_SECRET_KEY</field>
     </record>
 
-    <!-- Endpoint: the actual route. The API key lives here. -->
-    <record id="acme_orders_endpoint" model="edi.endpoint">
-        <field name="name">ACME Orders</field>
-        <field name="connection_id" ref="acme_connection"/>
-        <field name="method">GET</field>
-        <field name="url">https://api.acme.com/v1/orders</field>
-        <field name="api_key">MY_SECRET_KEY</field>
-    </record>
-
-    <!-- Integration: link to connection + endpoint -->
+    <!-- Integration: path + method define the resource endpoint -->
     <record id="acme_orders_in" model="edi.integration">
         <field name="name">Import ACME Orders</field>
         <field name="type">acme_orders_in</field>
@@ -124,7 +137,8 @@ The API returns a JSON array; each order is processed as a separate synchronizat
         <field name="response_content_type">json</field>  <!-- enables JSON pretty-print in UI -->
         <field name="synchronization_creation">1</field>
         <field name="connection_id" ref="acme_connection"/>
-        <field name="api_endpoint_id" ref="acme_orders_endpoint"/>
+        <field name="path">/v1/orders</field>
+        <field name="method">get</field>
         <field name="interval_number">1</field>
         <field name="interval_type">hours</field>
         <field name="active" eval="False"/>
@@ -182,31 +196,16 @@ Scenario: push stock levels to a REST API that requires OAuth2 client credential
 
 .. code-block:: xml
 
-    <!-- Connection: OAuth2 auth type -->
+    <!-- Connection: OAuth2 auth. Token credentials and resource base URL live here. -->
     <record id="wms_connection" model="edi.connection">
         <field name="name">WMS API</field>
         <field name="type">api</field>
+        <field name="url">https://wms.example.com</field>
         <field name="api_auth_type">oauth2</field>
-    </record>
-
-    <!-- Token endpoint: called once to get the Bearer token -->
-    <record id="wms_token_endpoint" model="edi.endpoint">
-        <field name="name">WMS Token</field>
-        <field name="connection_id" ref="wms_connection"/>
-        <field name="role">token</field>
-        <field name="method">POST</field>
-        <field name="url">https://wms.example.com/oauth/token</field>
+        <field name="token_path">/oauth/token</field>
         <field name="grant_type">client_credentials</field>
         <field name="client_id">MY_CLIENT_ID</field>
         <field name="client_secret">MY_CLIENT_SECRET</field>
-    </record>
-
-    <!-- Resource endpoint: the business route -->
-    <record id="wms_stock_endpoint" model="edi.endpoint">
-        <field name="name">WMS Stock Update</field>
-        <field name="connection_id" ref="wms_connection"/>
-        <field name="method">POST</field>
-        <field name="url">https://wms.example.com/api/v2/stock</field>
     </record>
 
     <!-- Filter: which products to send -->
@@ -224,7 +223,8 @@ Scenario: push stock levels to a REST API that requires OAuth2 client credential
         <field name="synchronization_content_type">json</field>
         <field name="synchronization_creation">50</field>
         <field name="connection_id" ref="wms_connection"/>
-        <field name="api_endpoint_id" ref="wms_stock_endpoint"/>
+        <field name="path">/api/v2/stock</field>
+        <field name="method">post</field>
         <field name="record_filter_id" ref="wms_stock_filter"/>
         <field name="interval_number">1</field>
         <field name="interval_type">hours</field>
@@ -327,9 +327,9 @@ Only needed when **not** using the built-in ``type="api"`` connection:
    * - Method
      - Purpose
    * - ``_fetch_synchronizations()``
-     - Return ``[{"filename": …, "content": …}, …]`` — used by IN flows without an endpoint.
+     - Return ``[{"filename": …, "content": …}, …]`` — used by IN flows without a path.
    * - ``_send_synchronization(filename, content)``
-     - Send content to the remote system — used by OUT flows without an endpoint.
+     - Send content to the remote system — used by OUT flows without a path.
    * - ``_clean_synchronization_in(data, status)``
      - Called after each IN sync (e.g. move processed file to an archive folder).
    * - ``_clean_synchronization_out(filename, status)``

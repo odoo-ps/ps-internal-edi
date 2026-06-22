@@ -9,6 +9,7 @@ from odoo import _, api, fields, models
 from odoo.addons.edi_base.decorators import IntegrationCheck
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import ormcache
+from odoo.tools.urls import urljoin as url_join
 
 
 _logger = logging.getLogger(__name__)
@@ -157,7 +158,7 @@ class Connection(models.Model):
 
 
 API_DEFAULT_TIMEOUT = 30  # TODO make it configurable ?
-API_TOKEN_EXPIRY_FALLBACK = 3600  # the real value should always come from the endpoint token response
+API_TOKEN_EXPIRY_FALLBACK = 3600  # the real value should always come from the token response
 
 
 class ConnectionApi(models.Model):
@@ -165,7 +166,11 @@ class ConnectionApi(models.Model):
     _description = "EDI Connection"
 
     type = fields.Selection(selection_add=[("api", "HTTP API")], ondelete={"api": "cascade"})
-    api_endpoint_ids = fields.One2many("edi.endpoint", "connection_id", string="Endpoints")
+
+    # Base URL shared by all integrations on this connection
+    url = fields.Char(string="Base URL", help="e.g. https://api.example.com")
+
+    # Auth type
     api_auth_type = fields.Selection(
         [
             ("public", "Public"),
@@ -178,42 +183,40 @@ class ConnectionApi(models.Model):
         tracking=True,
         help="OAuth2 Auth Type does rely on RFC 6749",
     )
-    api_token_endpoint_id = fields.Many2one(
-        "edi.endpoint",
-        string="Token Endpoint",
-        compute="_compute_api_token_endpoint_id",
-        inverse="_inverse_api_token_endpoint_id",
-        help="Endpoint used to obtain an OAuth2 access token.",
-        store=False,
+
+    # Credentials — used depending on api_auth_type
+    key = fields.Char(string="Key", copy=False)
+    username = fields.Char()
+    password = fields.Char()
+
+    # OAuth2 token endpoint
+    grant_type = fields.Selection(
+        [
+            ("client_credentials", "Client Credentials"),
+            ("password", "Password"),
+        ],
+        string="Grant Type",
+        default="client_credentials",
     )
+    client_id = fields.Char()
+    client_secret = fields.Char()
+    scope = fields.Char()
+    token_path = fields.Char(
+        string="Token Path",
+        help="Relative path of the OAuth2 token endpoint, e.g. /oauth/token",
+    )
+
+    # Cached OAuth2 token
     api_token = fields.Char(readonly=True, copy=False, groups="base.group_system")
     api_token_expires = fields.Datetime(
         string="Token Expires On", readonly=True, copy=False, groups="base.group_system"
     )
 
-    @api.depends("api_endpoint_ids.role")
-    def _compute_api_token_endpoint_id(self):
-        for conn in self:
-            conn.api_token_endpoint_id = conn.api_endpoint_ids.filtered(lambda e: e.role == "token")[:1]
-
-    def _inverse_api_token_endpoint_id(self):
-        for conn in self:
-            if conn.api_token_endpoint_id and conn.api_token_endpoint_id.connection_id != conn:
-                raise ValidationError(
-                    self.env._(
-                        "Token endpoint '%s' does not belong to this connection.",
-                        conn.api_token_endpoint_id.name,
-                    )
-                )
-            conn.api_endpoint_ids.filtered(lambda e: e.role == "token").write({"role": "resource"})
-            if conn.api_token_endpoint_id:
-                conn.api_token_endpoint_id.role = "token"
-
-    def _api_call(self, endpoint, payload=None, headers=None, *args, **kwargs):
+    def _api_call(self, path, method, payload=None, headers=None, *args, **kwargs):
         """Default HTTP implementation for API connections.
 
-        Uses _api_get_session(endpoint) for authentication (dispatches on api_auth_type).
-        GET
+        Uses _api_get_session() for authentication (dispatches on api_auth_type).
+        GET/DELETE
             → payload sent as query params
         POST/PUT/PATCH
             → dict/list sent as JSON body
@@ -223,10 +226,15 @@ class ConnectionApi(models.Model):
 
         Always returns response.text (raw string). Callers are responsible for
         parsing the content based on the expected format.
+
+        :param path: str — relative URL path, joined to self.url
+        :param method: str — HTTP method (get/post/put/patch/delete)
         """
         self.ensure_one()
 
-        if endpoint.method in ("get", "delete"):
+        url = url_join(self.url.strip(), path.strip()) if path else self.url.strip()
+
+        if method in ("get", "delete"):
             req_kwargs = {"params": payload}
         elif isinstance(payload, (dict, list)):
             req_kwargs = {"json": payload}
@@ -236,46 +244,43 @@ class ConnectionApi(models.Model):
         if headers:
             req_kwargs["headers"] = headers
 
-        with self._api_get_session(endpoint) as session:
-            fn = getattr(session, endpoint.method)
+        with self._api_get_session() as session:
+            fn = getattr(session, method)
             try:
-                response = fn(endpoint.url, timeout=API_DEFAULT_TIMEOUT, **req_kwargs)
+                response = fn(url, timeout=API_DEFAULT_TIMEOUT, **req_kwargs)
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:
                 raise ValidationError(self.env._("HTTP call failed: %s", e)) from e
 
         return response.text
 
-    def _api_get_session(self, endpoint=None):
+    def _api_get_session(self):
         """Return an authenticated requests.Session for this connection.
 
-        Usable as a context manager: ``with self._api_get_session(endpoint) as session:``.
+        Usable as a context manager: ``with self._api_get_session() as session:``.
 
         Default behavior dispatches on api_auth_type:
             - public   → plain session
-            - api_key  → Authorization: Bearer <endpoint.api_key>
-            - basic    → HTTPBasicAuth(endpoint.username, endpoint.password) — RFC 7617
+            - api_key  → Authorization: Bearer <self.key>
+            - basic    → HTTPBasicAuth(self.username, self.password) — RFC 7617
             - oauth2   → Authorization: Bearer <token from _api_get_token()>
         """
         self.ensure_one()
         session = requests.Session()
         if self.api_auth_type == "api_key":
-            api_key = endpoint.api_key if endpoint else ""
-            if not api_key:
-                raise ValidationError(self.env._("No API key defined on the endpoint."))
-            session.headers["Authorization"] = "Bearer " + api_key
+            if not self.key:
+                raise ValidationError(self.env._("No API key defined on the connection."))
+            session.headers["Authorization"] = "Bearer " + self.key
         elif self.api_auth_type == "basic":
-            username = endpoint.username if endpoint else ""
-            password = endpoint.password if endpoint else ""
-            if not username:
-                raise ValidationError(self.env._("No username defined on the endpoint."))
-            session.auth = (username, password or "")
+            if not self.username:
+                raise ValidationError(self.env._("No username defined on the connection."))
+            session.auth = (self.username, self.password or "")
         elif self.api_auth_type == "oauth2":
             session.headers["Authorization"] = "Bearer " + self._api_get_token()
         return session
 
     def _api_get_token(self):
-        """Obtain and cache an access token via api_token_endpoint_id.
+        """Obtain and cache an access token via token_path.
 
         Uses the cached token if still valid. Override _api_get_token_payload() to
         customize the request body.
@@ -292,9 +297,10 @@ class ConnectionApi(models.Model):
             _logger.info("Using cached token (expires %s)", sudo_conn.api_token_expires)
             return sudo_conn.api_token
 
-        url = self.api_token_endpoint_id.url
-        if not url:
+        if not self.url or not self.token_path:
             raise ValidationError(self.env._("No token endpoint properly configured on this connection."))
+
+        url = url_join(self.url.strip(), self.token_path.strip())
         _logger.info("Fetching token from %s", url)
 
         payload = self._api_get_token_payload()
@@ -322,9 +328,8 @@ class ConnectionApi(models.Model):
         :return: dict
         """
         self.ensure_one()
-        endpoint = self.api_token_endpoint_id
         token_fields = ["grant_type", "username", "password", "client_id", "client_secret", "scope"]
-        return {f: getattr(endpoint, f) for f in token_fields if getattr(self.api_token_endpoint_id, f)}
+        return {f: getattr(self, f) for f in token_fields if getattr(self, f)}
 
     @api.model
     def _api_parse_token_response(self, response):
@@ -342,7 +347,6 @@ class ConnectionApi(models.Model):
         if self.api_auth_type == "oauth2":
             self.api_reset_token()
             self._api_get_token()
-            # raise UserError(self.env._("Authentication succeeded — token obtained."))
             return self.env["bus.bus"]._sendone(
                 self.env.user.partner_id,
                 "simple_notification",

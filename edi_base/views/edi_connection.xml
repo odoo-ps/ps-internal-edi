@@ -24,28 +24,41 @@
                         </h3>
                     </div>
                     <group name="configuration">
-                        <group>
+                        <group name="basic" string="Basic Information">
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="type"/>
-                            <field name="configuration" groups="base.group_system"/>
-                        </group>
-                        <group name="api">
+                            <field name="configuration" groups="base.group_system" invisible="type == 'api'"/>
+                            <field name="url" invisible="type != 'api'"/>
                             <field name="api_auth_type" invisible="type != 'api'"/>
+                       </group>
+                        <group
+                            name="authentication"
+                            string="Authentication"
+                            invisible="type != 'api' or not api_auth_type or api_auth_type == 'public'"
+                        >
+                            <field name="key" invisible="api_auth_type != 'api_key'"/>
+                            <field name="token_path" invisible="api_auth_type != 'oauth2'"/>
+                            <field name="grant_type" invisible="api_auth_type != 'oauth2'"/>
                             <field
-                                name="api_token_endpoint_id"
-                                domain="[('connection_id', '=', id), ('role', '=', 'token')]"
-                                invisible="not id or api_auth_type != 'oauth2'"
+                                name="username"
+                                invisible="not(api_auth_type == 'basic' or (api_auth_type == 'oauth2' and grant_type == 'password'))"
                             />
+                            <field
+                                name="password"
+                                invisible="not(api_auth_type == 'basic' or (api_auth_type == 'oauth2' and grant_type == 'password'))"
+                                password="True"
+                            />
+                            <field name="client_id" invisible="api_auth_type != 'oauth2'"/>
+                            <field name="client_secret" invisible="api_auth_type != 'oauth2'" password="True"/>
+                            <field name="scope" invisible="api_auth_type != 'oauth2'"/>
                             <field name="api_token" invisible="api_auth_type != 'oauth2'" groups="base.group_system"/>
                             <field name="api_token_expires" invisible="api_auth_type != 'oauth2'"/>
                         </group>
+                        <group name="details"> </group>
                     </group>
                     <notebook>
                         <page string="Integrations">
                             <field name="integration_ids"/>
-                        </page>
-                        <page string="Endpoints" invisible="not api_auth_type">
-                            <field name="api_endpoint_ids"/>
                         </page>
                     </notebook>
                 </sheet>

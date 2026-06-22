@@ -96,7 +96,15 @@
                         </page>
                         <page name="configuration" string='Configuration' invisible="has_sub_integration">
                             <group>
-                                <group>
+                                <group name="connection" string="Connection">
+                                    <field name="connection_id"/>
+                                    <field name="record_filter_id" invisible="integration_flow == 'in'"/>
+                                </group>
+                                <group name="api" string="API" invisible="connection_type != 'api'">
+                                    <field name="path"/>
+                                    <field name="method"/>
+                                </group>
+                                <group name="content" string="Content &amp; Format">
                                     <field name="synchronization_content_type"/>
                                     <field
                                         name="response_content_type"
@@ -105,9 +113,6 @@
                                     />
                                     <field name="store_received_content"/>
                                     <field name="store_sent_content"/>
-                                    <field name="connection_id"/>
-                                    <field name="api_endpoint_id" invisible="not api_auth_type"/>
-                                    <field name="record_filter_id" invisible="integration_flow == 'in'"/>
                                 </group>
                             </group>
                             <separator string="Integration Parameter"/>
