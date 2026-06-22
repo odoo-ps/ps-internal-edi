@@ -13,7 +13,6 @@
         "data/connection.xml",
         "views/res_config_settings_views.xml",
         "views/edi_connection.xml",
-        "views/edi_endpoint.xml",
         "views/edi_integration.xml",
         "views/edi_synchronization.xml",
     ],

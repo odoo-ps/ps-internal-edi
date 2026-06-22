@@ -83,11 +83,15 @@ class Integration(models.Model):
     connection_id = fields.Many2one("edi.connection", required=True, string="Connection", tracking=True)
     api_auth_type = fields.Selection(related="connection_id.api_auth_type")
     connection_type = fields.Selection(related="connection_id.type")
-    api_endpoint_id = fields.Many2one(
-        "edi.endpoint",
-        ondelete="restrict",
-        domain="[('connection_id', '=', connection_id), ('role', '=', 'resource')]",
-        help="Optional resource endpoint for this integration. Must belong to the selected connection.",
+    path = fields.Char(
+        string="Path",
+        help="Relative URL path, e.g. /v1/orders",
+        tracking=True,
+    )
+    method = fields.Selection(
+        [("get", "GET"), ("post", "POST"), ("put", "PUT"), ("patch", "PATCH"), ("delete", "DELETE")],
+        string="HTTP Method",
+        default="post",
         tracking=True,
     )
     type = fields.Selection(
@@ -231,7 +235,8 @@ class Integration(models.Model):
             if ct:
                 headers["Content-Type"] = ct
         return self.connection_id._api_call(
-            endpoint=self.api_endpoint_id,
+            path=self.path,
+            method=self.method,
             payload=payload,
             headers=headers or None,
         )
@@ -255,23 +260,6 @@ class Integration(models.Model):
                 self.integration_flow,
             )
         )
-
-    @api.constrains("api_endpoint_id", "connection_id")
-    def _check_endpoint_connection(self):
-        for rec in self:
-            if rec.api_endpoint_id and rec.api_endpoint_id.connection_id != rec.connection_id:
-                raise ValidationError(
-                    rec.env._(
-                        "Endpoint '%s' does not belong to connection '%s'.",
-                        rec.api_endpoint_id.name,
-                        rec.connection_id.name,
-                    )
-                )
-
-    @api.onchange("connection_id")
-    def _onchange_connection_id_endpoint(self):
-        if self.api_endpoint_id and self.api_endpoint_id.connection_id != self.connection_id:
-            self.api_endpoint_id = False
 
     @api.model
     def _get_in_flow_type(self):

@@ -133,7 +133,7 @@ class IntegrationIn(models.Model):
             }
         """
         self.ensure_one()
-        if self.api_endpoint_id:
+        if self.connection_type == "api" and self.path:
             payload = self._build_in_payload()
             raw_text = self._api_call(payload)
             items = self._api_wrap_response(raw_text)
@@ -178,7 +178,7 @@ class IntegrationIn(models.Model):
                 content = xml.dom.minidom.parseString(raw_text).toprettyxml(indent="  ")
             except Exception:
                 pass
-        return [{"filename": self.api_endpoint_id.name, "content": content}]
+        return [{"filename": self.name, "content": content}]
 
     def _clean(self, data, status):
         """Called after the processing of each synchronization

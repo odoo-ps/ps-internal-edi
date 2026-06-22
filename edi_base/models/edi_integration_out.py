@@ -167,7 +167,7 @@ class IntegrationOut(models.Model):
         """
         self.ensure_one()
 
-        if self.api_endpoint_id:
+        if self.connection_type == "api" and self.path:
             res = self._api_call(self._build_out_payload(content))
             if self.store_received_content:
                 self.env.cr.sync._write_received(res)
