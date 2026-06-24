@@ -26,6 +26,30 @@ class Connection(models.Model):
 
     name = fields.Char(required=True)
     type = fields.Selection(selection=[], required=True, string="EDI Type", tracking=True)
+    auth_method = fields.Selection([("public", "Public")], string="Auth Method", default="public", tracking=True)
+    credential_type = fields.Selection(
+        [
+            ("none", "None"),
+            ("single_key", "Single Key"),
+            ("user_pass", "Username/Password"),
+        ],
+        default="none",
+        string="Credential Type",
+        tracking=True,
+    )
+    cached_token = fields.Char(
+        readonly=True,
+        copy=False,
+        groups="base.group_system",
+        help="Authentication token cached after the last successful handshake. Renewed automatically when expired.",
+    )
+    cached_token_expires = fields.Datetime(
+        string="Token Expires On",
+        readonly=True,
+        copy=False,
+        groups="base.group_system",
+        help="Expiry date of the cached token. A new token is fetched automatically when this date is past.",
+    )
     configuration = fields.Text(tracking=True)
     company_id = fields.Many2one("res.company", tracking=True)
     integration_ids = fields.One2many("edi.integration", "connection_id", readonly=True, context={"active_test": False})
@@ -126,6 +150,11 @@ class Connection(models.Model):
         self.ensure_one()
         return {}
 
+    def reset_cached_token(self):
+        """Clear the cached token, forcing re-authentication on the next call."""
+        self.ensure_one()
+        self.sudo().write({"cached_token": False, "cached_token_expires": False})
+
     ###################################
     #    End of abstract interface    #
     #  don't override these methods   #
@@ -166,56 +195,51 @@ class ConnectionApi(models.Model):
     _description = "EDI Connection"
 
     type = fields.Selection(selection_add=[("api", "HTTP API")], ondelete={"api": "cascade"})
+    auth_method = fields.Selection(
+        selection_add=[
+            ("http_bearer", "Bearer Token"),
+            ("http_basic", "HTTP Basic"),
+            ("http_oauth2", "OAuth2"),
+        ],
+        ondelete={"http_bearer": "set default", "http_basic": "set default", "http_oauth2": "set default"},
+    )
+    credential_type = fields.Selection(
+        selection_add=[
+            ("key_secret", "Key/Secret"),
+            ("user_key_secret", "Username/Password + Key/Secret"),
+        ],
+        ondelete={"key_secret": "set default", "user_key_secret": "set default"},
+    )
 
     # Base URL shared by all integrations on this connection
     url = fields.Char(string="Base URL", help="e.g. https://api.example.com")
 
-    # Auth type
-    api_auth_type = fields.Selection(
-        [
-            ("public", "Public"),
-            ("api_key", "API Key"),
-            ("basic", "Basic Auth (Login/Password)"),
-            ("oauth2", "OAuth2 (Get a token first)"),
-        ],
-        default=False,
-        string="Auth Type",
-        tracking=True,
-        help="OAuth2 Auth Type does rely on RFC 6749",
-    )
-
-    # Credentials — used depending on api_auth_type
+    # Credentials — visibility driven by credential_type on the base model
     key = fields.Char(string="Key", copy=False)
+    key_header_name = fields.Char(
+        default="Authorization",
+        help="HTTP header that carries the key, e.g. 'Authorization', 'X-API-Key', 'X-Auth-Token'.",
+    )
+    key_format = fields.Char(
+        default="Bearer {}",
+        help="Format string for the header value — '{}' is replaced by the key. "
+        "Use 'Bearer {}' for standard tokens, 'Token {}' for DRF-style, "
+        "or '{}' alone for headers like X-API-Key that carry the key directly.",
+    )
     username = fields.Char()
     password = fields.Char()
-
-    # OAuth2 token endpoint
-    grant_type = fields.Selection(
-        [
-            ("client_credentials", "Client Credentials"),
-            ("password", "Password"),
-        ],
-        string="Grant Type",
-        default="client_credentials",
-    )
     client_id = fields.Char()
     client_secret = fields.Char()
-    scope = fields.Char()
+    scope = fields.Char(help="Space-separated list of OAuth2 scopes to request, e.g. 'read write' or 'openid profile'.")
     token_path = fields.Char(
         string="Token Path",
         help="Relative path of the OAuth2 token endpoint, e.g. /oauth/token",
     )
 
-    # Cached OAuth2 token
-    api_token = fields.Char(readonly=True, copy=False, groups="base.group_system")
-    api_token_expires = fields.Datetime(
-        string="Token Expires On", readonly=True, copy=False, groups="base.group_system"
-    )
-
     def _api_call(self, path, method, payload=None, headers=None, *args, **kwargs):
         """Default HTTP implementation for API connections.
 
-        Uses _api_get_session() for authentication (dispatches on api_auth_type).
+        Uses _api_get_session() for authentication (dispatches on auth_method).
         GET/DELETE
             → payload sent as query params
         POST/PUT/PATCH
@@ -259,23 +283,25 @@ class ConnectionApi(models.Model):
 
         Usable as a context manager: ``with self._api_get_session() as session:``.
 
-        Default behavior dispatches on api_auth_type:
-            - public   → plain session
-            - api_key  → Authorization: Bearer <self.key>
-            - basic    → HTTPBasicAuth(self.username, self.password) — RFC 7617
-            - oauth2   → Authorization: Bearer <token from _api_get_token()>
+        Dispatches on auth_method:
+            - public      → plain session
+            - http_bearer → header per key_header_name, value per key_format (default: Authorization: Bearer <key>)
+            - http_basic  → HTTPBasicAuth(self.username, self.password) — RFC 7617
+            - http_oauth2 → Authorization: Bearer <token from _api_get_token()>
         """
         self.ensure_one()
         session = requests.Session()
-        if self.api_auth_type == "api_key":
+        if self.auth_method == "http_bearer":
             if not self.key:
-                raise ValidationError(self.env._("No API key defined on the connection."))
-            session.headers["Authorization"] = "Bearer " + self.key
-        elif self.api_auth_type == "basic":
+                raise ValidationError(self.env._("No key defined on the connection."))
+            key = self.key or ""  # guaranteed non-empty by the guard; or "" satisfies the type checker
+            header = self.key_header_name or "Authorization"
+            session.headers[header] = (self.key_format or "{}").format(key)
+        elif self.auth_method == "http_basic":
             if not self.username:
                 raise ValidationError(self.env._("No username defined on the connection."))
             session.auth = (self.username, self.password or "")
-        elif self.api_auth_type == "oauth2":
+        elif self.auth_method == "http_oauth2":
             session.headers["Authorization"] = "Bearer " + self._api_get_token()
         return session
 
@@ -285,17 +311,21 @@ class ConnectionApi(models.Model):
         Uses the cached token if still valid. Override _api_get_token_payload() to
         customize the request body.
 
-        Call api_reset_token() first to force re-authentication (e.g. from test()).
+        Call reset_cached_token() first to force re-authentication (e.g. from test()).
 
         :return: str — the access token
         :raises: ValidationError on auth failure or missing configuration
         """
         self.ensure_one()
 
-        sudo_conn = self.sudo()  # for api_token, since the integration is run with integration.user_id
-        if sudo_conn.api_token and sudo_conn.api_token_expires and sudo_conn.api_token_expires > fields.Datetime.now():
-            _logger.info("Using cached token (expires %s)", sudo_conn.api_token_expires)
-            return sudo_conn.api_token
+        sudo_conn = self.sudo()  # for cached_token, since the integration is run with integration.user_id
+        if (
+            sudo_conn.cached_token
+            and sudo_conn.cached_token_expires
+            and sudo_conn.cached_token_expires > fields.Datetime.now()
+        ):
+            _logger.info("Using cached token (expires %s)", sudo_conn.cached_token_expires)
+            return sudo_conn.cached_token
 
         if not self.url or not self.token_path:
             raise ValidationError(self.env._("No token endpoint properly configured on this connection."))
@@ -316,8 +346,8 @@ class ConnectionApi(models.Model):
 
         sudo_conn.write(
             {
-                "api_token": token,
-                "api_token_expires": fields.Datetime.now() + timedelta(seconds=expires_in),
+                "cached_token": token,
+                "cached_token_expires": fields.Datetime.now() + timedelta(seconds=expires_in),
             }
         )
         return token
@@ -325,27 +355,33 @@ class ConnectionApi(models.Model):
     def _api_get_token_payload(self):
         """Build the payload for the token request.
 
+        grant_type is derived from credential_type:
+            - user_key_secret → password grant (username + password + client_id + client_secret)
+            - user_pass       → password grant (username + password only, no client credentials)
+            - key_secret      → client_credentials grant (client_id + client_secret only)
+
         :return: dict
         """
         self.ensure_one()
-        token_fields = ["grant_type", "username", "password", "client_id", "client_secret", "scope"]
-        return {f: getattr(self, f) for f in token_fields if getattr(self, f)}
+        grant_type = "password" if self.credential_type in ("user_key_secret", "user_pass") else "client_credentials"
+        payload = {"grant_type": grant_type}
+        cred_fields = ["username", "password", "client_id", "client_secret", "scope"]
+        payload.update({f: getattr(self, f) for f in cred_fields if getattr(self, f)})
+        return payload
 
     @api.model
     def _api_parse_token_response(self, response):
         data = response.json()
         return data.get("access_token"), data.get("expires_in", API_TOKEN_EXPIRY_FALLBACK)
 
-    def api_reset_token(self):
-        """Clear the cached token, forcing re-authentication on the next _api_get_token() call."""
-        self.ensure_one()
-        self.sudo().write({"api_token": False, "api_token_expires": False})
-
     @IntegrationCheck(["api"])
     def test(self):
         self.ensure_one()
-        if self.api_auth_type == "oauth2":
-            self.api_reset_token()
+        if not self.type == "api":
+            return super().test()
+
+        if self.auth_method == "http_oauth2":
+            self.reset_cached_token()
             self._api_get_token()
             return self.env["bus.bus"]._sendone(
                 self.env.user.partner_id,

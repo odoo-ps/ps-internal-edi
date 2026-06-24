@@ -10,9 +10,9 @@
                     <button type="object" name="reset_config" string="Reset Configuration"/>
                     <button
                         type="object"
-                        name="api_reset_token"
+                        name="reset_cached_token"
                         string="Reset Token"
-                        invisible="not api_token"
+                        invisible="not cached_token"
                         groups="base.group_system"
                     />
                 </header>
@@ -26,33 +26,54 @@
                     <group name="configuration">
                         <group name="basic" string="Basic Information">
                             <field name="company_id" groups="base.group_multi_company"/>
-                            <field name="type"/>
+                            <field name="type" readonly="1"/>
                             <field name="configuration" groups="base.group_system" invisible="type == 'api'"/>
                             <field name="url" invisible="type != 'api'"/>
-                            <field name="api_auth_type" invisible="type != 'api'"/>
-                       </group>
+                            <field name="auth_method" invisible="type != 'api'" readonly="1"/>
+                            <field
+                                name="credential_type"
+                                invisible="type != 'api' or not auth_method or auth_method == 'public'"
+                                readonly="1"
+                            />
+                        </group>
                         <group
                             name="authentication"
                             string="Authentication"
-                            invisible="type != 'api' or not api_auth_type or api_auth_type == 'public'"
+                            invisible="not auth_method or auth_method == 'public'"
                         >
-                            <field name="key" invisible="api_auth_type != 'api_key'"/>
-                            <field name="token_path" invisible="api_auth_type != 'oauth2'"/>
-                            <field name="grant_type" invisible="api_auth_type != 'oauth2'"/>
-                            <field
-                                name="username"
-                                invisible="not(api_auth_type == 'basic' or (api_auth_type == 'oauth2' and grant_type == 'password'))"
-                            />
+                            <field name="token_path" invisible="auth_method != 'http_oauth2'"/>
+                            <field name="key" invisible="credential_type != 'single_key'"/>
+                            <field name="key_header_name" invisible="auth_method != 'http_bearer'"/>
+                            <field name="key_format" invisible="auth_method != 'http_bearer'"/>
+                            <field name="username" invisible="credential_type not in ('user_pass', 'user_key_secret')"/>
                             <field
                                 name="password"
-                                invisible="not(api_auth_type == 'basic' or (api_auth_type == 'oauth2' and grant_type == 'password'))"
+                                invisible="credential_type not in ('user_pass', 'user_key_secret')"
                                 password="True"
                             />
-                            <field name="client_id" invisible="api_auth_type != 'oauth2'"/>
-                            <field name="client_secret" invisible="api_auth_type != 'oauth2'" password="True"/>
-                            <field name="scope" invisible="api_auth_type != 'oauth2'"/>
-                            <field name="api_token" invisible="api_auth_type != 'oauth2'" groups="base.group_system"/>
-                            <field name="api_token_expires" invisible="api_auth_type != 'oauth2'"/>
+                            <field
+                                name="client_id"
+                                invisible="credential_type not in ('key_secret', 'user_key_secret')"
+                            />
+                            <field
+                                name="client_secret"
+                                invisible="credential_type not in ('key_secret', 'user_key_secret')"
+                                password="True"
+                            />
+                            <field name="scope" invisible="credential_type not in ('key_secret', 'user_key_secret')"/>
+
+                            <separator string="Cached OAuth2 token" invisible="auth_method != 'http_oauth2'"/>
+                            <field
+                                name="cached_token"
+                                string="Token"
+                                invisible="auth_method != 'http_oauth2'"
+                                groups="base.group_system"
+                            />
+                            <field
+                                name="cached_token_expires"
+                                string="Expired on"
+                                invisible="auth_method != 'http_oauth2'"
+                            />
                         </group>
                         <group name="details"> </group>
                     </group>

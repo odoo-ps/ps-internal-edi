@@ -1,5 +1,6 @@
 import base64
 import json
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -9,6 +10,7 @@ from odoo.exceptions import ValidationError
 from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 
+from ..models.edi_connection import API_TOKEN_EXPIRY_FALLBACK
 from .test_edi_common import TestEDICommonBase
 
 
@@ -88,13 +90,13 @@ class TestEdiAuth(TestEDICommonBase):
         conn = (
             self.new_env["edi.connection"]
             .with_context(mail_create_nolog=True)
-            .create({"name": "Auth Conn", "type": "api", "api_auth_type": "oauth2"})
+            .create({"name": "Auth Conn", "type": "api", "credential_type": "key_secret", "auth_method": "http_oauth2"})
         )
-        conn.write({"api_token": "abc", "api_token_expires": fields.Datetime.now()})
-        self.assertTrue(conn.api_token)
-        conn.api_reset_token()
-        self.assertFalse(conn.api_token)
-        self.assertFalse(conn.api_token_expires)
+        conn.write({"cached_token": "abc", "cached_token_expires": fields.Datetime.now()})
+        self.assertTrue(conn.cached_token)
+        conn.reset_cached_token()
+        self.assertFalse(conn.cached_token)
+        self.assertFalse(conn.cached_token_expires)
 
     def test_get_token_requires_token_path(self):
         """_api_get_token raises ValidationError when token_path is not configured"""
@@ -105,7 +107,8 @@ class TestEdiAuth(TestEDICommonBase):
                 {
                     "name": "No Token Endpoint Conn",
                     "type": "api",
-                    "api_auth_type": "oauth2",
+                    "credential_type": "key_secret",
+                    "auth_method": "http_oauth2",
                     "url": "https://fake.url",
                     # token_path intentionally omitted
                 }
@@ -116,30 +119,43 @@ class TestEdiAuth(TestEDICommonBase):
 
     def test_get_token_uses_cache(self):
         """_api_get_token returns cached token when still valid"""
-        from datetime import timedelta
-
         conn = (
             self.new_env["edi.connection"]
             .with_context(mail_create_nolog=True)
-            .create({"name": "Cache Token Conn", "type": "api", "api_auth_type": "oauth2"})
+            .create(
+                {
+                    "name": "Cache Token Conn",
+                    "type": "api",
+                    "credential_type": "key_secret",
+                    "auth_method": "http_oauth2",
+                }
+            )
         )
         future = fields.Datetime.now() + timedelta(hours=1)
-        conn.write({"api_token": "cached_token", "api_token_expires": future})
+        conn.write({"cached_token": "cached_token", "cached_token_expires": future})
         result = conn._api_get_token()
         self.assertEqual(result, "cached_token")
 
     def test_api_get_session_api_key(self):
-        """api_key auth sets Authorization: Bearer <key> on the session"""
+        """bearer auth sets Authorization: Bearer <key> on the session"""
         conn = (
             self.new_env["edi.connection"]
             .with_context(mail_create_nolog=True)
-            .create({"name": "ApiKey Conn", "type": "api", "api_auth_type": "api_key", "key": "my_secret_key"})
+            .create(
+                {
+                    "name": "ApiKey Conn",
+                    "type": "api",
+                    "credential_type": "single_key",
+                    "auth_method": "http_bearer",
+                    "key": "my_secret_key",
+                }
+            )
         )
         with conn._api_get_session() as session:
             self.assertEqual(session.headers.get("Authorization"), "Bearer my_secret_key")
 
     def test_api_get_session_basic(self):
-        """basic auth sets session.auth with username/password"""
+        """http_basic auth sets session.auth with username/password"""
         conn = (
             self.new_env["edi.connection"]
             .with_context(mail_create_nolog=True)
@@ -147,7 +163,8 @@ class TestEdiAuth(TestEDICommonBase):
                 {
                     "name": "Basic Conn",
                     "type": "api",
-                    "api_auth_type": "basic",
+                    "credential_type": "user_pass",
+                    "auth_method": "http_basic",
                     "username": "user",
                     "password": "pass",
                 }
@@ -156,17 +173,135 @@ class TestEdiAuth(TestEDICommonBase):
         with conn._api_get_session() as session:
             self.assertEqual(session.auth, ("user", "pass"))
 
+    def test_api_get_session_bearer_custom_header(self):
+        """http_bearer respects key_header_name and key_format overrides"""
+        conn = (
+            self.new_env["edi.connection"]
+            .with_context(mail_create_nolog=True)
+            .create(
+                {
+                    "name": "Custom Header Conn",
+                    "type": "api",
+                    "credential_type": "single_key",
+                    "auth_method": "http_bearer",
+                    "key": "MY_KEY",
+                    "key_header_name": "X-API-Key",
+                    "key_format": "{}",
+                }
+            )
+        )
+        with conn._api_get_session() as session:
+            self.assertEqual(session.headers.get("X-API-Key"), "MY_KEY")
+            self.assertNotIn("Authorization", session.headers)
+
+    def test_api_get_session_bearer_no_key_raises(self):
+        """http_bearer without a key raises ValidationError"""
+        conn = (
+            self.new_env["edi.connection"]
+            .with_context(mail_create_nolog=True)
+            .create(
+                {"name": "No Key Conn", "type": "api", "credential_type": "single_key", "auth_method": "http_bearer"}
+            )
+        )
+        with self.assertRaises(ValidationError):
+            conn._api_get_session()
+
+    def test_api_get_session_basic_no_username_raises(self):
+        """http_basic without a username raises ValidationError"""
+        conn = (
+            self.new_env["edi.connection"]
+            .with_context(mail_create_nolog=True)
+            .create(
+                {"name": "No User Conn", "type": "api", "credential_type": "user_pass", "auth_method": "http_basic"}
+            )
+        )
+        with self.assertRaises(ValidationError):
+            conn._api_get_session()
+
+    def test_api_get_token_payload_client_credentials(self):
+        """key_secret credential_type produces a client_credentials grant payload"""
+        conn = (
+            self.new_env["edi.connection"]
+            .with_context(mail_create_nolog=True)
+            .create(
+                {
+                    "name": "CC Payload Conn",
+                    "type": "api",
+                    "credential_type": "key_secret",
+                    "auth_method": "http_oauth2",
+                    "client_id": "cid",
+                    "client_secret": "csec",
+                    "scope": "read",
+                }
+            )
+        )
+        payload = conn._api_get_token_payload()
+        self.assertEqual(payload["grant_type"], "client_credentials")
+        self.assertEqual(payload["client_id"], "cid")
+        self.assertEqual(payload["client_secret"], "csec")
+        self.assertEqual(payload["scope"], "read")
+        self.assertNotIn("username", payload)
+
+    def test_api_get_token_payload_password_grant(self):
+        """user_key_secret and user_pass credential_types produce a password grant payload"""
+        for cred_type, extra in [
+            ("user_key_secret", {"client_id": "cid", "client_secret": "csec"}),
+            ("user_pass", {}),
+        ]:
+            conn = (
+                self.new_env["edi.connection"]
+                .with_context(mail_create_nolog=True)
+                .create(
+                    {
+                        "name": f"PG Payload Conn {cred_type}",
+                        "type": "api",
+                        "credential_type": cred_type,
+                        "auth_method": "http_oauth2",
+                        "username": "usr",
+                        "password": "pwd",
+                        **extra,
+                    }
+                )
+            )
+            payload = conn._api_get_token_payload()
+            self.assertEqual(payload["grant_type"], "password", f"Failed for {cred_type}")
+            self.assertEqual(payload["username"], "usr")
+            self.assertEqual(payload["password"], "pwd")
+
+    def test_api_parse_token_response_expires_in_fallback(self):
+        """_api_parse_token_response uses API_TOKEN_EXPIRY_FALLBACK when expires_in is absent"""
+        conn = (
+            self.new_env["edi.connection"]
+            .with_context(mail_create_nolog=True)
+            .create(
+                {"name": "Fallback Conn", "type": "api", "credential_type": "key_secret", "auth_method": "http_oauth2"}
+            )
+        )
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"access_token": "tok"}
+        token, expires_in = conn._api_parse_token_response(mock_resp)
+        self.assertEqual(token, "tok")
+        self.assertEqual(expires_in, API_TOKEN_EXPIRY_FALLBACK)
+
 
 @tagged("post_install", "-at_install")
 class TestEdiApiCallBehavior(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.mock_connection.write({"url": "https://fake.url", "api_auth_type": "public"})
+        cls.mock_connection.write({"url": "https://fake.url", "credential_type": "none", "auth_method": "public"})
         cls.public_conn = (
             cls.new_env["edi.connection"]
             .with_context(mail_create_nolog=True)
-            .create({"name": "Public Conn", "type": "api", "api_auth_type": "public", "url": "https://fake.url"})
+            .create(
+                {
+                    "name": "Public Conn",
+                    "type": "api",
+                    "credential_type": "none",
+                    "auth_method": "public",
+                    "url": "https://fake.url",
+                }
+            )
         )
         cls.integration_xml = cls.new_env["edi.integration"].create(
             {
@@ -225,7 +360,7 @@ class TestEdiApiPipeline(TestEDICommonBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.mock_connection.write({"url": "https://fake.url", "api_auth_type": "public"})
+        cls.mock_connection.write({"url": "https://fake.url", "credential_type": "none", "auth_method": "public"})
         cls.new_cr.commit()
 
     def _mock_http_response(self, json_data=None, text=None, status_code=200):
@@ -355,7 +490,7 @@ class TestEdiApiPipeline(TestEDICommonBase):
             filter_.with_env(env).unlink()
 
     def test_auth_api_key(self):
-        """api_key auth sends Authorization: Bearer <key> header on every request"""
+        """bearer auth sends Authorization: Bearer <key> header on every request"""
         conn = (
             self.new_env["edi.connection"]
             .with_context(mail_create_nolog=True)
@@ -363,7 +498,8 @@ class TestEdiApiPipeline(TestEDICommonBase):
                 {
                     "name": "API Key Conn",
                     "type": "api",
-                    "api_auth_type": "api_key",
+                    "credential_type": "single_key",
+                    "auth_method": "http_bearer",
                     "url": "https://fake.url",
                     "key": "secret123",
                 }
@@ -422,7 +558,8 @@ class TestEdiApiPipeline(TestEDICommonBase):
                 {
                     "name": "Basic Auth Conn",
                     "type": "api",
-                    "api_auth_type": "basic",
+                    "credential_type": "user_pass",
+                    "auth_method": "http_basic",
                     "url": "https://fake.url",
                     "username": "testuser",
                     "password": "testpass",
@@ -483,10 +620,10 @@ class TestEdiApiPipeline(TestEDICommonBase):
                 {
                     "name": "OAuth2 Conn",
                     "type": "api",
-                    "api_auth_type": "oauth2",
+                    "credential_type": "key_secret",
+                    "auth_method": "http_oauth2",
                     "url": "https://fake.url",
                     "token_path": "/oauth/token",
-                    "grant_type": "client_credentials",
                     "client_id": "my_client",
                     "client_secret": "my_secret",
                 }
@@ -645,10 +782,10 @@ class TestEdiOAuth2(TestEDICommonBase):
                 {
                     "name": "OAuth2 Full Flow Conn",
                     "type": "api",
-                    "api_auth_type": "oauth2",
+                    "credential_type": "user_key_secret",
+                    "auth_method": "http_oauth2",
                     "url": "https://fake.url",
                     "token_path": "/token",
-                    "grant_type": "password",
                     "client_id": "test_client",
                     "client_secret": "test_secret",
                     "username": "test_user",
@@ -658,10 +795,10 @@ class TestEdiOAuth2(TestEDICommonBase):
         )
         self.new_cr.commit()
 
-        conn.api_reset_token()
+        conn.reset_cached_token()
         token = conn._api_get_token()
         self.assertEqual(token, "FAKE_TOKEN_123")
-        self.assertEqual(conn.api_token, "FAKE_TOKEN_123")
+        self.assertEqual(conn.cached_token, "FAKE_TOKEN_123")
 
         with patch.object(type(conn.env["bus.bus"]), "_sendone") as mock_sendone:
             conn.test()
