@@ -1,12 +1,12 @@
 {
     "name": "Odoo PS EDI Archiving",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "license": "OEEL-1",
     "summary": "Automatically archive 2-Steps EDI table records",
     "category": "Tools",
     "website": "https://www.odoo.com",
     "author": "Odoo PS",
-    "depends": ["edi_2steps"],
+    "depends": ["edi_2steps", "edi_archiving"],
     "data": [
         "views/edi_integration_views.xml",
         "views/edi_synchronization_views.xml",

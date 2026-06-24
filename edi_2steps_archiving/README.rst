@@ -1,6 +1,6 @@
-==============================================
+===============================================
 Automatically archive EDI 2-steps queue records
-==============================================
+===============================================
 - add an active field on EDI 2-steps queue records (`edi.table.record`)
 - allow choosing how long to keep queue records before archiving them, by status
 - let Odoo's internal vacuum archive them depending on the configuration
