@@ -81,7 +81,7 @@ class Integration(models.Model):
         tracking=True,
     )
     connection_id = fields.Many2one("edi.connection", required=True, string="Connection", tracking=True)
-    api_auth_type = fields.Selection(related="connection_id.api_auth_type")
+    auth_method = fields.Selection(related="connection_id.auth_method")
     connection_type = fields.Selection(related="connection_id.type")
     path = fields.Char(
         string="Path",

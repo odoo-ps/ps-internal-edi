@@ -20,26 +20,41 @@ Holds credentials and communication logic for a third-party system. The built-in
 connection covers most REST APIs without writing any connection code:
 
 -   ``url``: base URL shared by all integrations, e.g. ``https://api.example.com``
--   ``api_auth_type``: authentication strategy — Public, API Key, Basic Auth, or OAuth2
+-   ``credential_type``: what credentials are stored — drives which credential fields appear in the UI
+-   ``auth_method``: how the credentials are transmitted — drives the HTTP authentication mechanism
 
-Auth credentials live directly on the connection:
+Both fields are set in data XML by developers — there is no edition through the backend.
+The supported combinations are:
 
 .. list-table::
-   :widths: 25 75
+   :widths: 22 18 60
    :header-rows: 1
 
-   * - Auth type
+   * - ``credential_type``
+     - ``auth_method``
      - Fields used
-   * - ``api_key``
-     - ``key``
-   * - ``basic``
+   * - ``none``
+     - ``public``
+     - — (no credentials)
+   * - ``single_key``
+     - ``http_bearer``
+     - ``key``, ``key_header_name`` (default: ``Authorization``), ``key_format`` (default: ``Bearer {}``)
+   * - ``user_pass``
+     - ``http_basic``
      - ``username``, ``password``
-   * - ``oauth2``
-     - ``username``, ``password``, ``grant_type``, ``client_id``, ``client_secret``, ``scope``,
-       ``token_path`` (relative path)
+   * - ``key_secret``
+     - ``http_oauth2``
+     - ``client_id`` (key), ``client_secret`` (secret), ``scope``, ``token_path`` → *client_credentials* grant
+   * - ``user_key_secret``
+     - ``http_oauth2``
+     - ``username``, ``password``, ``client_id``, ``client_secret``, ``scope``, ``token_path`` → *password* grant
 
-The framework handles authentication automatically; ``api_token`` and ``api_token_expires``
-cache the obtained OAuth2 token.
+``key_format`` accepts any Python format string where ``{}`` is replaced by the key value:
+``"Bearer {}"`` (default), ``"Token {}"`` (DRF-style), or ``"{}"`` alone for headers such as
+``X-API-Key`` or ``X-Auth-Token``. ``key_header_name`` controls which header carries the value.
+
+The grant type for OAuth2 is derived automatically from ``credential_type`` — no separate field.
+``cached_token`` and ``cached_token_expires`` store the obtained token and are refreshed transparently.
 
 For FTP/SFTP, dedicated modules (``edi_ftp_connection``, ``edi_sftp_connection``) are available.
 
@@ -123,8 +138,9 @@ The API returns a JSON array; each order is processed as a separate synchronizat
     <record id="acme_connection" model="edi.connection">
         <field name="name">ACME API</field>
         <field name="type">api</field>
+        <field name="credential_type">single_key</field>
         <field name="url">https://api.acme.com</field>
-        <field name="api_auth_type">api_key</field>
+        <field name="auth_method">http_bearer</field>
         <field name="key">MY_SECRET_KEY</field>
     </record>
 
@@ -196,14 +212,15 @@ Scenario: push stock levels to a REST API that requires OAuth2 client credential
 
 .. code-block:: xml
 
-    <!-- Connection: OAuth2 auth. Token credentials and resource base URL live here. -->
+    <!-- Connection: OAuth2 auth. Token credentials and resource base URL live here.        -->
+    <!-- credential_type="key_secret" → client_credentials grant (no username needed).     -->
     <record id="wms_connection" model="edi.connection">
         <field name="name">WMS API</field>
         <field name="type">api</field>
+        <field name="credential_type">key_secret</field>
         <field name="url">https://wms.example.com</field>
-        <field name="api_auth_type">oauth2</field>
+        <field name="auth_method">http_oauth2</field>
         <field name="token_path">/oauth/token</field>
-        <field name="grant_type">client_credentials</field>
         <field name="client_id">MY_CLIENT_ID</field>
         <field name="client_secret">MY_CLIENT_SECRET</field>
     </record>
