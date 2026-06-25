@@ -607,11 +607,6 @@ class Integration(models.Model):
         Override to persist pagination cursors, update state fields, etc.
         The exceptions list contains any errors raised during processing.
 
-        To implement in each integration:
-        if self.type != 'my_type':
-            return super()._on_synchronizations_done(exceptions)
-        ...
-
         :param exceptions: list of exceptions raised during synchronization processing
         """
         self.ensure_one()

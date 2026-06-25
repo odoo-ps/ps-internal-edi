@@ -6,10 +6,11 @@ from datetime import timedelta
 import requests
 
 from odoo import _, api, fields, models
-from odoo.addons.edi_base.decorators import IntegrationCheck
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import ormcache
 from odoo.tools.urls import urljoin as url_join
+
+from ..decorators import IntegrationCheck
 
 
 _logger = logging.getLogger(__name__)
@@ -377,9 +378,6 @@ class ConnectionApi(models.Model):
     @IntegrationCheck(["api"])
     def test(self):
         self.ensure_one()
-        if not self.type == "api":
-            return super().test()
-
         if self.auth_method == "http_oauth2":
             self.reset_cached_token()
             self._api_get_token()
@@ -391,5 +389,4 @@ class ConnectionApi(models.Model):
                     "message": self.env._("Authentication succeeded — token obtained."),
                 },
             )
-
         raise UserError(_("Not applicable for this type of connection"))

@@ -208,11 +208,6 @@ class IntegrationOut(models.Model):
         Override to wrap the content in a JSON envelope or apply any
         pre-send transformation.
 
-        To implement in each integration
-        if not self.type == 'My type':
-            return super()._build_out_payload(content)
-        ....
-
         :param content: str — content produced by _get_content
         :return: str | dict | list — payload passed to _api_call
         """
