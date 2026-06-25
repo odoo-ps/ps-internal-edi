@@ -1,7 +1,8 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import json
 import logging
-import xml.dom.minidom
+
+from lxml import etree
 
 from odoo import fields, models
 
@@ -175,8 +176,8 @@ class IntegrationIn(models.Model):
                 pass
         elif self.response_content_type == "xml":
             try:
-                content = xml.dom.minidom.parseString(raw_text).toprettyxml(indent="  ")
-            except Exception:
+                content = etree.tostring(etree.fromstring(raw_text.encode()), pretty_print=True).decode()
+            except etree.XMLSyntaxError:
                 pass
         return [{"filename": self.name, "content": content}]
 
