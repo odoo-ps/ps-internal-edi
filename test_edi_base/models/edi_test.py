@@ -3,7 +3,7 @@ import logging
 from io import StringIO
 
 from odoo import api, models
-from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
+from odoo.addons.edi_base.decorators import IntegrationCheck
 
 from odoo.addons.edi_base.models.decorator import integration
 

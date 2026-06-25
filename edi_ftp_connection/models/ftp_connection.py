@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from io import BytesIO as StringIO
 
 from odoo import _, api, fields, models
-from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
+from odoo.addons.edi_base.decorators import IntegrationCheck
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import ustr
 

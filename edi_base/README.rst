@@ -106,7 +106,7 @@ Example "out" flow
 
     from odoo import _, fields, models
     from odoo.exceptions import UserError, ValidationError
-    from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
+    from odoo.addons.edi_base.decorators import IntegrationCheck
 
 
     class APITestConnection(models.Model):

@@ -2,7 +2,7 @@ import os
 import os.path
 
 from odoo import models
-from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
+from odoo.addons.edi_base.decorators import IntegrationCheck
 from odoo.exceptions import UserError
 
 

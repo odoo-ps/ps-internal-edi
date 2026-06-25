@@ -4,7 +4,7 @@ from ast import literal_eval
 from io import StringIO
 
 from odoo import fields, models
-from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
+from odoo.addons.edi_base.decorators import IntegrationCheck
 
 _logger = logging.getLogger(__name__)
 

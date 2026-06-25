@@ -9,7 +9,7 @@ import pysftp
 from paramiko import RSAKey
 
 from odoo import api, fields, models
-from odoo.addons.edi_base.decorators.decorators import IntegrationCheck
+from odoo.addons.edi_base.decorators import IntegrationCheck
 
 _logger = logging.getLogger(__name__)
 
