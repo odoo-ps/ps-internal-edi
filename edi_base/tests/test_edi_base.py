@@ -344,6 +344,7 @@ class TestEdiApiCallBehavior(TestEDICommonBase):
         self.assertEqual(len(items), 1)
         self.assertIn("\n", items[0]["content"])
         self.assertIn("<child>value</child>", items[0]["content"])
+        self.assertNotIn("<?xml", items[0]["content"])
         self.assertEqual(items[0]["filename"], self.integration_xml.name)
 
     def test_api_wrap_response_xml_invalid_fallback(self):
