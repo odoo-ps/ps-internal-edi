@@ -1,15 +1,18 @@
 import logging
 from functools import WRAPPER_ASSIGNMENTS
+
 from odoo.exceptions import UserError
+
 
 _logger = logging.getLogger(__name__)
 
+
 class IntegrationCheck:
-    def __init__(self, integration_types: list[str], raise_if_wrong_integration:bool=False):
+    def __init__(self, integration_types: list[str], raise_if_wrong_integration: bool = False):
         if not (
-            isinstance(integration_types, list) and
-            len(integration_types) > 0 and
-            all(isinstance(i, str) for i in integration_types)
+            isinstance(integration_types, list)
+            and len(integration_types) > 0
+            and all(isinstance(i, str) for i in integration_types)
         ):
             raise TypeError("integration_types must be a non-empty list of strings")
         self.integration_types = integration_types
@@ -32,14 +35,44 @@ class IntegrationCheck:
 
     def __get__(self, obj, owner):
         if obj is None:
-            return self
+            # obj is None on any class-level attribute access, e.g.:
+            #   - getattr(ModelClass, 'test')          ← Odoo's RPC dispatcher (call_kw /
+            #                                            get_public_method) does exactly this to
+            #                                            retrieve a public method, then calls
+            #                                            method(recs, *args, **kwargs)
+            #   - getattr(mro_cls, 'test')             ← get_public_method's internal MRO scan
+            #                                            checking for _api_private
+            #   - FTPConnection.test / Model.test      ← direct class-level access in Python
+            #
+            # The naive "return self" would hand the IntegrationCheck *instance* (which is
+            # callable via __call__) to the caller.  When Odoo then invokes method(recs, ...),
+            # it triggers IC.__call__(recs), which is the decorator-application path: it stores
+            # the recordset as self.func and returns self — silently corrupting the descriptor
+            # and never reaching the actual method body.
+            #
+            # Fix: return a thin unbound wrapper that re-enters __get__ with the actual record
+            # once the caller provides it, correctly routing through the type-check logic.
+            ic = self
+
+            def unbound(rec, *args, **kwargs):
+                return ic.__get__(rec, type(rec))(*args, **kwargs)
+
+            for attr in WRAPPER_ASSIGNMENTS:
+                try:
+                    setattr(unbound, attr, getattr(self, attr))
+                except AttributeError:
+                    pass
+            return unbound
 
         if obj._name not in ("edi.integration", "edi.connection"):
-            _logger.warning(f"IntegrationCheck decorator can only be used on edi.integration or edi.connection, not on {obj._name}")
+            _logger.warning(
+                f"IntegrationCheck decorator can only be used on edi.integration or edi.connection, not on {obj._name}"
+            )
             return self
 
         def bound_method(*args, **kwargs):
-            # The decorator's owner is most often the highest level of the class (the base defining class) but we need the actual class.
+            # defining_class is the component class that declared the decorator (e.g. ConnectionApi),
+            # which may differ from owner (the composed registry class) — use it for super() to work.
             actual_owner = self.defining_class or owner
             obj_type = obj[:1].type if obj else None
 
@@ -49,7 +82,8 @@ class IntegrationCheck:
                     raise UserError(
                         obj.env._(
                             "This method can only be called in the %(entity_type)s of type(s) %(expected_types)s!",
-                            entity_type=entity, expected_types=",".join(self.integration_types)
+                            entity_type=entity,
+                            expected_types=",".join(self.integration_types),
                         )
                     )
 
@@ -57,7 +91,7 @@ class IntegrationCheck:
                 parent_method = getattr(super_obj, self.func.__name__, None)
                 if parent_method is not None:
                     return parent_method(*args, **kwargs)
-                return # no super method found, exit here
+                return  # no super method found, exit here
 
             return self.func(obj, *args, **kwargs)
 

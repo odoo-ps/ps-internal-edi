@@ -7,9 +7,11 @@ import requests
 
 from odoo import Command, api, fields
 from odoo.exceptions import ValidationError
+from odoo.service.model import call_kw, get_public_method
 from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 
+from ..decorators import IntegrationCheck
 from ..models.edi_connection import API_TOKEN_EXPIRY_FALLBACK
 from .test_edi_common import TestEDICommonBase
 
@@ -769,6 +771,51 @@ class TestEdiApiPipeline(TestEDICommonBase):
 
 @tagged("post_install", "-at_install", "ps_internal_edi")
 class TestEdiOAuth2(TestEDICommonBase):
+    def test_public_method_rpc_descriptor(self):
+        """get_public_method must return a plain callable, not the IC descriptor instance.
+
+        Regression: IC.__get__(None, cls) used to return self, causing call_kw to invoke
+        IC.__call__(recs) (the decorator constructor) instead of the actual method body.
+        """
+        method = get_public_method(self.mock_connection, "test")
+        self.assertNotIsInstance(method, IntegrationCheck)
+        self.assertTrue(callable(method))
+        self.assertEqual(method.__name__, "test")
+
+    @patch("odoo.addons.edi_base.models.edi_connection.requests.post")
+    def test_test_via_rpc_path(self, mock_post):
+        """test() called via Odoo's RPC dispatcher (call_kw) reaches the correct API implementation."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "FAKE_TOKEN_RPC", "expires_in": 3600}
+        mock_post.return_value = mock_response
+
+        conn = (
+            self.new_env["edi.connection"]
+            .with_context(mail_create_nolog=True)
+            .create(
+                {
+                    "name": "OAuth2 RPC Path Conn",
+                    "type": "api",
+                    "credential_type": "user_key_secret",
+                    "auth_method": "http_oauth2",
+                    "url": "https://fake.url",
+                    "token_path": "/token",
+                    "client_id": "test_client",
+                    "client_secret": "test_secret",
+                    "username": "test_user",
+                    "password": "test_password",
+                }
+            )
+        )
+        self.new_cr.commit()
+
+        with patch.object(type(conn.env["bus.bus"]), "_sendone") as mock_sendone:
+            call_kw(self.new_env["edi.connection"], "test", [[conn.id]], {})
+        mock_sendone.assert_called_once()
+        _, notif_type, payload = mock_sendone.call_args[0]
+        self.assertEqual(notif_type, "simple_notification")
+        self.assertIn("Authentication succeeded", payload["message"])
+
     @patch("odoo.addons.edi_base.models.edi_connection.requests.post")
     def test_get_token_full_flow(self, mock_post):
         """_api_get_token fetches and caches a token; test() reports authentication success"""
