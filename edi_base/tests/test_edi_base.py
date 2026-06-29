@@ -319,13 +319,13 @@ class TestEdiApiCallBehavior(TestEDICommonBase):
         )
         cls.new_cr.commit()
 
-    def test_api_call_http_error_raises_validation_error(self):
-        """_api_call raises ValidationError on HTTP 4xx/5xx"""
+    def test_api_call_http_error_raises_http_error(self):
+        """_api_call raises HTTPError on HTTP 4xx/5xx (caller is responsible for converting it)"""
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Client Error")
 
         with patch.object(requests.Session, "get", return_value=mock_response):
-            with self.assertRaises(ValidationError):
+            with self.assertRaises(requests.exceptions.HTTPError):
                 self.mock_connection._api_call(path="/api", method="get")
 
     def test_api_call_connection_error_raises_validation_error(self):
@@ -426,6 +426,62 @@ class TestEdiApiPipeline(TestEDICommonBase):
             self.assertEqual(sync.state, "done")
             self.assertTrue(sync.sent_content, "sent_content (CSV payload) should be logged")
             self.assertTrue(sync.received_content, "received_content (API response) should be logged")
+
+    def test_pipeline_out_http_error(self):
+        """HTTP error body must be stored in received_content even when the API returns 4xx/5xx"""
+        filter_ = self.new_env["ir.filters"].create(
+            {
+                "name": "EDI Pipeline HTTP Error Filter",
+                "model_id": "res.partner",
+                "domain": '[["name","ilike","EDI PIPE TEST http_error"]]',
+            }
+        )
+        edi = self.Integration.with_context(autocommit=True, no_exception_log=True).create(
+            {
+                "name": "Export Partner Pipeline HTTP Error",
+                "type": "api",
+                "integration_flow": "out",
+                "synchronization_creation": 0,
+                "synchronization_content_type": "csv",
+                "connection_id": self.mock_connection.id,
+                "path": "/api/v1/partners",
+                "method": "post",
+                "record_filter_id": filter_.id,
+                "active": False,
+            }
+        )
+        self.new_cr.commit()
+        self.addCleanup(self._cleanup_out_test, edi, filter_)
+
+        now = fields.Datetime.now()
+        self.new_env["res.partner"].create({"name": "EDI PIPE TEST http_error"})
+        self.new_env.cr.commit()
+
+        error_body = '{"error": "Unprocessable Entity"}'
+        mock_resp = MagicMock()
+        mock_resp.text = error_body
+        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_resp)
+
+        with patch.object(type(edi), "_get_content", return_value="id,name\n1,Test\n"), patch(
+            "requests.Session.post", return_value=mock_resp
+        ):
+            edi.process_integration()
+
+        with self.registry.cursor() as new_cr:
+            new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
+            integration = new_env["edi.integration"].browse(edi.id)
+            self.assertEqual(integration.last_state, "fail")
+
+            sync = new_env["edi.synchronization"].search(
+                [("integration_id", "=", edi.id), ("synchronization_date", ">=", now)]
+            )
+            self.assertEqual(len(sync), 1)
+            self.assertEqual(sync.state, "fail")
+            self.assertEqual(
+                sync.received_content,
+                error_body,
+                "HTTP error response body must be stored in received_content",
+            )
 
     def test_pipeline_in(self):
         """IN integration with GET path uses _api_call and logs received_content on the sync"""

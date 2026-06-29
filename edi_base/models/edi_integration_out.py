@@ -3,7 +3,10 @@ import ast
 import logging
 from datetime import datetime, timezone
 
+import requests
+
 from odoo import fields, models
+from odoo.exceptions import ValidationError
 
 
 _logger = logging.getLogger(__name__)
@@ -59,6 +62,12 @@ class IntegrationOut(models.Model):
                 content = self._process_out_data(records)
                 # at the exit, the savepoint will flush (force to reveal concurrent updates)
                 # thus, no need of explicit flush
+        except requests.exceptions.HTTPError as e:
+            # savepoint already rolled back — this write survives
+            if self.store_received_content and e.response is not None:
+                self.env.cr.sync._write_received(e.response.text)
+            response_body = e.response.text if e.response is not None else ""
+            raise ValidationError(self.env._("HTTP call failed: %s\n%s", e, response_body)) from e
         except Exception:
             raise
         finally:
