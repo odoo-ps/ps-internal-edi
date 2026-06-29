@@ -274,7 +274,10 @@ class ConnectionApi(models.Model):
             try:
                 response = fn(url, timeout=API_DEFAULT_TIMEOUT, **req_kwargs)
                 response.raise_for_status()
+            except requests.exceptions.HTTPError:
+                raise  # to avoid this one from being intercepted by RequestException (since HTTPError is a subclass)
             except requests.exceptions.RequestException as e:
+                # for timeout or DNS error we have no response, so we keep it separated
                 raise ValidationError(self.env._("HTTP call failed: %s", e)) from e
 
         return response.text
