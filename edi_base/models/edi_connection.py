@@ -2,6 +2,7 @@
 import json
 import logging
 from datetime import timedelta
+from urllib.parse import urlparse
 
 import requests
 
@@ -234,7 +235,7 @@ class ConnectionApi(models.Model):
     scope = fields.Char(help="Space-separated list of OAuth2 scopes to request, e.g. 'read write' or 'openid profile'.")
     token_path = fields.Char(
         string="Token Path",
-        help="Relative path of the OAuth2 token endpoint, e.g. /oauth/token",
+        help="Relative path or absolute url of the OAuth2 token endpoint, e.g. /oauth/token or https://api.example.com/oauth/token",
     )
 
     def _api_call(self, path, method, payload=None, headers=None, *args, **kwargs):
@@ -334,7 +335,10 @@ class ConnectionApi(models.Model):
         if not self.url or not self.token_path:
             raise ValidationError(self.env._("No token endpoint properly configured on this connection."))
 
-        url = url_join(self.url.strip(), self.token_path.strip())
+        if urlparse(self.token_path).scheme in ("http", "https"):  # absolute url
+            url = self.token_path.strip()
+        else:
+            url = url_join(self.url.strip(), self.token_path.strip())
         _logger.info("Fetching token from %s", url)
 
         payload = self._api_get_token_payload()
