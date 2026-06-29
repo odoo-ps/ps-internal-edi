@@ -3,7 +3,7 @@ import ast
 import logging
 from datetime import datetime, timezone
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 _logger = logging.getLogger(__name__)
@@ -52,20 +52,30 @@ class IntegrationOut(models.Model):
         self.ensure_one()
 
         content = False
+        res = False
         try:
             # all operations must be executed in the same savepoint
             # because they should be atomic
             with self.env.cr.savepoint():
-                content = self._process_out_data(records)
+                self.env.cr.activity = "Get Content"
+                content = self._get_out_content(records)
+
+                self.env.cr.activity = "Send Synchro"
+                res = self._send_content(content, records)
+
+                self.env.cr.activity = "Postprocess"
+                self._postprocess(res, content, records)
                 # at the exit, the savepoint will flush (force to reveal concurrent updates)
                 # thus, no need of explicit flush
         except Exception:
             raise
         finally:
-            if content:
-                # force the write of the content on the synchronization
-                if self.store_sent_content:
-                    self.env.cr.sync._write_sent(content)
+            # content and res are set before _postprocess, so they survive a savepoint
+            # rollback caused by an exception in _postprocess
+            if content and self.store_sent_content:
+                self.env.cr.sync._write_sent(content)
+            if res and self.store_received_content:
+                self.env.cr.sync._write_received(res)
 
     def _get_out_data(self):
         """Return the data to process for out flow
@@ -84,9 +94,9 @@ class IntegrationOut(models.Model):
         self.ensure_one()
         return self._get_content(data)
 
+    @api.deprecated("The code was moved to _process_out() -> This method is no longer called during execution.")
     def _process_out_data(self, records):
         """Process the given records for out flow
-
         :param records: recordset
         :return: str
         """
@@ -169,8 +179,6 @@ class IntegrationOut(models.Model):
 
         if self.connection_type == "api" and self.path:
             res = self._api_call(self._build_out_payload(content))
-            if self.store_received_content:
-                self.env.cr.sync._write_received(res)
         else:
             res = self.connection_id._send_synchronization(self.env.cr.sync.filename, content)
         self._clean_synchronization(records, "done")
