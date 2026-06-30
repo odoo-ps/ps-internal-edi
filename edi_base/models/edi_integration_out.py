@@ -3,7 +3,7 @@ import ast
 import logging
 from datetime import datetime, timezone
 
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 _logger = logging.getLogger(__name__)
@@ -52,26 +52,21 @@ class IntegrationOut(models.Model):
         self.ensure_one()
 
         content = False
-        res = False
         try:
             # all operations must be executed in the same savepoint
             # because they should be atomic
             with self.env.cr.savepoint():
-                self.env.cr.activity = "Get Content"
-                content = self._get_out_content(records)
-
-                self.env.cr.activity = "Send Synchro"
-                res = self._send_content(content, records)
-
-                self.env.cr.activity = "Postprocess"
-                self._postprocess(res, content, records)
+                content = self._process_out_data(records)
                 # at the exit, the savepoint will flush (force to reveal concurrent updates)
                 # thus, no need of explicit flush
         except Exception:
             raise
         finally:
-            # content and res are set before _postprocess, so they survive a savepoint
-            # rollback caused by an exception in _postprocess
+            # If _postprocess raised, _process_out_data never returned, so content is still
+            # False here — fall back to the value stored on cr by _send_content, which
+            # survives the savepoint rollback because it is a plain Python attribute.
+            content = content or getattr(self.env.cr, "_edi_out_content", False)
+            res = getattr(self.env.cr, "_edi_out_res", False)
             if content and self.store_sent_content:
                 self.env.cr.sync._write_sent(content)
             if res and self.store_received_content:
@@ -94,9 +89,14 @@ class IntegrationOut(models.Model):
         self.ensure_one()
         return self._get_content(data)
 
-    @api.deprecated("The code was moved to _process_out() -> This method is no longer called during execution.")
     def _process_out_data(self, records):
         """Process the given records for out flow
+
+        # TODO (breaking change): remove this method and inline its steps directly in _process_out
+        # (see _get_out_content / _send_content / _postprocess). Also remove cr._edi_out_content
+        # and cr._edi_out_res from _send_content, and the getattr fallbacks in _process_out's finally.
+        # Any module that overrides _process_out_data must migrate to one of the finer-grained hooks.
+
         :param records: recordset
         :return: str
         """
@@ -177,10 +177,19 @@ class IntegrationOut(models.Model):
         """
         self.ensure_one()
 
+        # store on cr so _process_out's finally can access them even after a savepoint rollback
+        # triggered by an exception in _postprocess
+        self.env.cr._edi_out_content = content
+
         if self.connection_type == "api" and self.path:
             res = self._api_call(self._build_out_payload(content))
         else:
             res = self.connection_id._send_synchronization(self.env.cr.sync.filename, content)
+
+        # store on cr so _process_out's finally can access them even after a savepoint rollback
+        # triggered by an exception in _postprocess
+        self.env.cr._edi_out_res = res
+
         self._clean_synchronization(records, "done")
         return res
 
