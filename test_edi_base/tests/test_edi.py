@@ -589,6 +589,36 @@ class TestEdiOUTCases(TestEDICommonBase):
             self.assertEqual(sync.state, "fail")
             self.assertEqual(len(sync.error_ids), 1)
 
+    def test_export_partner_postprocess_crash(self):
+        """sent_content must be stored even when _postprocess crashes and rolls back the savepoint."""
+
+        now = fields.Datetime.now()
+
+        self.Partner.create({"name": "EDI TEST postprocess"})
+        self.new_env.cr.commit()
+
+        with mock.patch.object(
+            type(self.edi), "_postprocess", side_effect=Exception("Simulated crash in _postprocess")
+        ):
+            self.edi.process_integration()
+
+        with self.registry.cursor() as new_cr:
+
+            new_env = api.Environment(new_cr, self.env.user.id, self.env.context)
+
+            integration = new_env["edi.integration"].browse(self.edi.id)
+            self.assertEqual(integration.last_state, "fail")
+            self.assertGreaterEqual(integration.last_failure_date, now)
+
+            sync = new_env["edi.synchronization"].search(
+                [("integration_id", "=", self.edi.id), ("synchronization_date", ">=", now)]
+            )
+
+            self.assertEqual(len(sync), 1)
+            self.assertEqual(sync.state, "fail")
+            self.assertTrue(sync.sent_content, "sent_content must be stored even when _postprocess crashes")
+            self.assertEqual(len(sync.error_ids), 1)
+
     def test_export_partner_real_time(self):
 
         now = fields.Datetime.now()
