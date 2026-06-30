@@ -1,6 +1,5 @@
 import psycopg2
 
-from odoo import _
 from odoo.exceptions import UserError
 
 
@@ -38,6 +37,7 @@ class Locker:
             )
             sequence_id = self.new_cr.fetchone()
             if not sequence_id:
+                self.new_cr.close()
                 raise UserError(self.env._("No lock to grab : sequence %s doesn't exist", self.sequence_name))
 
             self.new_cr.execute("SELECT 1 FROM ir_sequence WHERE id=%s FOR UPDATE NOWAIT", [sequence_id[0]])

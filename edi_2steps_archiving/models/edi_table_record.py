@@ -29,11 +29,11 @@ class EdiTableRecord(models.Model):
 
     @api.model
     def _archive_states(self):
-        return ["new", "fail", "done", "cancel", "warning"]
+        return ["new", "fail", "done", "cancelled", "warning"]
 
     @api.model
     def _archive_states_domain(self, states):
-        return [("state", "in", states)]
+        return Domain([("state", "in", states)])
 
     @api.model
     def _archive_outdated_table_records(self):

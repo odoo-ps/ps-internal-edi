@@ -24,20 +24,20 @@
                     </setting>
                     <setting string="States" help="Archive table records with those states">
                         <div class="mt16 content-group" id="edi_table_record_archive_state_error">
-                            <field name="edi_table_record_archive_state_error"/>
-                            <label for="edi_table_record_archive_state_error" class="o_light_label" string="Error"/>
+                            <field name="edi_table_record_archive_state_fail"/>
+                            <label for="edi_table_record_archive_state_fail" class="o_light_label" string="Error"/>
                         </div>
-                        <div class="mt16 content-group" id="edi_table_record_archive_state_success">
-                            <field name="edi_table_record_archive_state_success"/>
-                            <label for="edi_table_record_archive_state_success" class="o_light_label" string="Success"/>
+                        <div class="mt16 content-group" id="edi_table_record_archive_state_done">
+                            <field name="edi_table_record_archive_state_done"/>
+                            <label for="edi_table_record_archive_state_done" class="o_light_label" string="Success"/>
                         </div>
                         <div class="mt16 content-group" id="edi_table_record_archive_state_new">
                             <field name="edi_table_record_archive_state_new"/>
                             <label for="edi_table_record_archive_state_new" class="o_light_label" string="New"/>
                         </div>
                         <div class="mt16 content-group" id="edi_table_record_archive_state_cancel">
-                            <field name="edi_table_record_archive_state_cancel"/>
-                            <label for="edi_table_record_archive_state_cancel" class="o_light_label" string="Cancel"/>
+                            <field name="edi_table_record_archive_state_cancelled"/>
+                            <label for="edi_table_record_archive_state_cancelled" class="o_light_label" string="Cancelled"/>
                         </div>
                     </setting>
                 </block>

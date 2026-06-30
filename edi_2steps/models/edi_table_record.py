@@ -2,7 +2,7 @@ from collections import defaultdict
 
 import psycopg2
 
-from odoo import _, api, fields, models, Command
+from odoo import api, fields, models, Command
 from odoo.exceptions import UserError
 from odoo.orm.domains import Domain
 from odoo.tools import groupby
@@ -111,7 +111,7 @@ class EdiTableRecord(models.Model):
     def _search_can_be_processed(self, operator, value):
         """Search records that can be processed by the second step"""
         if operator not in ("=", "!=") or value not in (True, False):
-            raise UserError(_("Invalid operator or value"))
+            raise UserError(self.env._("Invalid operator or value"))
 
         domain = []
         for integration in (
@@ -144,7 +144,7 @@ class EdiTableRecord(models.Model):
         action_dict = self.env.ref("edi_base.synchronizations_act_window").read([])[0]
         action_dict.update(
             {
-                "name": _("Synchronizations"),
+                "name": self.env._("Synchronizations"),
                 "domain": [("id", "in", (self.updated_by_sync_ids | self.processed_by_sync_ids).ids)],
             }
         )
@@ -155,7 +155,7 @@ class EdiTableRecord(models.Model):
 
         action_dict = self.env.ref("edi_base.synchronizations_act_window").read([])[0]
         action_dict.update(
-            {"name": _("Updated by synchronizations"), "domain": [("id", "in", self.updated_by_sync_ids.ids)]}
+            {"name": self.env._("Updated by synchronizations"), "domain": [("id", "in", self.updated_by_sync_ids.ids)]}
         )
         return action_dict
 
@@ -164,7 +164,7 @@ class EdiTableRecord(models.Model):
 
         action_dict = self.env.ref("edi_base.synchronizations_act_window").read([])[0]
         action_dict.update(
-            {"name": _("Processed by synchronizations"), "domain": [("id", "in", self.processed_by_sync_ids.ids)]}
+            {"name": self.env._("Processed by synchronizations"), "domain": [("id", "in", self.processed_by_sync_ids.ids)]}
         )
         return action_dict
 
@@ -176,15 +176,14 @@ class EdiTableRecord(models.Model):
         """
         data_to_process = defaultdict(list)
 
-        for integration, group_records in groupby(self, lambda r: r.integration_id):
+        for integration, group_records in self.grouped("integration_id"):
             if not integration.use_edi_table:
-                raise UserError(_("Integration %s is not configured to use EDI 2-steps queue", integration.name))
+                raise UserError(self.env._("Integration %s is not configured to use EDI 2-steps queue", integration.name))
 
             # filter
-            group_records = self.filtered(lambda r: r.id in group_records)
             records_to_process = group_records.filtered("can_be_processed")
             if records_to_process != group_records:
-                raise UserError(_("Some records cannot be processed"))
+                raise UserError(self.env._("Some records cannot be processed"))
 
             # order
             records_to_process = records_to_process.sorted(integration._edi_table_record_order(method=True))
@@ -204,13 +203,13 @@ class EdiTableRecord(models.Model):
     def action_cancel(self, raise_error=True):
         can_be_cancelled = self.filtered("can_be_processed")
         if raise_error and can_be_cancelled != self:
-            raise UserError(_("Some records cannot be cancelled"))
+            raise UserError(self.env._("Some records cannot be cancelled"))
         can_be_cancelled._cancel()
 
     def action_clear(self, raise_error=True):
         can_be_cleared = self.filtered(lambda r: not r.can_be_processed)
         if raise_error and can_be_cleared != self:
-            raise UserError(_("Some records cannot be cleared"))
+            raise UserError(self.env._("Some records cannot be cleared"))
         can_be_cleared._clear()
 
     def action_reset(self):
@@ -226,7 +225,7 @@ class EdiTableRecord(models.Model):
 
     @api.model
     def _end_states(self):
-        return ["success", "fail", "cancel"]
+        return ["done", "fail", "cancelled"]
 
     def _get_error_state(self, exc):
         """Get the state to set when an error occurs

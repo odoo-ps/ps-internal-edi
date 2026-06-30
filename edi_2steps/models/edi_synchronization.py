@@ -1,4 +1,4 @@
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class Synchronization(models.Model):
@@ -68,7 +68,7 @@ class Synchronization(models.Model):
         (updated_table_records & processed_table_records).edi_table_operation = "update_and_process"
         (updated_table_records - processed_table_records).edi_table_operation = "update"
         (processed_table_records - updated_table_records).edi_table_operation = "process"
-        (updated_table_records | processed_table_records).edi_table_operation = False
+        (self - (updated_table_records | processed_table_records)).edi_table_operation = False
 
     # -------------------------------------------------------------------------
     # Actions
@@ -78,7 +78,7 @@ class Synchronization(models.Model):
         self.ensure_one()
         action = self.env["ir.actions.act_window"]._for_xml_id("edi_2steps.edi_table_record_act_window")
         action.update({
-            "name": _("EDI 2-steps queue records updated by %s") % self.name,
+            "name": self.env._("EDI 2-steps queue records updated by %s", self.name),
             "domain": [("id", "in", self.updated_edi_table_record_ids.ids)],
         })
         return action
@@ -87,7 +87,7 @@ class Synchronization(models.Model):
         self.ensure_one()
         action = self.env["ir.actions.act_window"]._for_xml_id("edi_2steps.edi_table_record_act_window")
         action.update({
-            "name": _("EDI 2-steps queue records processed by %s") % self.name,
+            "name": self.env._("EDI 2-steps queue records processed by %s", self.name),
             "domain": [("id", "in", self.processed_edi_table_record_ids.ids)],
         })
         return action

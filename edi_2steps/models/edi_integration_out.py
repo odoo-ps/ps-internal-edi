@@ -30,7 +30,6 @@ class IntegrationOut(models.Model):
         # OVERRIDE
         self.ensure_one()
         if self.use_edi_table:
-
             if self._should_process_edi_table():
                 self.env.cr.activity = "Process EDI 2-steps queue (step 2)"
                 content = self._process_out_edi_table(records)

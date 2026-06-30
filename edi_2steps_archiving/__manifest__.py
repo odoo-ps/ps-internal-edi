@@ -6,7 +6,7 @@
     "category": "Tools",
     "website": "https://www.odoo.com",
     "author": "Odoo PS",
-    "depends": ["edi_2steps"],
+    "depends": ["edi_2steps", "edi_archiving"],
     "data": [
         "views/edi_integration_views.xml",
         "views/edi_synchronization_views.xml",

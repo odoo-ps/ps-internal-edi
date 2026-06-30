@@ -3,7 +3,7 @@ import uuid
 from ast import literal_eval
 from collections import defaultdict
 
-from odoo import _, api, fields, models, Command
+from odoo import api, fields, models, Command
 from odoo.addons.edi_2steps.tools.lock import Locker
 from odoo.orm.domains import Domain
 
@@ -145,7 +145,9 @@ class Integration(models.Model):
         return res
 
     def unlink(self):
+        actions = self.edi_table_cron_id.ir_actions_server_id
         self.edi_table_cron_id.unlink()
+        actions.unlink()
         return super().unlink()
 
     # -------------------------------------------------------------------------
@@ -160,7 +162,7 @@ class Integration(models.Model):
             default_integration_id=self.id, search_default_can_be_processed=True
         )
         action.update({
-            "name": _("%s's EDI 2-steps queue records", self.name),
+            "name": self.env._("%s's EDI 2-steps queue records", self.name),
             "domain": [("integration_id", "=", self.id)],
             "context": ctx,
         })
@@ -202,14 +204,16 @@ class Integration(models.Model):
         return {"priority": self.priority, "user_id": self.user_id.id}
 
     @api.model
-    def create_xmlid(self, record):
-        if record.exists():
-            self.env["ir.model.data"].create({
+    def create_xmlid(self, records):
+        ir_model_data_to_create = []
+        for record in records.exists():
+            ir_model_data_to_create.append({
                 "name": f"{record._table}_{record.id}_{uuid.uuid4().hex[:8]}",
                 "module": "__cloc_exclude__",
                 "res_id": record.id,
                 "model": record._name,
             })
+        self.env["ir.model.data"].create(ir_model_data_to_create)
 
     def check_edi_table_cron_id(self):
         """Check the EDI 2-steps CRON consistency.
@@ -235,9 +239,9 @@ class Integration(models.Model):
                 "interval_type": "minutes",
                 "integration_ids": [Command.link(integration.id)],
             })
-        self.env["ir.cron"].create(crons_to_create)
+        new_edi_table_crons = self.env["ir.cron"].create(crons_to_create)
         # Add xml_id to the server action does avoid the test.cloc.count_customization() to catch it
-        self.create_xmlid(edi2_steps_integrations.edi_table_cron_id.ir_actions_server_id)
+        self.create_xmlid(new_edi_table_crons.ir_actions_server_id)
 
         for integration in edi2_steps_integrations:
             integration.edi_table_cron_id.active = integration.active
@@ -547,7 +551,7 @@ class Integration(models.Model):
             if None, cancel all the edi.table.record linked to this integration
         :return: recordset of edi.table.record
         """
-        result = defaultdict(self.env["edi.table.record"])
+        result = defaultdict(lambda: self.env["edi.table.record"])
         for rec in self._get_edi_table_records(identifiers):
             result[rec.identifier] |= rec
         return result
