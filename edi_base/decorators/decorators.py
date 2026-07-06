@@ -31,6 +31,13 @@ class IntegrationCheck:
 
     def __call__(self, func):
         self.func = func
+        if not self.integration_types:
+            _logger.warning(
+                "IntegrationCheck on %s has no integration types; the type check is skipped "
+                "(raise_if_wrong_integration has no effect) and the decorated method will "
+                "always delegate to super().",
+                getattr(func, "__qualname__", func.__name__),
+            )
         for attr in WRAPPER_ASSIGNMENTS:
             with contextlib.suppress(AttributeError):
                 setattr(self, attr, getattr(func, attr))
@@ -82,7 +89,7 @@ class IntegrationCheck:
             obj_type = obj[:1].type if obj else None
 
             if obj_type not in self.integration_types:
-                if self.raise_if_wrong_integration:
+                if self.raise_if_wrong_integration and self.integration_types:
                     entity = obj.env._("integration") if obj._name == "edi.integration" else obj.env._("edi.connection")
                     raise UserError(
                         obj.env._(
