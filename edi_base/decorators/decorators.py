@@ -1,4 +1,5 @@
 import logging
+import warnings
 from functools import WRAPPER_ASSIGNMENTS
 
 from odoo.exceptions import UserError
@@ -9,13 +10,20 @@ _logger = logging.getLogger(__name__)
 
 
 class IntegrationCheck:
-    def __init__(self, integration_types: list[str], raise_if_wrong_integration: bool = False):
-        if not (
-            isinstance(integration_types, list)
-            and len(integration_types) > 0
-            and all(isinstance(i, str) for i in integration_types)
-        ):
-            raise TypeError("integration_types must be a non-empty list of strings")
+    def __init__(self, *integration_types: str, raise_if_wrong_integration: bool = False):
+        # NOTE: Accept both varargs (@IntegrationCheck("api", "sftp")) and the
+        #       legacy single list/tuple form (@IntegrationCheck(["api", "sftp"])).
+        if len(integration_types) == 1 and isinstance(integration_types[0], (list, tuple)):
+            warnings.warn(
+                "Passing integration types as a list/tuple to IntegrationCheck is deprecated "
+                "and support will be dropped in 20.0; pass them as positional arguments "
+                "instead, e.g. IntegrationCheck('api', 'sftp').",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            integration_types = tuple(integration_types[0])
+        if not all(isinstance(i, str) for i in integration_types):
+            raise TypeError("integration_types must be strings")
         self.integration_types = integration_types
         self.raise_if_wrong_integration = raise_if_wrong_integration
         self.func = None

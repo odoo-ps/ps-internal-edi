@@ -15,7 +15,7 @@ class TestIntegration(models.Model):
 
     type = fields.Selection(selection_add=[("api_2steps", "API 2 steps")], ondelete={"api_2steps": "cascade"})
 
-    @IntegrationCheck(["api_2steps"])
+    @IntegrationCheck("api_2steps")
     def _prepare_in_edi_table(self, data):
         result = []
         for d in data:
@@ -52,7 +52,7 @@ class TestIntegration(models.Model):
                 )
         return result
 
-    @IntegrationCheck(["api_2steps"])
+    @IntegrationCheck("api_2steps")
     def _process_in_edi_table(self, data):
         vals_list = []
         for d in data:
@@ -79,7 +79,7 @@ class TestIntegration(models.Model):
 
         return [{"content": [{"id": record.id, "name": record.name} for record in records]}]
 
-    @IntegrationCheck(["api_2steps"])
+    @IntegrationCheck("api_2steps")
     def _process_out_edi_table(self, records):
         content = StringIO()
         writer = csv.writer(content)

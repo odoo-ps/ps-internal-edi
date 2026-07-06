@@ -178,13 +178,13 @@ The API returns a JSON array; each order is processed as a separate synchronizat
         )
 
         # --- Optional: pass query parameters (pagination, date filter…) ---
-        @IntegrationCheck(["acme_orders_in"])
+        @IntegrationCheck("acme_orders_in")
         def _build_in_payload(self):
             # GET params appended to the URL
             return {"since": str(self.last_success_date or "2000-01-01"), "limit": 100}
 
         # --- Optional: split a multi-item response into one sync per order ---
-        @IntegrationCheck(["acme_orders_in"])
+        @IntegrationCheck("acme_orders_in")
         def _api_wrap_response(self, raw_text):
             orders = json.loads(raw_text).get("orders", [])
             return [
@@ -193,7 +193,7 @@ The API returns a JSON array; each order is processed as a separate synchronizat
             ]
 
         # --- Required: process the received content ---
-        @IntegrationCheck(["acme_orders_in"])
+        @IntegrationCheck("acme_orders_in")
         def _process_content(self, data):
             for d in data:
                 order = json.loads(d["content"])
@@ -266,7 +266,7 @@ Scenario: push stock levels to a REST API that requires OAuth2 client credential
         )
 
         # --- Required: serialize records into the API payload ---
-        @IntegrationCheck(["wms_stock_out"])
+        @IntegrationCheck("wms_stock_out")
         def _get_content(self, records):
             return json.dumps([
                 {"sku": p.default_code, "qty": p.qty_available}
@@ -274,7 +274,7 @@ Scenario: push stock levels to a REST API that requires OAuth2 client credential
             ])
 
         # --- Optional: post-process after successful send ---
-        @IntegrationCheck(["wms_stock_out"])
+        @IntegrationCheck("wms_stock_out")
         def _postprocess(self, response, content, records):
             records.write({"wms_last_sync": fields.Datetime.now()})
 
@@ -369,7 +369,7 @@ Other useful options
 
     .. code-block:: python
 
-        @IntegrationCheck(["get_products_from_xx_software"])
+        @IntegrationCheck("get_products_from_xx_software")
         def _process_content(self, data):
               # then I can write my code
 
@@ -377,7 +377,7 @@ Other useful options
 
     .. code-block:: python
 
-        @IntegrationCheck(["get_products_from_xx_software"], raise_if_wrong_integration=True)
+        @IntegrationCheck("get_products_from_xx_software", raise_if_wrong_integration=True)
         def _process_content(self, data):
               # then I can write my code
 

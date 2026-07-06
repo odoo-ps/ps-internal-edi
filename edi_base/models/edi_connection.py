@@ -382,7 +382,7 @@ class ConnectionApi(models.Model):
         data = response.json()
         return data.get("access_token"), data.get("expires_in", API_TOKEN_EXPIRY_FALLBACK)
 
-    @IntegrationCheck(["api"])
+    @IntegrationCheck("api")
     def test(self):
         self.ensure_one()
         if self.auth_method == "http_oauth2":

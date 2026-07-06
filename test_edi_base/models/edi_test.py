@@ -36,7 +36,7 @@ class TestIntegration(models.Model):
 
     _inherit = "edi.integration"
 
-    @IntegrationCheck(["api"])
+    @IntegrationCheck("api")
     def _get_content(self, records):
         if len(records) == 1 and "error" in records.name:
             self._report_error("Export Partner", message="Cannot export the partner")
@@ -60,7 +60,7 @@ class TestIntegration(models.Model):
         writer.writerows(rows)
         return content.getvalue()
 
-    @IntegrationCheck(["api"])
+    @IntegrationCheck("api")
     def _process_content(self, data):
         for d in data:
 

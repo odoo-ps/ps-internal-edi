@@ -25,34 +25,34 @@ class SFTPConnection(models.Model):
     #             Methods overridden from edi_base                      #
     #####################################################################
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     def test(self):
         """Try to connect to the server"""
         self.ensure_one()
         self._ftp_test_connection()
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     def _send_synchronization(self, filename, content, *args, **kwargs):
         """Override to upload the file"""
         self.ensure_one()
         return self._ftp_send_file(filename, content, *args, **kwargs)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     def _fetch_synchronizations(self, *args, **kwargs):
         """Override to download the file from the FTP server"""
         self.ensure_one()
         return self._ftp_fetch_files(*args, **kwargs)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     def _clean_synchronization_in(self, data, status, *args, **kwargs):
         self._clean_local_file(data, *args, **kwargs)
         self._clean(data.get("filename"), status, "in", *args, **kwargs)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     def _clean_synchronization_out(self, filename, status, *args, **kwargs):
         self._clean(filename, status, "out", *args, **kwargs)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     def _get_default_configuration(self):
         """Provide a configuration template for this type of connection"""
         self.ensure_one()
@@ -76,7 +76,7 @@ class SFTPConnection(models.Model):
     #    by a connection based on SFTP                                  #
     #####################################################################
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     def connect(self):
         """Open a connection"""
         self.ensure_one()
@@ -107,13 +107,13 @@ class SFTPConnection(models.Model):
         self.ftp_load_config(server, config)
         return server
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def pwd(self, server):
         """Get the current directory"""
         return server.pwd
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def dir_exists(self, server, path):
         """Check if the directory exists"""
@@ -123,28 +123,28 @@ class SFTPConnection(models.Model):
         except Exception:
             return False
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def file_exists(self, server, path, filename):
         """Check if the file exists"""
         return server.exists(os.path.join(path, filename))
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def delete_file(self, server, path):
         server.remove(path)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def change_dir(self, server, path):
         server.chdir(path)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def rename(self, server, old, new):
         server.rename(old, new)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def list_files(self, server, path=False, filename=False):
         if path:
@@ -166,12 +166,12 @@ class SFTPConnection(models.Model):
                     filenames.append(attr.filename)
         return filenames
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def _upload_file(self, server, filename, binary_content):
         server.putfo(binary_content, filename)
 
-    @IntegrationCheck(["sftp"])
+    @IntegrationCheck("sftp")
     @api.model
     def _download_file(self, server, directory, filename):
         server.get(filename, os.path.join(directory, filename))
