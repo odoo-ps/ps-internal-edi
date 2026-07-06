@@ -1,12 +1,12 @@
 {
     "name": "Odoo PS EDI Framework",
-    "version": "19.0.2.0.1",
+    "version": "19.0.2.0.2",
     "license": "OEEL-1",
     "summary": "Gateway between odoo and third party components",
     "category": "Tools",
     "website": "https://www.odoo.com",
     "author": "Odoo PS",
-    "depends": ["mail"],
+    "depends": ["mail", "edi_audit"],
     "data": [
         "security/edi_base.xml",
         "security/ir.model.access.csv",
