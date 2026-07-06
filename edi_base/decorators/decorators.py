@@ -78,7 +78,8 @@ class IntegrationCheck:
 
         if obj._name not in ("edi.integration", "edi.connection"):
             _logger.warning(
-                f"IntegrationCheck decorator can only be used on edi.integration or edi.connection, not on {obj._name}"
+                "IntegrationCheck decorator can only be used on edi.integration or edi.connection, not on %s",
+                obj._name
             )
             return self
 
