@@ -2,6 +2,7 @@ import logging
 from functools import WRAPPER_ASSIGNMENTS
 
 from odoo.exceptions import UserError
+import contextlib
 
 
 _logger = logging.getLogger(__name__)
@@ -23,10 +24,8 @@ class IntegrationCheck:
     def __call__(self, func):
         self.func = func
         for attr in WRAPPER_ASSIGNMENTS:
-            try:
+            with contextlib.suppress(AttributeError):
                 setattr(self, attr, getattr(func, attr))
-            except AttributeError:
-                pass
         self.__wrapped__ = func
         return self
 
@@ -58,10 +57,8 @@ class IntegrationCheck:
                 return ic.__get__(rec, type(rec))(*args, **kwargs)
 
             for attr in WRAPPER_ASSIGNMENTS:
-                try:
+                with contextlib.suppress(AttributeError):
                     setattr(unbound, attr, getattr(self, attr))
-                except AttributeError:
-                    pass
             return unbound
 
         if obj._name not in ("edi.integration", "edi.connection"):
