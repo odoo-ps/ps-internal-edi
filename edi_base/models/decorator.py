@@ -6,6 +6,8 @@ from functools import wraps
 from odoo import SUPERUSER_ID, api, fields
 from odoo.modules.registry import Registry
 
+from odoo.addons.edi_audit.audit import AuditRun
+
 
 _logger = logging.getLogger(__name__)
 
@@ -24,35 +26,17 @@ def integration(name):
         @wraps(fct)
         def wrapper(self, *args, **kwargs):
             self.env.flush_all()
-            new_cr = Registry(self.env.cr.dbname).cursor()
-            new_env = api.Environment(new_cr, SUPERUSER_ID, self.env.context)
-            edi = new_env["edi.integration"].search(
-                [("name", "=", name), "|", ("active", "=", False), ("active", "=", True)], limit=1
-            )
 
-            if not edi:
-                edi = edi.create(
-                    {
-                        "integration_flow": "in",
-                        "connection_id": new_env.ref("edi_base.api_connection").id,
-                        "type": "api",
-                        "name": name,
-                        "synchronization_content_type": "json",
-                        "active": False,
-                    }
-                )
-                _logger.info("No integration found, a default one has been created: '%s' [%s]", name, edi.id)
+            # The integration must be committed on its own cursor so the audit
+            # transaction (a separate cursor) can FK-reference it.
+            edi_id = _get_or_create_api_integration(self.env, name)
 
-            # NOTE inspired from _process_synchronization
-            # create a default synchronization,
-            # commit it, so that the synchronization is created
-            # even in case of timeout during the prosess
-            sync = edi.env["edi.synchronization"].create(
-                {
-                    "name": "%s @%s" % (edi.name, time.time()),
-                    "integration_id": edi.id,
-                    "synchronization_date": fields.Datetime.now(),
-                    "received_content": """
+            sync_name = "%s @%s" % (name, time.time())
+            metadata = {
+                "name": sync_name,
+                "integration_id": edi_id,
+                "synchronization_date": fields.Datetime.now(),
+                "received_content": """
                     Function
                     \t%s.%s
                     Args
@@ -62,28 +46,67 @@ def integration(name):
                     Context
                     \t%s
                 """
-                    % (self._name, fct.__name__, args, kwargs, self.env.context),
-                    "user_id": self.env.user.id,
-                }
-            )
+                % (self._name, fct.__name__, args, kwargs, self.env.context),
+                "user_id": self.env.user.id,
+            }
 
-            new_cr.commit()
+            # SUPERUSER: creating edi.synchronization requires base.group_system
+            # (see edi_base/security/ir.model.access.csv); audit must not be
+            # blocked by the caller's rights (matches prior decorator behavior).
+            run = AuditRun(
+                self.env,
+                "edi_synchronization",
+                name=sync_name,
+                metadata=metadata,
+                default_activity=name,
+                uid=SUPERUSER_ID,
+            )
+            run.start()
             res = None
             try:
                 with self.env.cr.savepoint():
                     res = fct(self, *args, **kwargs)
-            except Exception as e:
-                sync._report_error(name, e)
+            except Exception as exc:
+                run.error(exception=exc)
+                run.fail()
                 raise
             else:
-                sync._done()
+                run.done()
             finally:
-                edi._set_status(sync)
-
-                new_cr.commit()
-                new_cr.close()
+                if run.record:
+                    run.record.integration_id._set_status(run.record)
+                    run.commit()
+                run.close()
             return res
 
         return wrapper
 
     return decorator
+
+
+def _get_or_create_api_integration(env, name):
+    """Return the id of the (committed) api integration named ``name``.
+
+    Created on a dedicated cursor and committed so a separate audit
+    transaction can reference it.
+    """
+    new_cr = Registry(env.cr.dbname).cursor()
+    new_env = api.Environment(new_cr, SUPERUSER_ID, env.context)
+    try:
+        edi = new_env["edi.integration"].search(
+            [("name", "=", name), "|", ("active", "=", False), ("active", "=", True)], limit=1
+        )
+        if not edi:
+            edi = new_env["edi.integration"].create({
+                "integration_flow": "in",
+                "connection_id": new_env.ref("edi_base.api_connection").id,
+                "type": "api",
+                "name": name,
+                "synchronization_content_type": "json",
+                "active": False,
+            })
+            _logger.info("No integration found, a default one has been created: '%s' [%s]", name, edi.id)
+        new_cr.commit()
+        return edi.id
+    finally:
+        new_cr.close()
