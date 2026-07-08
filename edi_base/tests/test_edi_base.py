@@ -674,6 +674,7 @@ class TestEdiApiPipeline(TestEDICommonBase):
         expected = "Basic " + base64.b64encode(b"testuser:testpass").decode()
         self.assertEqual(prep.headers.get("Authorization"), expected)
 
+    @mute_logger("odoo.addons.edi_base.models.edi_connection")
     def test_auth_oauth2_pipeline(self):
         """oauth2 auth fetches a token then uses it as Bearer in the resource call"""
         conn = (
@@ -842,6 +843,7 @@ class TestEdiOAuth2(TestEDICommonBase):
         self.assertTrue(callable(method))
         self.assertEqual(method.__name__, "test")
 
+    @mute_logger("odoo.addons.edi_base.models.edi_connection")
     @patch("odoo.addons.edi_base.models.edi_connection.requests.post")
     def test_test_via_rpc_path(self, mock_post):
         """test() called via Odoo's RPC dispatcher (call_kw) reaches the correct API implementation."""
@@ -876,6 +878,7 @@ class TestEdiOAuth2(TestEDICommonBase):
         self.assertEqual(notif_type, "simple_notification")
         self.assertIn("Authentication succeeded", payload["message"])
 
+    @mute_logger("odoo.addons.edi_base.models.edi_connection")
     @patch("odoo.addons.edi_base.models.edi_connection.requests.post")
     def test_get_token_full_flow(self, mock_post):
         """_api_get_token fetches and caches a token; test() reports authentication success"""

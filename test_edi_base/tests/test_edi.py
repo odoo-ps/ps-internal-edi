@@ -111,11 +111,12 @@ class TestEdiApiCasesXMLRPC(TestHttpBase):
         super().setUpClass()
         user = cls.env.ref("base.user_admin")
         user = user.with_user(user)
-        key = (
-            user.env["res.users.apikeys"]
-            .sudo()
-            ._generate(scope="rpc", name="test", expiration_date=datetime.now() + timedelta(days=0.5))
-        )
+        with mute_logger("odoo.addons.base.models.res_users"):
+            key = (
+                user.env["res.users.apikeys"]
+                .sudo()
+                ._generate(scope="rpc", name="test", expiration_date=datetime.now() + timedelta(days=0.5))
+            )
         cls.bearer_header = {"Authorization": f"Bearer {key}"}
 
     def test_api_decorator_json(self):
