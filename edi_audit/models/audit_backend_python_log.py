@@ -12,8 +12,9 @@ class AuditBackendPythonLog(models.AbstractModel):
     _description = "Audit backend: python logging"
 
     def _audit_start(self, name, metadata):
-        _logger.info("Audit run started: %s", name)
-        return name
+        cid = self._audit_run_id()
+        _logger.info("Audit run started: %s [%s]", name, cid)
+        return cid
 
     def _audit_received(self, entry, content):
         _logger.info("Audit [%s] received: %s", entry, content)

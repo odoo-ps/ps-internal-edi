@@ -6,7 +6,7 @@ from functools import wraps
 from odoo import SUPERUSER_ID, api, fields
 from odoo.modules.registry import Registry
 
-from odoo.addons.edi_audit.audit import AuditRun
+from odoo.addons.edi_audit.audit import _run_audited
 
 
 _logger = logging.getLogger(__name__)
@@ -27,8 +27,6 @@ def integration(name):
         def wrapper(self, *args, **kwargs):
             self.env.flush_all()
 
-            # The integration must be committed on its own cursor so the audit
-            # transaction (a separate cursor) can FK-reference it.
             edi_id = _get_or_create_api_integration(self.env, name)
 
             sync_name = "%s @%s" % (name, time.time())
@@ -36,48 +34,21 @@ def integration(name):
                 "name": sync_name,
                 "integration_id": edi_id,
                 "synchronization_date": fields.Datetime.now(),
-                "received_content": """
-                    Function
-                    \t%s.%s
-                    Args
-                    \t%s
-                    Kwarg
-                    \t%s
-                    Context
-                    \t%s
-                """
-                % (self._name, fct.__name__, args, kwargs, self.env.context),
                 "user_id": self.env.user.id,
             }
 
-            # SUPERUSER: creating edi.synchronization requires base.group_system
-            # (see edi_base/security/ir.model.access.csv); audit must not be
-            # blocked by the caller's rights (matches prior decorator behavior).
-            run = AuditRun(
-                self.env,
+            return _run_audited(
+                self,
                 "edi_synchronization",
-                name=sync_name,
+                sync_name,
+                fct,
+                args,
+                kwargs,
                 metadata=metadata,
-                default_activity=name,
                 uid=SUPERUSER_ID,
+                default_activity=name,
+                on_finalize=lambda sync: sync.integration_id._set_status(sync),
             )
-            run.start()
-            res = None
-            try:
-                with self.env.cr.savepoint():
-                    res = fct(self, *args, **kwargs)
-            except Exception as exc:
-                run.error(exception=exc)
-                run.fail()
-                raise
-            else:
-                run.done()
-            finally:
-                if run.record:
-                    run.record.integration_id._set_status(run.record)
-                    run.commit()
-                run.close()
-            return res
 
         return wrapper
 

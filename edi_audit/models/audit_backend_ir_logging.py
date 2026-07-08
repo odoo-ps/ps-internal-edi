@@ -9,22 +9,23 @@ class AuditBackendIrLogging(models.AbstractModel):
     _audit_needs_cursor = True
 
     def _audit_start(self, name, metadata):
-        self._audit_log("start", name)
-        return name
+        cid = self._audit_run_id()
+        self._audit_log("start", name, cid)
+        return cid
 
     def _audit_received(self, entry, content):
-        self._audit_log("received", content)
+        self._audit_log("received", content, entry)
 
     def _audit_sent(self, entry, content):
-        self._audit_log("sent", content)
+        self._audit_log("sent", content, entry)
 
     def _audit_error(self, entry, activity, exception=None, message=None):
-        self._audit_log(activity or "error", message or exception, level="ERROR")
+        self._audit_log(activity or "error", message or exception, entry, level="ERROR")
 
     def _audit_finalize(self, entry, state):
-        self._audit_log("finalize", state)
+        self._audit_log("finalize", state, entry)
 
-    def _audit_log(self, func, message, level="INFO"):
+    def _audit_log(self, func, message, cid, level="INFO"):
         self.env["ir.logging"].create({
             "name": "edi_audit",
             "type": "server",
@@ -32,6 +33,6 @@ class AuditBackendIrLogging(models.AbstractModel):
             "dbname": self.env.cr.dbname,
             "message": str(message),
             "func": func,
-            "path": "edi_audit",
+            "path": cid,
             "line": "0",
         })

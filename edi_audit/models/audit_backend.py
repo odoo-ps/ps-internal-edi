@@ -1,3 +1,5 @@
+import uuid
+
 from odoo import models
 
 
@@ -6,6 +8,10 @@ class AuditBackend(models.AbstractModel):
     _description = "Audit backend (contract)"
 
     _audit_needs_cursor = False  # True -> AuditRun opens an isolated cursor
+
+    def _audit_run_id(self):
+        """A per-run correlation id, used by log backends to group a run's emissions."""
+        return uuid.uuid4().hex
 
     def _audit_start(self, name, metadata):
         raise NotImplementedError

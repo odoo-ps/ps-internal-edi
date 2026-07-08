@@ -5,6 +5,7 @@ from io import StringIO
 from odoo import api, models
 from odoo.addons.edi_base.decorators import IntegrationCheck
 
+from odoo.addons.edi_audit.audit import audit
 from odoo.addons.edi_base.models.decorator import integration
 
 
@@ -30,6 +31,22 @@ class ResPartner(models.Model):
             time.sleep(data.pop("time"))
 
         return self.create([data]).id
+
+    @api.model
+    @audit("python_log", name="Audit Probe")
+    def audit_probe_ok(self, value):
+        return value
+
+    @api.model
+    @audit("python_log")
+    def audit_probe_fail(self):
+        raise ValueError("probe boom")
+
+    @api.model
+    @integration("Stacked Probe")
+    @audit("python_log")
+    def stacked_probe(self, value):
+        return value
 
 
 class TestIntegration(models.Model):
