@@ -1,44 +1,40 @@
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.edi_audit.audit import AuditRun, audit_run
-from odoo.addons.edi_audit.audit.backend import AuditBackend
 
 
-class _RecordingBackend(AuditBackend):
-    needs_env = False
+class _RecordingBackend:
+    _audit_needs_cursor = False
 
     def __init__(self):
         self.calls = []
 
-    def start(self, env, name, metadata):
+    def _audit_start(self, name, metadata):
         self.calls.append(("start", name))
+        return name
 
-    def received(self, content):
-        self.calls.append(("received", content))
+    def _audit_received(self, entry, content):
+        self.calls.append(("received", entry, content))
 
-    def sent(self, content):
-        self.calls.append(("sent", content))
+    def _audit_sent(self, entry, content):
+        self.calls.append(("sent", entry, content))
 
-    def error(self, activity, exception=None, message=None):
-        self.calls.append(("error", activity, str(exception) if exception else message))
+    def _audit_error(self, entry, activity, exception=None, message=None):
+        self.calls.append(("error", entry, activity, str(exception) if exception else message))
 
-    def finalize(self, state):
-        self.calls.append(("finalize", state))
+    def _audit_finalize(self, entry, state):
+        self.calls.append(("finalize", entry, state))
 
 
-class _EnvBackend(_RecordingBackend):
-    needs_env = True
-
-    def start(self, env, name, metadata):
-        super().start(env, name, metadata)
-        self._seen_env = env
+class _CursorBackend(_RecordingBackend):
+    _audit_needs_cursor = True
 
 
 class _FailingStartBackend(_RecordingBackend):
-    needs_env = True
+    _audit_needs_cursor = True
 
-    def start(self, env, name, metadata):
-        raise ValueError("start kaboom")
+    def _audit_start(self, name, metadata):
+        raise ValueError("start kaboom")  # noqa: EM101
 
 
 @tagged("post_install", "-at_install", "ps_internal_edi")
@@ -50,8 +46,14 @@ class TestAuditRun(TransactionCase):
             run.sent("out")
         self.assertEqual(
             backend.calls,
-            [("start", "run1"), ("received", "in"), ("sent", "out"), ("finalize", "done")],
+            [
+                ("start", "run1"),
+                ("received", "run1", "in"),
+                ("sent", "run1", "out"),
+                ("finalize", "run1", "done"),
+            ],
         )
+        self.assertEqual(run.entry, "run1")
 
     def test_span_exception_finalizes_fail(self):
         backend = _RecordingBackend()
@@ -59,17 +61,17 @@ class TestAuditRun(TransactionCase):
             with audit_run(self.env, backend, name="run2"):
                 raise ValueError("boom")
         self.assertEqual(backend.calls[0], ("start", "run2"))
-        self.assertIn(("finalize", "fail"), backend.calls)
+        self.assertIn(("finalize", "run2", "fail"), backend.calls)
         self.assertTrue(any(call[0] == "error" for call in backend.calls))
 
-    def test_no_cursor_when_backend_needs_no_env(self):
+    def test_no_cursor_when_backend_needs_no_cursor(self):
         run = AuditRun(self.env, _RecordingBackend(), name="run3")
         run.start()
         self.addCleanup(run.close)
         self.assertIsNone(run.env)
 
-    def test_isolated_cursor_when_backend_needs_env(self):
-        run = AuditRun(self.env, _EnvBackend(), name="run4")
+    def test_isolated_cursor_when_backend_needs_cursor(self):
+        run = AuditRun(self.env, _CursorBackend(), name="run4")
         run.start()
         self.addCleanup(run.close)
         self.assertIsNotNone(run.env)
@@ -79,18 +81,17 @@ class TestAuditRun(TransactionCase):
         run = AuditRun(self.env, _FailingStartBackend(), name="run6")
         with self.assertRaisesRegex(ValueError, "start kaboom"):
             run.start()
-        # cursor was opened (needs_env) but must have been closed on failure
         self.assertIsNone(run.env)
 
-    def test_string_backend_key_resolves(self):
-        # a backend passed by key is resolved via the registry
-        with self.assertRaisesRegex(KeyError, "nope_key"):
-            AuditRun(self.env, "nope_key", name="run5")
+    def test_unknown_backend_key_raises_on_start(self):
+        run = AuditRun(self.env, "nope_key", name="run5")
+        with self.assertRaisesRegex(KeyError, "edi.audit.backend.nope_key"):
+            run.start()
 
     def test_cancel_finalizes_cancelled(self):
         backend = _RecordingBackend()
         run = AuditRun(self.env, backend, name="run7")
         run.start()
         run.cancel()
-        self.assertIn(("finalize", "cancelled"), backend.calls)
+        self.assertIn(("finalize", "run7", "cancelled"), backend.calls)
         self.assertTrue(run.finalized)

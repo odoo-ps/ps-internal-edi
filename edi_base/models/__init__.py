@@ -6,3 +6,4 @@ from . import edi_integration_in
 from . import edi_integration_out
 from . import edi_synchronization
 from . import edi_connection
+from . import audit_backend_edi_synchronization

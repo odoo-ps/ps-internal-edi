@@ -1,15 +1,11 @@
 import contextlib
 
 from odoo import api
+from odoo.models import BaseModel
 from odoo.modules.registry import Registry
 
-from .backend import AuditBackend, get_backend
 
-
-def _resolve_backend(backend):
-    if isinstance(backend, AuditBackend):
-        return backend
-    return get_backend(backend)
+_BACKEND_PREFIX = "edi.audit.backend."
 
 
 class AuditRun:
@@ -17,17 +13,20 @@ class AuditRun:
 
     Owns an isolated cursor/env (only when the backend needs one) so the audit
     trail is committed independently of the caller's transaction and survives a
-    rollback of the main flow. Replaces the old ``cr.sync`` cursor threading:
-    the run is passed around explicitly instead.
+    rollback of the main flow. Backends are stateless ``edi.audit.backend.*``
+    AbstractModels resolved per-database through the ORM registry; ``_audit_start``
+    returns an opaque entry that this handle threads back into every later call.
     """
 
     def __init__(self, env, backend, name, metadata=None, default_activity=None, uid=None):
         self._src_env = env
         self._uid = uid or env.uid
-        self.backend = _resolve_backend(backend)
+        self._backend_spec = backend
         self.name = name
         self.metadata = metadata or {}
         self.default_activity = default_activity
+        self._backend = None
+        self._entry = None
         self._cr = None
         self._env = None
         self.finalized = False
@@ -37,15 +36,29 @@ class AuditRun:
         return self._env
 
     @property
+    def entry(self):
+        return self._entry
+
+    @property
     def record(self):
-        return getattr(self.backend, "record", None)
+        return self._entry if isinstance(self._entry, BaseModel) else None
+
+    def _resolve(self, env):
+        # NOTE: A string key resolves to an AbstractModel on the given env;
+        #       otherwise the spec is a pre-resolved recordset or a duck-typed
+        #       test double, used as-is.
+        backend = env[_BACKEND_PREFIX + self._backend_spec] if isinstance(self._backend_spec, str) else self._backend_spec
+        if backend._audit_needs_cursor:
+            self._cr = Registry(self._src_env.cr.dbname).cursor()
+            self._env = api.Environment(self._cr, self._uid, self._src_env.context)
+            if isinstance(backend, BaseModel):
+                backend = backend.with_env(self._env)
+        return backend
 
     def start(self):
+        self._backend = self._resolve(self._src_env)
         try:
-            if self.backend.needs_env:
-                self._cr = Registry(self._src_env.cr.dbname).cursor()
-                self._env = api.Environment(self._cr, self._uid, self._src_env.context)
-            self.backend.start(self._env, self.name, self.metadata)
+            self._entry = self._backend._audit_start(self.name, self.metadata)
             self.commit()
         except Exception:
             self.close()
@@ -53,15 +66,17 @@ class AuditRun:
         return self
 
     def received(self, content):
-        self.backend.received(content)
+        self._backend._audit_received(self._entry, content)
         self.commit()
 
     def sent(self, content):
-        self.backend.sent(content)
+        self._backend._audit_sent(self._entry, content)
         self.commit()
 
     def error(self, exception=None, message=None, activity=None):
-        self.backend.error(activity or self.default_activity or "error", exception=exception, message=message)
+        self._backend._audit_error(
+            self._entry, activity or self.default_activity or "error", exception=exception, message=message
+        )
         self.commit()
 
     def done(self):
@@ -74,7 +89,7 @@ class AuditRun:
         self._finalize("cancelled")
 
     def _finalize(self, state):
-        self.backend.finalize(state)
+        self._backend._audit_finalize(self._entry, state)
         self.finalized = True
         self.commit()
 
