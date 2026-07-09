@@ -324,15 +324,19 @@ class TestEdiApiCallBehavior(TestEDICommonBase):
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Client Error")
 
-        with patch.object(requests.Session, "get", return_value=mock_response):
-            with self.assertRaises(requests.exceptions.HTTPError):
-                self.mock_connection._api_call(path="/api", method="get")
+        with (
+            patch.object(requests.Session, "get", return_value=mock_response),
+            self.assertRaises(requests.exceptions.HTTPError)
+        ):
+            self.mock_connection._api_call(path="/api", method="get")
 
     def test_api_call_connection_error_raises_validation_error(self):
         """_api_call raises ValidationError on network-level errors"""
-        with patch.object(requests.Session, "get", side_effect=requests.exceptions.ConnectionError("timeout")):
-            with self.assertRaises(ValidationError):
-                self.mock_connection._api_call(path="/api", method="get")
+        with (
+            patch.object(requests.Session, "get", side_effect=requests.exceptions.ConnectionError("timeout")),
+            self.assertRaises(ValidationError)
+        ):
+            self.mock_connection._api_call(path="/api", method="get")
 
     def test_api_session_public_no_auth_header(self):
         """Public auth type creates a plain session without Authorization header"""
