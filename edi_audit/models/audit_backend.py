@@ -16,10 +16,10 @@ class AuditBackend(models.AbstractModel):
     def _audit_start(self, name, metadata):
         raise NotImplementedError
 
-    def _audit_received(self, entry, content):
+    def _audit_input(self, entry, content):
         raise NotImplementedError
 
-    def _audit_sent(self, entry, content):
+    def _audit_output(self, entry, content):
         raise NotImplementedError
 
     def _audit_error(self, entry, activity, exception=None, message=None):

@@ -14,6 +14,16 @@ def _describe_call(record, fct, args, kwargs):
     )
 
 
+def _describe_result(result):
+    # NOTE: Describing the return value must never fail the audited call: it
+    #       runs after the call succeeded, so a raising __repr__ would turn a
+    #       completed operation into an error.
+    try:
+        return f"Result\n\t{result!r}"
+    except Exception:  # noqa: BLE001
+        return f"Result\n\t<undescribable {type(result).__name__}>"
+
+
 def _run_audited(record, backend, name, fct, args, kwargs, *, metadata=None, uid=None, default_activity=None, on_finalize=None):
     with audit_run(
         record.env,
@@ -24,9 +34,10 @@ def _run_audited(record, backend, name, fct, args, kwargs, *, metadata=None, uid
         uid=uid,
         on_finalize=on_finalize,
     ) as run:
-        run.received(_describe_call(record, fct, args, kwargs))
+        run.input(_describe_call(record, fct, args, kwargs))
         with record.env.cr.savepoint():
             res = fct(record, *args, **kwargs)
+        run.output(_describe_result(res))
     return res
 
 

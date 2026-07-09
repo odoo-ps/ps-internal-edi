@@ -12,7 +12,7 @@ from odoo.addons.edi_audit.audit import _run_audited
 _logger = logging.getLogger(__name__)
 
 
-def integration(name):
+def integration(name, flow="in"):
     """
     The idea behind that decorator is to allow to mark some RPC'allable methods
     to behave the same way an integration does.
@@ -20,6 +20,9 @@ def integration(name):
     As for realtime method, inconsistency can happen since the function is executed on
     a different cursor than the integration and synchronization status.
     fct(*args, **kwargs) is using cursor args[0].env.cr != new self.env.cr (used by the integration)
+
+    ``flow`` sets the direction ("in" or "out") of the integration when it is
+    first created; it has no effect if the integration already exists.
     """
 
     def decorator(fct):
@@ -27,7 +30,7 @@ def integration(name):
         def wrapper(self, *args, **kwargs):
             self.env.flush_all()
 
-            edi_id = _get_or_create_api_integration(self.env, name)
+            edi_id = _get_or_create_api_integration(self.env, name, flow)
 
             sync_name = "%s @%s" % (name, time.time())
             metadata = {
@@ -55,11 +58,13 @@ def integration(name):
     return decorator
 
 
-def _get_or_create_api_integration(env, name):
+def _get_or_create_api_integration(env, name, flow):
     """Return the id of the (committed) api integration named ``name``.
 
     Created on a dedicated cursor and committed so a separate audit
-    transaction can reference it.
+    transaction can reference it. ``flow`` ("in" or "out") is only used
+    when the integration doesn't exist yet; reuse of an existing
+    integration is by name alone.
     """
     new_cr = Registry(env.cr.dbname).cursor()
     new_env = api.Environment(new_cr, SUPERUSER_ID, env.context)
@@ -69,7 +74,7 @@ def _get_or_create_api_integration(env, name):
         )
         if not edi:
             edi = new_env["edi.integration"].create({
-                "integration_flow": "in",
+                "integration_flow": flow,
                 "connection_id": new_env.ref("edi_base.api_connection").id,
                 "type": "api",
                 "name": name,

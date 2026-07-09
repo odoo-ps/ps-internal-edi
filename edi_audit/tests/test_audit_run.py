@@ -1,6 +1,7 @@
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.edi_audit.audit import AuditRun, audit_run
+from odoo.addons.edi_audit.audit.decorator import _describe_result
 
 
 class _RecordingBackend:
@@ -13,11 +14,11 @@ class _RecordingBackend:
         self.calls.append(("start", name))
         return name
 
-    def _audit_received(self, entry, content):
-        self.calls.append(("received", entry, content))
+    def _audit_input(self, entry, content):
+        self.calls.append(("input", entry, content))
 
-    def _audit_sent(self, entry, content):
-        self.calls.append(("sent", entry, content))
+    def _audit_output(self, entry, content):
+        self.calls.append(("output", entry, content))
 
     def _audit_error(self, entry, activity, exception=None, message=None):
         self.calls.append(("error", entry, activity, str(exception) if exception else message))
@@ -42,14 +43,14 @@ class TestAuditRun(TransactionCase):
     def test_span_success_lifecycle(self):
         backend = _RecordingBackend()
         with audit_run(self.env, backend, name="run1") as run:
-            run.received("in")
-            run.sent("out")
+            run.input("in")
+            run.output("out")
         self.assertEqual(
             backend.calls,
             [
                 ("start", "run1"),
-                ("received", "run1", "in"),
-                ("sent", "run1", "out"),
+                ("input", "run1", "in"),
+                ("output", "run1", "out"),
                 ("finalize", "run1", "done"),
             ],
         )
@@ -95,3 +96,14 @@ class TestAuditRun(TransactionCase):
         run.cancel()
         self.assertIn(("finalize", "run7", "cancelled"), backend.calls)
         self.assertTrue(run.finalized)
+
+    def test_describe_result_degrades_on_raising_repr(self):
+        """Describing the return value must never raise: a broken __repr__ would
+        otherwise fail an already-successful audited call."""
+
+        class _BadRepr:
+            def __repr__(self):
+                raise ValueError("no repr for you")  # noqa: EM101
+
+        described = _describe_result(_BadRepr())
+        self.assertIn("<undescribable _BadRepr>", described)

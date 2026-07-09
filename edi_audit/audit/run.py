@@ -65,12 +65,12 @@ class AuditRun:
             raise
         return self
 
-    def received(self, content):
-        self._backend._audit_received(self._entry, content)
+    def input(self, content):
+        self._backend._audit_input(self._entry, content)
         self.commit()
 
-    def sent(self, content):
-        self._backend._audit_sent(self._entry, content)
+    def output(self, content):
+        self._backend._audit_output(self._entry, content)
         self.commit()
 
     def error(self, exception=None, message=None, activity=None):

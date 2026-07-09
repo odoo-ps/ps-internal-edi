@@ -16,11 +16,11 @@ class AuditBackendPythonLog(models.AbstractModel):
         _logger.info("Audit run started: %s [%s]", name, cid)
         return cid
 
-    def _audit_received(self, entry, content):
-        _logger.info("Audit [%s] received: %s", entry, content)
+    def _audit_input(self, entry, content):
+        _logger.info("Audit [%s] input: %s", entry, content)
 
-    def _audit_sent(self, entry, content):
-        _logger.info("Audit [%s] sent: %s", entry, content)
+    def _audit_output(self, entry, content):
+        _logger.info("Audit [%s] output: %s", entry, content)
 
     def _audit_error(self, entry, activity, exception=None, message=None):
         _logger.error("Audit [%s] error during %s: %s", entry, activity, message or exception)

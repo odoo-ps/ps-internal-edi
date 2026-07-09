@@ -15,7 +15,7 @@ class TestAuditBackendModels(TransactionCase):
         backend = self.env["edi.audit.backend.python_log"]
         with self.assertLogs("odoo.addons.edi_audit.audit", level="INFO") as capture:
             entry = backend._audit_start("run-pl", {})
-            backend._audit_received(entry, "payload-in")
+            backend._audit_input(entry, "payload-in")
             backend._audit_finalize(entry, "done")
         joined = "\n".join(capture.output)
         self.assertIn("run-pl", joined)
@@ -25,7 +25,7 @@ class TestAuditBackendModels(TransactionCase):
         backend = self.env["edi.audit.backend.python_log"]
         with self.assertLogs("odoo.addons.edi_audit.audit", level="INFO") as capture:
             cid = backend._audit_start("run-pl", {})
-            backend._audit_received(cid, "payload-in")
+            backend._audit_input(cid, "payload-in")
             backend._audit_finalize(cid, "done")
         self.assertNotEqual(cid, "run-pl")  # cid is a generated id, not the run name
         joined = "\n".join(capture.output)
@@ -53,7 +53,7 @@ class TestAuditBackendModels(TransactionCase):
         backend = self.env["edi.audit.backend.ir_logging"]
         with RecordCapturer(self.env["ir.logging"], [("name", "=", "edi_audit")]) as capture:
             cid = backend._audit_start("run-il", {})
-            backend._audit_received(cid, "in")
+            backend._audit_input(cid, "in")
             backend._audit_finalize(cid, "done")
         rows = capture.records
         self.assertEqual(len(rows), 3)

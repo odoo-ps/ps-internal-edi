@@ -13,11 +13,11 @@ class AuditBackendIrLogging(models.AbstractModel):
         self._audit_log("start", name, cid)
         return cid
 
-    def _audit_received(self, entry, content):
-        self._audit_log("received", content, entry)
+    def _audit_input(self, entry, content):
+        self._audit_log("input", content, entry)
 
-    def _audit_sent(self, entry, content):
-        self._audit_log("sent", content, entry)
+    def _audit_output(self, entry, content):
+        self._audit_log("output", content, entry)
 
     def _audit_error(self, entry, activity, exception=None, message=None):
         self._audit_log(activity or "error", message or exception, entry, level="ERROR")

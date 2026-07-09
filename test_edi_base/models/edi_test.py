@@ -48,6 +48,11 @@ class ResPartner(models.Model):
     def stacked_probe(self, value):
         return value
 
+    @api.model
+    @integration("Outbound Probe", flow="out")
+    def outbound_probe(self, value):
+        return value
+
 
 class TestIntegration(models.Model):
 
