@@ -99,13 +99,14 @@ class Integration(models.Model):
     def _compute_edi_table_records_to_process_count(self):
         self.edi_table_records_to_process_count = 0
         integrations = self.filtered("use_edi_table")
-        domain = Domain([])
+        domain_parts = []
         for integration in integrations:
-            domain |= integration._edi_table_record_domain()
+            domain_parts.append(integration._edi_table_record_domain())
+        domain = Domain.OR(domain_parts)
         if not domain:
             return
         count_mapping = defaultdict(int)
-        groups = self.env["edi.table.record"]._read_group(domain, ["id"], ["integration_id:count"])
+        groups = self.env["edi.table.record"]._read_group(domain, ["integration_id"], ["id:count"])
         for integration, count in groups:
             count_mapping[integration] = count
         for integration in integrations:

@@ -113,11 +113,12 @@ class EdiTableRecord(models.Model):
         if operator not in ("=", "!=") or value not in (True, False):
             raise UserError(self.env._("Invalid operator or value"))
 
-        domain = []
+        domain_parts = []
         for integration in (
             self.env["edi.integration"].with_context(active_test=False).search([("use_edi_table", "=", True)])
         ):
-            domain = Domain.OR([domain, integration._edi_table_record_domain()])
+            domain_parts.append(integration._edi_table_record_domain())
+        domain = Domain.OR(domain_parts)
         if not domain:
             domain = [("id", "=", 0)]
         if (operator == "=" and not value) or (operator == "!=" and value):
@@ -189,7 +190,7 @@ class EdiTableRecord(models.Model):
             records_to_process = records_to_process.sorted(integration._edi_table_record_order(method=True))
 
             # convert record to data
-            records_data = integration._convert_edi_table_to_data(records_to_process)
+            records_data = integration._convert_edi_table_records_to_data(records_to_process)
             data_to_process[integration] = records_data
 
         # process integrations according to cron priority

@@ -14,3 +14,13 @@ def migrate(cr, version):
     ]
     for view in views_to_remove:
         util.remove_view(cr, f"edi_2steps.{view}")
+
+    cr.execute("""
+        UPDATE edi_table_record SET state =
+        CASE 
+            WHEN state = 'error' THEN 'fail'
+            WHEN state = 'cancel' THEN 'cancelled'
+            ELSE state
+        END
+        WHERE state IN ('error', 'cancel')
+    """)
