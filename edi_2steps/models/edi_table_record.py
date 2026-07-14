@@ -177,7 +177,7 @@ class EdiTableRecord(models.Model):
         """
         data_to_process = defaultdict(list)
 
-        for integration, group_records in self.grouped("integration_id"):
+        for integration, group_records in self.grouped("integration_id").items():
             if not integration.use_edi_table:
                 raise UserError(self.env._("Integration %s is not configured to use EDI 2-steps queue", integration.name))
 
