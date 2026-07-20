@@ -9,7 +9,7 @@
             >["&amp;",["monitoring_report_id","=",False],"|",["state","=","new"],["state","=","fail"]]</field>
         </record>
         <record id="main_monitoring" model="edi.monitoring">
-            <field name="name">Shops integrations</field>
+            <field name="name">Integrations Monitoring</field>
             <field name="email"/>
             <field name="filter_id" ref="synchronizations_filter"/>
         </record>
