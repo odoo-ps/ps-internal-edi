@@ -1,161 +1,153 @@
-===================
-EDI Table (2 steps)
-===================
+===========
+EDI 2-steps
+===========
 
-**Extend Framework edi_base**
+-------------
+Particularity
+-------------
 
-Allow to configure integrations to use an intermediate table (EDI Table) to synchronize your data.
+Extends ``edi_base`` to split a flow into two independent steps instead of one:
 
-This new feature can be activated via a new boolean **"Use EDI Table"** on the integration configuration.
+-   **Step 1** converts the source data (IN) or the records to send (OUT) into
+    ``edi.table.record`` rows — a lightweight intermediate queue — without touching any
+    business model.
+-   **Step 2**, run by its own dedicated cron, later picks up pending ``edi.table.record`` rows
+    and does the actual business processing (IN) / sending (OUT).
 
-Once the boolean **"Use EDI Table"** is checked, the integration is decomposed into 2 steps.
+The two steps never run concurrently for the same integration (guarded by a DB-level lock), so
+step 2 never processes a row step 1 is still writing. Splitting this way decouples fetching/
+capturing data from processing it: capture keeps running even while processing is slow, and a
+row that failed processing stays in the queue to be retried on the next step-2 run, without
+re-fetching it from the source.
 
---------------
-In Flows Steps
---------------
+-------------
+Configuration
+-------------
 
-- Step 1 (Update EDI Table): Prepare the input to create/update EDI Table records.
-- Step 2 (Process EDI Table): Process the EDI Table records to create/update/delete records in your Odoo database.
+On the integration form, once **Use EDI 2-steps** (``use_edi_table``) is checked:
 
----------------
-Out Flows Steps
----------------
+-   ``edi_table_synchronization_creation``: how many ``edi.table.record`` rows step 2 processes
+    per synchronization — same semantics as ``synchronization_creation`` (``1`` = one by one,
+    ``0`` = all together, ``n`` = batches of n)
+-   ``edi_table_match_identifier`` ("Match Identifier"): if checked, step 1 looks for an
+    existing, not-yet-processed ``edi.table.record`` with the same ``identifier`` and updates
+    it instead of creating a new one
+-   ``edi_table_record_clear_content`` ("Clear Record Content"): when to empty ``content`` —
+    ``on_success``, ``on_error``, ``on_success_or_error`` (``edi_archiving`` adds the
+    ``on_archiving`` variants)
 
-- Step 1: Prepare the input to create/update EDI Table records.
-- Step 2: Process the EDI Table records to synchronize with the provider.
+A dedicated cron ("Process EDI 2-steps queue for <integration>") is created automatically,
+polling every minute by default — adjustable afterwards via ``edi_table_interval_number`` /
+``edi_table_interval_type`` on the integration form. It is archived automatically if
+**Use EDI 2-steps** is unchecked, and follows the integration's own ``active`` state.
 
-EDI Table
-=========
+------------
+How it works
+------------
 
-The original integration CRON will be used to execute the first step (update).
+``edi.table.record.state``:
 
-A new CRON is automatically created to execute the second step (process).
+-   ``new``: created by step 1, waiting for step 2
+-   ``warning``: step 2 failed with a recoverable error (e.g. a concurrent DB update) — stays
+    eligible for a retry
+-   ``fail``: step 2 failed and the row cannot be processed anymore (terminal)
+-   ``done``: processed successfully by step 2 (terminal)
+-   ``cancelled``: cancelled by a user, cannot be processed anymore (terminal)
 
-Both CRONs cannot be executed at the same time to avoid concurrent updates.
+Only ``new`` and ``warning`` rows are picked up by step 2 (and matched by
+``edi_table_match_identifier``).
 
-The EDI Table is modeled by a new model **edi.table.record**:
+--------
+Examples
+--------
 
-- identifier: unique identifier (optional)
+Two methods are required per flow direction; the rest of the integration (connection,
+``path``/``method`` or FTP/SFTP folders, ``synchronization_content_type``, …) is configured
+exactly as without EDI 2-steps.
 
-- content: content to process in the second step
+``data/edi.xml``
+================
 
-- state:
+.. code-block:: xml
 
-    - new: the record is created by the first step
+    <record id="acme_orders_in" model="edi.integration">
+        <field name="name">Import ACME Orders</field>
+        <field name="type">acme_orders_in</field>
+        <field name="integration_flow">in</field>
+        <field name="connection_id" ref="acme_connection"/>
+        <!-- ... path/method or FTP folders as usual ... -->
 
-    - warning: an error occurred during the second step (processing) but the record can still be processed (e.g: concurrent update)
+        <!-- EDI 2-steps -->
+        <field name="use_edi_table" eval="True"/>
+        <field name="edi_table_match_identifier" eval="True"/>
+        <field name="edi_table_synchronization_creation">1</field>
+    </record>
 
-    - fail: an error occurred during the second step (processing) and the record cannot be processed anymore (e.g: missing mandatory field)
+``models/acme_integration.py``
+==============================
 
-    - done: the record is processed successfully by the second step
+.. code-block:: python
 
-    - cancel: the record is cancelled by the user and cannot be processed anymore
-
-
-Those records are created by step 1 and processed by step 2.
-
-When created, the state is set to "new".
-
-When processed, the state is set to "warning", "fail" or "done" depending on the result.
-
-
-When boolean **"Match Identifier"** is checked, the integration step 1 will try to match an existing EDI Table record with the same identifier.
-
-If a match is found, the content of the EDI Table record is updated with the new content.
-
-If no match is found, a new EDI Table record is created.
-
-When boolean "Match Identifier" is not checked, a new EDI Table record is always created.
+    from odoo import fields, models
+    from odoo.addons.edi_base.decorators import IntegrationCheck
 
 
-Requirements
-============
+    class AcmeOrdersIn(models.Model):
+        _inherit = "edi.integration"
 
-This module requires new functions to be defined on the model edi.integration in order to work properly with the EDI Table.
+        type = fields.Selection(
+            selection_add=[("acme_orders_in", "ACME - Import Orders")],
+            ondelete={"acme_orders_in": "cascade"},
+        )
 
-The following functions are the minimum ones to be defined (other functions can be defined to handle success or error cases):
+        # --- Step 1: split the raw IN data into one edi.table.record per order ---
+        @IntegrationCheck("acme_orders_in")
+        def _prepare_in_edi_table(self, data):
+            return [
+                {"identifier": order["id"], "content": order["content"], "filename": d["filename"]}
+                for d in data
+                for order in [d["content"]]
+            ]
 
-----------------
-In Flows Methods
-----------------
+        # --- Step 2: process one edi.table.record ---
+        @IntegrationCheck("acme_orders_in")
+        def _process_in_edi_table(self, data):
+            for d in data:
+                self.env["sale.order"].create_or_update_from_acme(d["content"])
+            return "done"
 
-**Step 1 (Update EDI Table):**
+        # --- Step 1: convert products to send into edi.table.record content ---
+        @IntegrationCheck("acme_stock_out")
+        def _prepare_out_edi_table(self, records):
+            return [{"identifier": p.default_code, "content": p.default_code} for p in records]
 
-::
+        # --- Step 2: build what will actually be sent for one edi.table.record ---
+        @IntegrationCheck("acme_stock_out")
+        def _process_out_edi_table(self, records):
+            return "\n".join(records.mapped("content"))
 
-    def _prepare_in_edi_table(self, data):
-        """Allow the integration to redefine the first step (conversion of data into edi.table.record)
+------------------------
+Reference: key overrides
+------------------------
 
-        To implement in each integration
-        ....
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
 
-        :param data: list of dict
-            each dict contains key
-            - filename: str
-            - content: str
-        :return: list of dict (vals to create or update edi.table.record)
-        e.g. [{'identifier': 'an identifier', 'content': 'a content', 'filename': 'a filename'}, ...]
-
-        Can use self._report_error
-        """
-        return []
-
-**Step 2 (Process EDI Table):**
-
-::
-
-    def _process_in_edi_table(self, data):
-        """Allow the integration to redefine the second step (process edi.table.record)
-
-        To implement in each integration
-        ....
-
-        :param data: list of dict
-            each dict contains key
-            - filename: str
-            - content: str
-            - edi_table_record: record edi.table.record
-        :return: status use by _clean
-
-        Can use self._report_error
-        """
-        return 'done'
-
------------------
-Out Flows Methods
------------------
-
-**Step 1 (Update EDI Table):**
-
-::
-
-    def _prepare_out_edi_table(self, records):
-        """Allow the integration to redefine the first step (conversion of records into edi.table.record)
-
-        To implement in each integration
-        ....
-
-        :param records: recordset
-        :return: list of dict (vals to create or update edi.table.record)
-        e.g. [{'identifier': 'an identifier', 'content': 'a content'}, ...]
-
-        Can use self._report_error
-        """
-        return []
-
-**Step 2 (Process EDI Table):**
-
-::
-
-    def _process_out_edi_table(self, records):
-        """Allow the integration to redefine the second step (processing of a edi.table.record)
-
-        To implement in each integration
-        ....
-
-        :param data: recordset edi.table.record
-        :return: str
-
-        Can use self._report_error
-        """
-        return ''
+   * - Method
+     - When to override
+   * - ``_prepare_in_edi_table(data)`` / ``_prepare_out_edi_table(records)``
+     - **Required.** Step 1: build the ``edi.table.record`` vals (``identifier``, ``content``)
+       from the IN data / OUT records.
+   * - ``_process_in_edi_table(data)`` / ``_process_out_edi_table(records)``
+     - **Required.** Step 2: business logic, same role as ``_process_content`` /
+       ``_get_content`` without EDI 2-steps.
+   * - ``_get_edi_table_record_name_in(data)`` / ``_get_table_record_name_out(records)``
+     - Override to customize the ``edi.table.record`` name. Default: integration name + date +
+       filenames.
+   * - ``_handle_error_edi_table_in/out`` / ``_handle_success_edi_table_in/out``
+     - Called after step 2 processes each row, in addition to the standard
+       ``_handle_error`` / ``_postprocess``. Default: no-op (OUT success writes back the
+       synchronization ``filename``).
+   * - ``_postprocess_edi_table(send_result, content, records)``
+     - OUT only. Called after step 2 sends the content. Default: no-op.
