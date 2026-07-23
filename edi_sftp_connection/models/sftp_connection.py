@@ -156,12 +156,14 @@ class SFTPConnection(models.Model):
                 # Retrieve the attributes of the single file to verify it's a file
                 try:
                     attr = server.stat(filename)
-                    if stat.S_ISREG(attr.st_mode):
+                    if stat.S_ISREG(attr.st_mode) and self._ftp_is_valid_filename(filename):
                         filenames.append(filename)
                 except Exception:
                     pass
         else:
             for attr in server.listdir_attr():
+                if not self._ftp_is_valid_filename(attr.filename):
+                    continue
                 if stat.S_ISREG(attr.st_mode):
                     filenames.append(attr.filename)
         return filenames
@@ -176,3 +178,16 @@ class SFTPConnection(models.Model):
     def _download_file(self, server, directory, filename):
         server.get(filename, os.path.join(directory, filename))
         return os.path.join(directory, filename)
+
+    @api.model
+    def _get_remote_file_size(self, server, file_path):
+        """Return the size in bytes of a remote file
+
+        :param server: pysftp.Connection
+        :param file_path: str
+        :return: int or None
+        """
+        try:
+            return server.stat(file_path).st_size
+        except Exception:
+            return None

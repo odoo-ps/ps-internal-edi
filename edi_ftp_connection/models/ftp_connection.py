@@ -219,10 +219,14 @@ class FTPConnection(models.Model):
         #       files and folders, we expect files to have a '.' on its name,
         #       obviously that is a rather random heuristic.
         fname, _, extension = filename.rpartition(".")
-        if not fname or extension in ["bak", "old"]:
+        if not fname or extension in self._get_invalid_file_extensions():
             return False
 
         return True
+
+    @api.model
+    def _get_invalid_file_extensions(self):
+        return ["bak", "old"]
 
     #####################################################################
     #   Generic methods between FTP connection and other based on FTP   #
@@ -309,7 +313,7 @@ class FTPConnection(models.Model):
 
         with self.connect() as server:
             filenames = self.list_files(server, server.in_folder)
-            filtered_ones = self._filter_files(filenames, kwargs.get("integration_id"))
+            filtered_ones = self._filter_files(filenames, kwargs.get("integration_id"), server=server)
             for filename in filtered_ones:
                 try:
                     result.append(
@@ -332,10 +336,11 @@ class FTPConnection(models.Model):
                     res["content"] = f.read()
         return result
 
-    def _filter_files(self, filenames, integration_id):
+    def _filter_files(self, filenames, integration_id, server=None):
         """Filter files to be processed
         :param filenames:
         :param integration_id:
+        :param server: optional server connection
         :return: list of filenames
         """
         if not filenames or not integration_id:
@@ -352,10 +357,25 @@ class FTPConnection(models.Model):
         if self.ftp_limit_in_files > 0:
             filenames = filenames[: self.ftp_limit_in_files]
 
+        # 3. filter empty files (0 bytes on the remote server)
+        if server is not None:
+            non_empty = []
+            for filename in filenames:
+                file_path = os.path.join(server.in_folder, filename)
+                size = self._get_remote_file_size(server, file_path)
+                if size is None:
+                    non_empty.append(filename)
+                    _logger.warning("Could not determine the size of file %s on the server, keeping it to avoid any data loss.", file_path)
+                elif size == 0:
+                    _logger.warning("File %s is empty (0 bytes) on the server, skipping.", file_path)
+                else:
+                    non_empty.append(filename)
+            filenames = non_empty
+
         if not filenames or not self.ftp_in_done_let:
             return filenames
 
-        # 3. filter by files that have already been processed
+        # 4. filter by files that have already been processed
         # if we have to let the processed files on the server (in folder),
         # then we have to excluded them from the next synchros
         filenames_str = ", ".join(["('%s')" % filename for filename in filenames])
@@ -449,3 +469,16 @@ class FTPConnection(models.Model):
             self.delete_file(server, file_path)
         else:
             raise UserError(_("File '%s' already present on SFTP server") % file_path)
+
+    @api.model
+    def _get_remote_file_size(self, server, file_path):
+        """Return the size in bytes of a remote file
+
+        :param server: ftplib.FTP connection
+        :param file_path: str
+        :return: int or None
+        """
+        try:
+            return server.size(file_path)
+        except Exception:
+            return None
