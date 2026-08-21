@@ -5,6 +5,25 @@ import os
 import stat
 from base64 import decodebytes
 
+import paramiko
+
+# pysftp (last released 2021, unmaintained) unconditionally imports paramiko.DSSKey at
+# module load time. paramiko 3.0+ dropped DSSKey (DSA host/private keys are obsolete and
+# insecure), so pysftp can no longer be imported against any modern paramiko. We never
+# exercise pysftp's DSA-key fallback path ourselves (connect() below always passes an
+# already-built RSAKey or no key at all), so a non-functional stand-in that only exists to
+# satisfy the import is safe - it fails loudly instead of silently if that path is ever hit.
+if not hasattr(paramiko, "DSSKey"):
+
+    class _RemovedDSSKey:
+        @classmethod
+        def from_private_key_file(cls, *args, **kwargs):
+            raise NotImplementedError(
+                "DSA/DSS SSH keys are no longer supported (removed from paramiko 3.0+)."
+            )
+
+    paramiko.DSSKey = _RemovedDSSKey
+
 import pysftp
 from paramiko import RSAKey
 
