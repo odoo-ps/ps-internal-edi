@@ -3,7 +3,6 @@ import json
 import logging
 
 from odoo import _, api, fields, models, tools
-from odoo.api import NewId
 from odoo.exceptions import UserError, ValidationError
 from odoo.modules.registry import Registry
 from odoo.tools.safe_eval import safe_eval
@@ -200,31 +199,27 @@ class Integration(models.Model):
                 flow_type = "unknown"
             integration.integration_flow_type = flow_type
 
+    def _get_synchronization_counts(self, aggregate):
+        """Return {integration: aggregate} computed in database over the synchronizations of ``self._origin``"""
+        return dict(
+            self.env["edi.synchronization"]._read_group(
+                [("integration_id", "in", self._origin.ids)],
+                groupby=["integration_id"],
+                aggregates=[aggregate],
+            )
+        )
+
     @api.depends("synchronization_ids")
     def _compute_synchronization_count(self):
+        counts = self._get_synchronization_counts("__count")
         for rec in self:
-            rec.synchronization_count = len(rec.synchronization_ids)
+            rec.synchronization_count = counts.get(rec._origin, 0)
 
-    @api.depends("synchronization_ids")
+    @api.depends("synchronization_ids.triggered_date")
     def _compute_execution_count(self):
-        creating_ones = self.filtered(lambda x: isinstance(x.id, NewId))
-        if creating_ones:
-            creating_ones.execution_count = 0
-
-        existing_ones = self - creating_ones
-        if existing_ones:
-            self.env.cr.execute(
-                """
-                SELECT i.id, COUNT(DISTINCT s.triggered_date)
-                FROM edi_integration AS i
-                LEFT JOIN edi_synchronization AS s ON s.integration_id = i.id
-                WHERE i.id in %s
-                GROUP BY i.id
-                """,
-                (tuple(existing_ones.ids),),
-            )
-            for integration_id, count in self.env.cr.fetchall():
-                self.browse(integration_id).execution_count = count
+        counts = self._get_synchronization_counts("triggered_date:count_distinct")
+        for rec in self:
+            rec.execution_count = counts.get(rec._origin, 0)
 
     def _api_call(self, payload=None):
         headers = {}
