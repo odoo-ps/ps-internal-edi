@@ -202,8 +202,21 @@ class Integration(models.Model):
 
     @api.depends("synchronization_ids")
     def _compute_synchronization_count(self):
-        for rec in self:
+        creating_ones = self.filtered(lambda x: isinstance(x.id, NewId))
+        for rec in creating_ones:
             rec.synchronization_count = len(rec.synchronization_ids)
+
+        existing_ones = self - creating_ones
+        if existing_ones:
+            counts = dict(
+                self.env["edi.synchronization"]._read_group(
+                    [("integration_id", "in", existing_ones.ids)],
+                    groupby=["integration_id"],
+                    aggregates=["__count"],
+                )
+            )
+            for rec in existing_ones:
+                rec.synchronization_count = counts.get(rec, 0)
 
     @api.depends("synchronization_ids")
     def _compute_execution_count(self):
@@ -215,16 +228,16 @@ class Integration(models.Model):
         if existing_ones:
             self.env.cr.execute(
                 """
-                SELECT i.id, COUNT(DISTINCT s.triggered_date)
-                FROM edi_integration AS i
-                LEFT JOIN edi_synchronization AS s ON s.integration_id = i.id
-                WHERE i.id in %s
-                GROUP BY i.id
+                SELECT integration_id, COUNT(DISTINCT triggered_date)
+                FROM edi_synchronization
+                WHERE integration_id IN %s
+                GROUP BY integration_id
                 """,
                 (tuple(existing_ones.ids),),
             )
-            for integration_id, count in self.env.cr.fetchall():
-                self.browse(integration_id).execution_count = count
+            counts = dict(self.env.cr.fetchall())
+            for rec in existing_ones:
+                rec.execution_count = counts.get(rec.id, 0)
 
     def _api_call(self, payload=None):
         headers = {}
