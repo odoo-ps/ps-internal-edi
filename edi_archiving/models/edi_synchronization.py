@@ -15,7 +15,7 @@ class Synchronization(models.Model):
 
     @api.model
     def _archive_states(self):
-        return ["new", "fail", "done", "cancel"]
+        return ["new", "fail", "done", "cancelled"]
 
     @api.model
     def _archive_states_domain(self, states):
@@ -77,9 +77,17 @@ class Synchronization(models.Model):
             self.env.ref("base.autovacuum_job")._trigger(at=fields.Datetime.now() + timedelta(minutes=1))
 
     def action_archive(self):
-        """Free some space if the content sent or received was stored"""
+        """Free some space by clearing stored content when archiving"""
         if not self:
             return
+        # The errors, not the synchronization contents, are what actually grows: they are written
+        # per failure and hold a full traceback each. Once the content is released, an error has
+        # nothing left to diagnose, so it goes too; the synchronization keeps its state and dates.
+        # Opt-in, so that an installation which already configured archiving keeps its behaviour
+        # until it decides otherwise. Deleted before archiving, which would otherwise recompute
+        # their stored `active` and rewrite each row just before it goes.
+        if self.env["ir.config_parameter"].sudo().get_param("edi.archive.delete_errors"):
+            self.error_ids.unlink()
         self.content = False
         return super().action_archive()
 
