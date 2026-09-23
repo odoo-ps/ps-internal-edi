@@ -305,3 +305,30 @@ Want to go deeper ?
 -------------------
 
 Then have a look at the code, it's quite well documented.
+
+
+Upgrading to 17.0.1.3.0 on a large database
+===========================================
+
+``edi.synchronization.error.synchronization_id`` is indexed from this version on. The foreign key
+is ``ON DELETE CASCADE``, and PostgreSQL enforces that cascade with one
+``DELETE FROM edi_synchronization_error WHERE synchronization_id = $1`` per deleted parent row —
+without the index, each of those scans the whole error table. On the installation that prompted
+this change the table had reached 33.9 M rows / 53 GB, and deleting a backlog was impossible.
+
+Odoo creates the index with a plain ``CREATE INDEX`` during the upgrade, which holds an
+``ACCESS EXCLUSIVE`` lock on the table for the whole build. On a table of that size that is tens of
+minutes during which the table cannot be read or written. **If your error table is large, build the
+index by hand before deploying the upgrade**:
+
+.. code-block:: sql
+
+    CREATE INDEX CONCURRENTLY edi_synchronization_error__synchronization_id_index
+        ON edi_synchronization_error (synchronization_id);
+
+``CONCURRENTLY`` does not take the blocking lock, so it can run on a live database. The name above
+is the one Odoo derives from the table and column, so the ORM finds it and skips creation — the
+upgrade then costs nothing. Check ``pg_index.indisvalid`` afterwards: a ``CONCURRENTLY`` build that
+fails leaves an **invalid** index behind, which the planner ignores. The 17.0.1.3.0 pre-migration
+drops such a leftover so that the ORM rebuilds it rather than skipping it on the strength of its
+name alone.
