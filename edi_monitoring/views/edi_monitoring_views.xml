@@ -136,7 +136,7 @@
                 decoration-success="state=='done'"
                 decoration-warning="state=='warning'"
                 decoration-info="state=='new'"
-                decoration-muted="state=='cancel'"
+                decoration-muted="state=='cancelled'"
                 decoration-danger="state=='fail'"
             >
                 <field name="source"/>
