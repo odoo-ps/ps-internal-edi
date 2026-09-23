@@ -1,5 +1,6 @@
 import logging
 
+from odoo.tools import SQL
 from odoo.tools.sql import column_exists
 
 
@@ -44,12 +45,15 @@ def pre_init_hook(env):
     Measured on a 3 M row / 4.7 GB table: 1.0 s and no size change, against a full-table UPDATE
     that rewrites every row and doubles the table until it is vacuumed.
     """
+    # Two DDL statements per table, over a fixed pair of table names, once per installation. The
+    # loop is not a per-record shape: it cannot grow, and ALTER TABLE takes no parameters to batch.
     for table in ("edi_synchronization", "edi_synchronization_error"):
         if column_exists(env.cr, table, "active"):
             continue
         _logger.info("Adding %s.active without rewriting the table", table)
-        env.cr.execute('ALTER TABLE "%s" ADD COLUMN "active" boolean DEFAULT TRUE' % table)
-        env.cr.execute('ALTER TABLE "%s" ALTER COLUMN "active" DROP DEFAULT' % table)
+        column = SQL.identifier("active")
+        env.cr.execute(SQL("ALTER TABLE %s ADD COLUMN %s boolean DEFAULT TRUE", SQL.identifier(table), column))
+        env.cr.execute(SQL("ALTER TABLE %s ALTER COLUMN %s DROP DEFAULT", SQL.identifier(table), column))
 
 
 def post_init_hook(env):
