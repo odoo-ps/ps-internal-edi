@@ -38,10 +38,16 @@
                             <field name="edi_archive_state_new"/>
                             <label for="edi_archive_state_new" class="o_light_label" string="New"/>
                         </div>
-                        <div class="mt16 content-group" id="edi_archive_state_cancel">
-                            <field name="edi_archive_state_cancel"/>
-                            <label for="edi_archive_state_cancel" class="o_light_label" string="Cancel"/>
+                        <div class="mt16 content-group" id="edi_archive_state_cancelled">
+                            <field name="edi_archive_state_cancelled"/>
+                            <label for="edi_archive_state_cancelled" class="o_light_label" string="Cancelled"/>
                         </div>
+                    </setting>
+                    <setting
+                        string="Clear error details when archiving"
+                        help="Empty the description of the errors attached to an archived synchronization. The errors themselves are kept, with their activity and date, but their stored text is released."
+                    >
+                        <field name="edi_archive_clear_error_description"/>
                     </setting>
                 </block>
             </xpath>
