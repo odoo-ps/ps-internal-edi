@@ -14,7 +14,11 @@ class SynchronizationError(models.Model):
     _order = "create_date desc"
 
     integration_id = fields.Many2one(related="synchronization_id.integration_id", store=True)
-    synchronization_id = fields.Many2one(comodel_name="edi.synchronization", ondelete="cascade", readonly=True)
+    # The index is required, not an optimization. PostgreSQL enforces the ON DELETE CASCADE as one
+    # "DELETE FROM edi_synchronization_error WHERE synchronization_id = $1" per deleted parent row,
+    # which without an index sequentially scans the whole error table every single time. That table
+    # is the largest one this framework produces, so unlink() is unusable on a backlog without it.
+    synchronization_id = fields.Many2one("edi.synchronization", ondelete="cascade", readonly=True, index=True)
     activity = fields.Char(readonly=True)
     description = fields.Text(readonly=True)
     description_short = fields.Text(compute="_compute_short_desc")
