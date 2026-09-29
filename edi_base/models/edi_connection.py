@@ -6,9 +6,9 @@ from urllib.parse import urlparse
 
 import requests
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import ormcache
+from odoo.api import ormcache
 from odoo.tools.urls import urljoin as url_join
 
 from ..decorators import IntegrationCheck
@@ -184,7 +184,7 @@ class Connection(models.Model):
         self.ensure_one()
         value = self.json_configuration.get(name)
         if raise_if_not_found and not value:
-            raise ValidationError(_("No %s defined in configuration", name))
+            raise ValidationError(self.env._("No %s defined in configuration", name))
         return value
 
 
@@ -396,4 +396,4 @@ class ConnectionApi(models.Model):
                     "message": self.env._("Authentication succeeded — token obtained."),
                 },
             )
-        raise UserError(_("Not applicable for this type of connection"))
+        raise UserError(self.env._("Not applicable for this type of connection"))
