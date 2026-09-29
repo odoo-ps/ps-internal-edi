@@ -112,7 +112,7 @@
                 delete="0"
                 decoration-success="state=='done'"
                 decoration-info="state=='new'"
-                decoration-muted="state=='cancel'"
+                decoration-muted="state=='cancelled'"
                 decoration-danger="state=='fail'"
             >
                 <field name="name"/>
@@ -216,7 +216,7 @@
                 <filter name="new" string="New" domain="[('state', '=', 'new')]"/>
                 <filter name="done" string="Done" domain="[('state', '=', 'done')]"/>
                 <filter name="fail" string="Failed" domain="[('state', '=', 'fail')]"/>
-                <filter name="cancel" string="Cancelled" domain="[('state', '=', 'cancel')]"/>
+                <filter name="cancelled" string="Cancelled" domain="[('state', '=', 'cancelled')]"/>
                 <group string="Group By">
                     <filter name="group_by_integration" string="Integration" context="{'group_by': 'integration_id'}"/>
                     <filter name="group_by_type" string="Flow Type" context="{'group_by': 'synchronization_flow'}"/>
