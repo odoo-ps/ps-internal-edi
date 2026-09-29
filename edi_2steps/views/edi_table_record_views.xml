@@ -60,7 +60,7 @@
                         <button
                             type="object"
                             name="open_synchronizations"
-                            icon="fa-cloud-upload"
+                            icon="cloud_upload"
                             class="oe_stat_button"
                             string="Synchronizations"
                         />

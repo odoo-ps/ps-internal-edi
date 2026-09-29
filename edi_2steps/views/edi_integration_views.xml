@@ -31,7 +31,7 @@
                     class="oe_stat_button"
                     type="object"
                     name="open_edi_table_records"
-                    icon="fa-thin fa-database"
+                    icon="database"
                     invisible="not use_edi_table"
                 >
                     <field name="edi_table_records_to_process_count" widget="statinfo" string="EDI 2-steps Queue"/>
