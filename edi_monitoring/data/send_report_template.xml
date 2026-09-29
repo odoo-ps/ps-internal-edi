@@ -12,9 +12,7 @@
     <!-- Report added as an attached file to the email -->
     <template id="report_template">
         <t t-set="data_report_landscape" t-value="True"/>
-        <t t-call="web.html_container">
-            <t t-set="data_report_margin_top" t-value="0"/>
-            <t t-set="data_report_header_spacing" t-value="0"/>
+        <t t-call="web.html_container" data_report_margin_top="0" data_report_header_spacing="0">
             <t t-foreach="docs" t-as="o">
                 <t t-call="web.internal_layout">
                     <div class="page" style="font-size:70%">

@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 from odoo import models, fields, api
-from odoo.orm.domains import Domain
+from odoo.fields import Domain
 
 _logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class EdiTableRecord(models.Model):
         """
         # consider the configured duration
         config = self.env["ir.config_parameter"].sudo()
-        duration = int(config.get_param(duration_param, 0))
+        duration = config.get_int(duration_param, 0)
         if not duration:
             return self
         domain = Domain([
@@ -87,7 +87,7 @@ class EdiTableRecord(models.Model):
         # only consider the configured states
         states = [
             state for state in self._archive_states()
-            if config.get_param(f"edi.table.record.archive.state.{state}", False)
+            if config.get_bool(f"edi.table.record.archive.state.{state}", False)
         ]
         if not states:  # just a security, but should never happen thanks to check on settings side
             return self

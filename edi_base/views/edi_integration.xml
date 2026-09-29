@@ -29,16 +29,32 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button class="oe_stat_button" type="object" name="toggle_active" icon="fa-archive">
-                            <field name="active" widget="boolean_button"/>
-                            <div class="o_field_widget o_stat_info">
-                                <span class="o_stat_text">Active</span>
+                        <button
+                            class="oe_stat_button"
+                            type="object"
+                            name="action_archive"
+                            icon="archive"
+                            invisible="not active"
+                        >
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Archive</span>
+                            </div>
+                        </button>
+                        <button
+                            class="oe_stat_button"
+                            type="object"
+                            name="action_unarchive"
+                            icon="unarchive"
+                            invisible="active"
+                        >
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Unarchive</span>
                             </div>
                         </button>
                         <button
                             type="object"
                             name="open_synchronizations"
-                            icon="fa-cloud-upload"
+                            icon="cloud_upload"
                             class="oe_stat_button"
                             string="Synchronizations"
                         >
@@ -50,7 +66,7 @@
                         <button
                             type="object"
                             name="open_synchronizations"
-                            icon="fa-cloud-upload"
+                            icon="cloud_upload"
                             class="oe_stat_button"
                             string="Executions"
                             context="{'search_default_group_by_triggered_date': True}"
@@ -62,6 +78,7 @@
                             </div>
                         </button>
                     </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_title">
                         <h3>
                             <label for="name" string="Name" class="oe_edit_only"/>
@@ -204,15 +221,30 @@
                                     >
                                         Synchronize
                                     </a>
-                                    <a role="menuitem" type="object" name="toggle_active" class="dropdown-item">
-                                        <t t-if="!record.active.raw_value">Unarchive</t>
-                                        <t t-if="record.active.raw_value">Archive</t>
+                                    <a
+                                        role="menuitem"
+                                        type="object"
+                                        name="action_archive"
+                                        class="dropdown-item"
+                                        t-if="record.active.raw_value"
+                                    >
+                                        Archive
+                                    </a>
+                                    <a
+                                        role="menuitem"
+                                        type="object"
+                                        name="action_unarchive"
+                                        class="dropdown-item"
+                                        t-if="!record.active.raw_value"
+                                    >
+                                        Unarchive
                                     </a>
                                 </div>
                             </div>
                         </div>
                     </t>
                     <t t-name="card">
+                         <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                          <main class="o_integration_kanban_main">
                             <div>
                                 <field class="d-block fw-bold fs-5" name="name"/>
@@ -234,15 +266,15 @@
                          </main>
                         <footer class="align-items-end">
                             <span t-if="record.active.raw_value" class="text-success float-start">
-                                    <i class="fa fa-circle" role="img" aria-label="Active" title="Active"/>
+                                    <i class="oi" data-icon="circle" role="img" aria-label="Active" title="Active"/>
                                 </span>
                                 <span t-else="" class="text-danger float-start">
-                                    <i class="fa fa-circle" role="img" aria-label="Archived" title="Archived"/>
+                                    <i class="oi" data-icon="circle" role="img" aria-label="Archived" title="Archived"/>
                                 </span>
                             <field
                                 name="last_state"
                                 widget="label_selection"
-                                options="{'classes': {'no_sync': 'light', 'new': 'info', 'done': 'success', 'fail': 'danger', 'cancelled': 'secondary'}}"
+                                options="{'classes': {'no_sync': 'color-12', 'new': 'info', 'done': 'success', 'fail': 'danger', 'cancelled': 'secondary'}}"
                                 class="ms-auto"
                             />
                         </footer>

@@ -1,6 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import _, api, models
+from odoo import api, models
 from odoo.exceptions import ValidationError
 
 
@@ -15,7 +15,7 @@ class Integration(models.Model):
                 and rec.integration_flow_type == "in"
                 and rec.synchronization_creation != 1
             ):
-                raise ValidationError(_('Let in "in_folder" only works with Synchronization Creation = 1'))
+                raise ValidationError(rec.env._('Let in "in_folder" only works with Synchronization Creation = 1'))
 
     def _get_in_content(self):
         """

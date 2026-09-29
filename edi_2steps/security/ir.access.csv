@@ -1,0 +1,4 @@
+id,name,model_id,group_id/id,operation,domain
+access_edi_table_record_user_all,access_edi_table_record_user_all,edi.table.record,base.group_user,r,
+access_edi_table_record_erp_manager_all,access_edi_table_record_erp_manager_all,edi.table.record,base.group_system,crud,
+edi_table_record_company_rule,Restricted EDI 2-steps Queue Record: multi-company,edi.table.record,,crud,"['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]"

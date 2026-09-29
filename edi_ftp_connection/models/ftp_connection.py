@@ -7,11 +7,10 @@ import tempfile
 from datetime import datetime, timezone
 from io import BytesIO as StringIO
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.addons.edi_base.decorators import IntegrationCheck
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import ustr
-
+from odoo.tools import exception_to_unicode
 
 _logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class FTPConnection(models.Model):
                     integration.integration_flow_type == "in" and integration.synchronization_creation != 1
                     for integration in rec.integration_ids
                 ):
-                    raise ValidationError(_('Let in "in_folder" only works with Synchronization Creation = 1'))
+                    raise ValidationError(rec.env._('Let in "in_folder" only works with Synchronization Creation = 1'))
 
     #####################################################################
     #             Methods overridden from edi_base                      #
@@ -256,13 +255,17 @@ class FTPConnection(models.Model):
 
             # Handle non existing path
             if not self.dir_exists(server, path):
-                raise UserError(_('Folder "%s" : "%s" does not exists') % (folder, path))
+                raise UserError(self.env._('Folder "%s" : "%s" does not exists', folder, path))
 
             # Handle same path for different folders
             if path in paths:
                 raise UserError(
-                    _('Try to use path "%s" for folder "%s", but folder "%s" already use this one')
-                    % (path, folder, paths[path])
+                    self.env._(
+                        'Try to use path "%s" for folder "%s", but folder "%s" already use this one',
+                        path,
+                        folder,
+                        paths[path],
+                    )
                 )
             paths[path] = folder
 
@@ -270,7 +273,7 @@ class FTPConnection(models.Model):
             server.__setattr__(folder, path)
 
         if self.ftp_in_done_let and hasattr(server, "in_folder_done"):
-            raise UserError(_("You shouldn't have an in_folder_done if you want to let the file on the folder"))
+            raise UserError(self.env._("You shouldn't have an in_folder_done if you want to let the file on the folder"))
 
     def _ftp_test_connection(self):
         """Just try to connect"""
@@ -278,9 +281,11 @@ class FTPConnection(models.Model):
             with self.connect():
                 pass
         except Exception as e:
-            raise UserError(_("Connection Test Failed! Here is what we got instead:\n %s") % ustr(e)) from e
+            raise UserError(
+                self.env._("Connection Test Failed! Here is what we got instead:\n %s", exception_to_unicode(e))
+            ) from e
         else:
-            raise UserError(_("Connection Test Succeeded! Everything seems properly set up!"))
+            raise UserError(self.env._("Connection Test Succeeded! Everything seems properly set up!"))
 
     def _ftp_send_file(self, filename, content, *args, **kwargs):
         with self.connect() as server:
@@ -293,7 +298,9 @@ class FTPConnection(models.Model):
                 self.rename(server, os.path.join(pwd, uploading_file), os.path.join(pwd, filename))
             except Exception as e:
                 _logger.error(e)
-                raise UserError(_("Send synchronization failed for file %s:\n%s") % (filename, ustr(e))) from e
+                raise UserError(
+                    self.env._("Send synchronization failed for file %s:\n%s", filename, exception_to_unicode(e))
+                ) from e
 
     def _ftp_fetch_files(self, *args, **kwargs):
         """Download the file into a temporary dictionnary
@@ -321,7 +328,9 @@ class FTPConnection(models.Model):
                     )
                 except Exception as e:
                     _logger.error(e)
-                    raise UserError(_("Fetch synchronization failed for file %s:\n%s") % (filename, ustr(e))) from e
+                    raise UserError(
+                        self.env._("Fetch synchronization failed for file %s:\n%s", filename, exception_to_unicode(e))
+                    ) from e
         if hasattr(server, "encoding"):
             encoding = server.encoding
         else:
@@ -448,4 +457,4 @@ class FTPConnection(models.Model):
         elif on_conflict == "replace":
             self.delete_file(server, file_path)
         else:
-            raise UserError(_("File '%s' already present on SFTP server") % file_path)
+            raise UserError(self.env._("File '%s' already present on SFTP server", file_path))

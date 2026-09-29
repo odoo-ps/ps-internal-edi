@@ -1,6 +1,6 @@
 {
     "name": "Odoo PS EDI 2 Steps",
-    "version": "19.0.1.0.1",
+    "version": "20.0.1.0.0",
     "license": "OEEL-1",
     "summary": "Process integrations in 2 steps by using an intermediate table",
     "category": "Tools",
@@ -8,8 +8,7 @@
     "author": "Odoo PS",
     "depends": ["edi_base"],
     "data": [
-        "security/ir_rules.xml",
-        "security/ir.model.access.csv",
+        "security/ir.access.csv",
         "data/ir_action_server.xml",
         "views/edi_integration_views.xml",
         "views/edi_synchronization_views.xml",

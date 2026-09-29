@@ -1,4 +1,4 @@
-from odoo import _, fields, models
+from odoo import fields, models
 from odoo.exceptions import UserError
 
 
@@ -17,6 +17,6 @@ class ResConfigSettings(models.TransientModel):
             self[f] for f in self._fields if f.startswith("edi_archive_state_")
         ):
             raise UserError(
-                _("An EDI archive or delete duration should go with actual states to consider for archiving")
+                self.env._("An EDI archive or delete duration should go with actual states to consider for archiving")
             )
         return super().execute()
