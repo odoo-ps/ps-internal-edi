@@ -2,9 +2,9 @@
 EDI 2-steps Archiving
 ========================
 
-------------
+-------------
 Particularity
-------------
+-------------
 
 Same mechanism as ``edi_archiving`` (an ``active`` field + an autovacuum job archiving, then
 deleting, old records by age and state), applied this time to ``edi.table.record`` — the

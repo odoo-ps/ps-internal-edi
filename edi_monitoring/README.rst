@@ -2,9 +2,9 @@
 EDI Monitoring
 ==============
 
-------------
+-------------
 Particularity
-------------
+-------------
 
 Adds observability on top of ``edi_base``, for developers and functional users alike:
 

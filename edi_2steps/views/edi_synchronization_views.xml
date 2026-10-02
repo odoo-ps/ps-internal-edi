@@ -10,7 +10,7 @@
                     class="oe_stat_button"
                     type="object"
                     name="open_updated_edi_table_records"
-                    icon="fa-thin fa-database"
+                    icon="database"
                     invisible="updated_edi_table_record_count == 0"
                 >
                     <field name="updated_edi_table_record_count" widget="statinfo" string="Updated EDI 2-steps Queue"/>
@@ -19,7 +19,7 @@
                     class="oe_stat_button"
                     type="object"
                     name="open_processed_edi_table_records"
-                    icon="fa-thin fa-database"
+                    icon="database"
                     invisible="processed_edi_table_record_count == 0"
                 >
                     <field name="processed_edi_table_record_count" widget="statinfo" string="Processed EDI 2-steps Queue"/>

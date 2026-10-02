@@ -1,0 +1,4 @@
+id,name,model_id,group_id/id,operation,domain
+access_edi_monitoring,access_edi_monitoring,edi.monitoring,base.group_user,crud,
+access_edi_monitoring_report,access_edi_monitoring_report,edi.monitoring.report,base.group_user,crud,
+access_edi_monitoring_report_line,access_edi_monitoring_report_line,edi.monitoring.report.line,base.group_user,crud,
