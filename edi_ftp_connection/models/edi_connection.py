@@ -56,6 +56,10 @@ class EdiConnection(models.Model):
             },
         }
 
+    @api.model
+    def _get_advanced_defaults(self):
+        return {**super()._get_advanced_defaults(), "ftp_passive": True}
+
     @api.constrains("transport", "url", "tls_client_auth")
     def _check_ftp_client_certificate(self):
         for connection in self:

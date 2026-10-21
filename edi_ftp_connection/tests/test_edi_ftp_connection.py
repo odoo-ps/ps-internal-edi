@@ -178,7 +178,7 @@ class TestEdiFtpConnection(BaseCommon):
             self.connection.action_test()
 
     def test_auth_types(self):
-        for auth_type in ("api_key", "oauth2", "ssh_key", "custom"):
+        for auth_type in ("api_key", "oauth2", "ssh_key"):
             with self.subTest(auth_type=auth_type), self.assertRaises(ValidationError):
                 self.connection.auth_type = auth_type
         with self.assertRaises(ValidationError):
@@ -304,7 +304,7 @@ class TestEdiFtpConnection(BaseCommon):
         self.assertEqual(self._folder("/acme/archive/ko"), {"b_order.csv": b"b"})
 
     def test_acknowledge_delete(self):
-        self.connection.write({"file_processed_action": "delete", "file_failed_folder": False})
+        self.connection.file_processed_action = "delete"  # the failed folder (set) is only used with move
         with self.connection._edi_connect() as session:
             messages = self._receive_by_name(session)
             self.connection._edi_acknowledge(session, messages["a_order.csv"], success=True)
@@ -313,13 +313,13 @@ class TestEdiFtpConnection(BaseCommon):
         self.assertEqual(self._folder("/acme/in"), {"b_order.csv": b"b", "c_order.xml": b"c"})
 
     def test_acknowledge_keep(self):
-        self.connection.file_processed_action = "keep"
+        self.connection.file_processed_action = "keep"  # the failed folder (set) is only used with move
         with self.connection._edi_connect() as session:
             messages = self._receive_by_name(session)
             self.connection._edi_acknowledge(session, messages["a_order.csv"], success=True)
             self.connection._edi_acknowledge(session, messages["b_order.csv"], success=False)
-        self.assertEqual(set(self._folder("/acme/in")), {"a_order.csv", "c_order.xml"})
-        self.assertEqual(self._folder("/acme/in/error"), {"b_order.csv": b"b"})
+        self.assertEqual(set(self._folder("/acme/in")), {"a_order.csv", "b_order.csv", "c_order.xml"})
+        self.assertFalse(self._folder("/acme/in/error"))
 
     def test_acknowledge_folder_outside_root(self):
         self.connection.file_success_folder = "../../elsewhere"
@@ -369,3 +369,8 @@ class TestEdiFtpConnection(BaseCommon):
         self.assertEqual(
             {p: c for p, c in FakeFTP.files.items() if p.startswith("/acme/out/")}, {"/acme/out/order.csv": b"previous"}
         )
+
+    def test_show_advanced(self):
+        self.assertFalse(self.connection.show_advanced)
+        self.connection.ftp_passive = False
+        self.assertTrue(self.connection.show_advanced)

@@ -128,9 +128,6 @@ and use them in ``_edi_connect``.
        refresh token is then used and rotated automatically. PKCE is used unless disabled.
    * - ``ssh_key``
      - Username + private key (SFTP)
-   * - ``custom``
-     - Implemented by a client module in ``_http_authenticate_custom`` (``:edi-hook: client``),
-       selected by ``auth_custom_code``: request signing, login call returning a session cookie, ...
 
 Two options are combinable with any authentication:
 
@@ -141,11 +138,42 @@ Two options are combinable with any authentication:
 -   **Extra headers** (HTTP, ``http_use_headers``): one ``Name: value`` per line, sent with every
     request, e.g. an Azure API Management subscription key or an API version.
 
-The form shows the credential fields listed by ``_get_auth_fields()`` for the selected
-``auth_type``, through the computed ``auth_field_names``
-(``invisible="'username' not in auth_field_names"``), so it is never overridden for credentials.
-Adding an authentication is a change in ``edi_base``: a value in ``auth_type``, its fields, its
-entry in ``_get_auth_fields()`` and its field in the form.
+The *Credentials* tab of the form shows the fields listed by ``_get_auth_fields()`` for the
+selected ``auth_type``, through the computed ``auth_field_names``
+(``invisible="'username' not in auth_field_names"``).
+
+Adding an authentication
+------------------------
+
+An authentication specific to one remote system (request signing, login call returning a session
+cookie, provider specific token, ...) is added by the client module, like any selection value:
+
+.. code-block:: python
+
+    class EdiConnection(models.Model):
+        _inherit = "edi.connection"
+
+        auth_type = fields.Selection(selection_add=[("acme_hmac", "ACME Signature")],
+                                     ondelete={"acme_hmac": "set default"})
+        acme_key = fields.Char(copy=False)
+
+        def _get_transports(self):
+            transports = super()._get_transports()
+            transports["http"]["auth_types"] += ("acme_hmac",)
+            return transports
+
+        def _get_auth_fields(self):
+            return {**super()._get_auth_fields(), "acme_hmac": ("acme_key",)}
+
+        def _http_authenticate(self, session):
+            if self.auth_type != "acme_hmac":
+                return super()._http_authenticate(session)
+            session.auth = AcmeHmacAuth(self.sudo().acme_key)  # a requests.auth.AuthBase
+
+and its fields are added to the ``credentials`` group of the *Credentials* tab, with
+``invisible="'acme_key' not in auth_field_names"``. ``_http_authenticate`` and
+``_get_auth_fields`` are ``:edi-hook: client``. An authentication that no code handles is refused
+when the session is opened.
 
 File based transports
 ---------------------
@@ -164,8 +192,8 @@ FTP and SFTP share the same logic, implemented once in ``edi_base`` for every tr
 
     -   processed successfully (``file_processed_action``): moved to ``file_success_folder``
         (default), deleted, or left in place
-    -   failed: moved to ``file_failed_folder`` if set, otherwise left in place, to be received
-        again (retried) on the next run
+    -   failed: moved to ``file_failed_folder`` when the processed files are moved and it is set,
+        otherwise left in place, to be received again (retried) on the next run
 
     The folders are relative to the folder of the file (``done``: ``in/done``), or to the folder
     of the URL when they start with ``/``
@@ -223,7 +251,10 @@ A framework module (e.g. ``edi_ftp_connection``):
 #.  overrides ``_edi_connect`` and, for a file based transport, the ``_file_*`` primitives (or
     the other ``_edi_*`` methods otherwise), following the override pattern above;
 #.  adds its transport-specific fields, if any (e.g. the FTP passive mode), to the form in the
-    ``transport`` group, ``invisible`` unless its transport is selected;
+    ``transport`` group, ``invisible`` unless its transport is selected; a field that rarely needs a
+    change is also hidden unless ``show_advanced``, and declared with its default value in
+    ``_get_advanced_defaults()`` (``:edi-hook: framework``), so that ``show_advanced`` is checked as
+    soon as it is changed;
 #.  tests the transport by mocking the underlying library (``ftplib``, ...), e.g. with an
     in-memory fake server as in ``edi_ftp_connection``.
 

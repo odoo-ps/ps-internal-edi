@@ -143,7 +143,7 @@ class TestEdiSftpConnection(BaseCommon):
     # ------------------------------------------------------------
 
     def test_auth_types(self):
-        for auth_type in ("none", "api_key", "oauth2", "custom"):
+        for auth_type in ("none", "api_key", "oauth2"):
             with self.subTest(auth_type=auth_type), self.assertRaises(ValidationError):
                 self.connection.auth_type = auth_type
         self.assertFalse(self.connection.tls_client_auth_supported)

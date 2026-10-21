@@ -5,7 +5,7 @@
         <field name="inherit_id" ref="edi_base.connection_form_view"/>
         <field name="arch" type="xml">
             <field name="timeout" position="after">
-                <field name="ftp_passive" invisible="transport != 'ftp'"/>
+                <field name="ftp_passive" invisible="transport != 'ftp' or not show_advanced"/>
             </field>
         </field>
     </record>

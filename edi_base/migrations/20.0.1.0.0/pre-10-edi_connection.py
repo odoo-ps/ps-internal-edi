@@ -120,6 +120,15 @@ def migrate(cr, version):
             processed_action = "keep"
         else:
             processed_action = "move" if done_folder else "delete"
+        if error_folder and processed_action != "move":
+            # the failed folder is only used when the processed files are moved
+            _logger.warning(
+                "edi.connection %s: the processed files are %s, the failed files are now left in place "
+                "instead of being moved to %s",
+                connection_id,
+                "deleted" if processed_action == "delete" else "left in place",
+                error_folder,
+            )
         cr.execute(
             """
             UPDATE edi_connection

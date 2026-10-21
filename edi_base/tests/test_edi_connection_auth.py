@@ -174,22 +174,20 @@ class TestEdiConnectionAuth(BaseCommon):
             self.connection.write({"tls_client_auth": True})
 
     # ------------------------------------------------------------
-    # Custom authentication
+    # Extension
     # ------------------------------------------------------------
 
-    def test_custom_auth(self):
-        self.connection.write({"auth_type": "custom", "auth_custom_code": "acme_hmac", "api_key": "K3Y"})
-        with self.assertRaises(EdiTransportError):  # no implementation
-            self._receive()
+    def test_authentication_extension(self):
+        """A module adding an authentication implements it in _http_authenticate."""
 
-        def _http_authenticate_custom(connection, session):
-            if connection.auth_custom_code != "acme_hmac":
-                return super(EdiConnection, connection)._http_authenticate_custom(session)
-            session.headers["X-Signature"] = f"signed with {connection.api_key}"
+        def _http_authenticate(connection, session):
+            if connection.auth_type != "none":  # stands for the auth_type added by the module
+                return super(EdiConnection, connection)._http_authenticate(session)
+            session.headers["X-Signature"] = "signed"
 
-        with patch.object(EdiConnection, "_http_authenticate_custom", _http_authenticate_custom):
+        with patch.object(EdiConnection, "_http_authenticate", _http_authenticate):
             session, _kwargs, _cert = self._receive()
-        self.assertEqual(session.headers["X-Signature"], "signed with K3Y")
+        self.assertEqual(session.headers["X-Signature"], "signed")
 
     # ------------------------------------------------------------
     # OAuth2 authorization code

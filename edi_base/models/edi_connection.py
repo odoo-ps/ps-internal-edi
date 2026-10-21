@@ -108,6 +108,15 @@ class EdiConnection(models.Model):
         "login directory.",
     )
     timeout = fields.Integer(default=30, help="Seconds to wait for the remote system to answer.")
+    show_advanced = fields.Boolean(
+        string="Advanced Settings",
+        compute="_compute_show_advanced",
+        store=True,
+        readonly=False,
+        copy=False,
+        help="Show the settings that rarely need a change (client certificate, extra headers, timeout, ...). "
+        "Checked automatically when one of them is changed, so that it is never hidden.",
+    )
     transport_file_based = fields.Boolean(compute="_compute_transport_file_based")
     file_on_conflict = fields.Selection(
         selection=[
@@ -124,7 +133,7 @@ class EdiConnection(models.Model):
     )
     file_processed_action = fields.Selection(
         selection=[
-            ("move", "Move to the Success Folder"),
+            ("move", "Move"),
             ("delete", "Delete"),
             ("keep", "Leave in Place"),
         ],
@@ -132,7 +141,8 @@ class EdiConnection(models.Model):
         default="move",
         required=True,
         tracking=True,
-        help="Incoming flows only: what to do with a received file once processed successfully. The files "
+        help="Incoming flows only: what to do with a received file once processed successfully (a failed one is "
+        "moved to the failed folder with Move, left in place otherwise). The files "
         "sent by Odoo (outgoing flows) are not affected: once uploaded, they belong to the remote system.\n"
         "When the files are moved or deleted, the most recent ones are received first. When they are left in "
         "place, the oldest ones are received first, and only the files more recent than the last processed one.",
@@ -148,9 +158,10 @@ class EdiConnection(models.Model):
         string="Failed Folder",
         default="error",
         tracking=True,
-        help="Incoming flows only: where to move the received files whose processing failed: relative to the "
-        "folder of the file (e.g. error for in/error), or to the path of the URL if it starts with /. Leave "
-        "empty to leave them in place: they are received again, to be retried, on the next run.",
+        help="Incoming flows only, when the processed files are moved: where to move the received files whose "
+        "processing failed: relative to the folder of the file (e.g. error for in/error), or to the path of the "
+        "URL if it starts with /. Leave empty to leave them in place: they are received again, to be retried, on "
+        "the next run. When the processed files are deleted or left in place, the failed ones are left in place.",
     )
     auth_type = fields.Selection(
         selection=[
@@ -159,13 +170,11 @@ class EdiConnection(models.Model):
             ("api_key", "API Key"),
             ("oauth2", "OAuth2"),
             ("ssh_key", "SSH Key"),
-            ("custom", "Custom"),
         ],
         string="Authentication",
         required=True,
         default="none",
         tracking=True,
-        help="Custom: implemented by a client module, see Custom Authentication.",
     )
     auth_field_names = fields.Json(
         compute="_compute_auth_field_names",
@@ -240,14 +249,6 @@ class EdiConnection(models.Model):
     )
     ssh_passphrase = fields.Char(string="Key Passphrase", copy=False, help="Leave empty if the key is not encrypted.")
 
-    # custom
-    auth_custom_code = fields.Char(
-        string="Custom Authentication",
-        tracking=True,
-        help="Code of the custom authentication implemented by a client module (see _http_authenticate_custom). "
-        "Username, password and API key are available to the implementation.",
-    )
-
     # client certificate (mutual TLS), combinable with any auth_type
     tls_client_auth = fields.Boolean(
         string="Client Certificate",
@@ -287,6 +288,35 @@ class EdiConnection(models.Model):
         copy=False,
         help="One header per line, as in HTTP: Name: value",
     )
+
+    @api.depends(lambda self: list(self._get_advanced_defaults()))
+    def _compute_show_advanced(self):
+        defaults = self._get_advanced_defaults()
+        for connection in self:
+            if any(connection[field] != default for field, default in defaults.items()):
+                connection.show_advanced = True
+
+    @api.model
+    def _get_advanced_defaults(self):
+        """Map the advanced fields (hidden unless ``show_advanced``) to their default value.
+
+        ``show_advanced`` is checked as soon as one of them is changed. Extended by the transport
+        modules for their own advanced fields.
+
+        :edi-hook: framework
+        :rtype: dict[str, Any]
+        """
+        return {
+            "timeout": 30,
+            "file_on_conflict": "fail",
+            "api_key_location": "header",
+            "api_key_name": "Authorization",
+            "api_key_prefix": "Bearer",
+            "oauth2_use_pkce": True,
+            "oauth2_scope": False,
+            "tls_client_auth": False,
+            "http_use_headers": False,
+        }
 
     @api.depends("auth_type", "oauth2_grant_type")
     def _compute_auth_field_names(self):
@@ -339,13 +369,21 @@ class EdiConnection(models.Model):
                     },
                 }
 
+        A module adding an authentication adds it to the ``auth_types`` of the transports it
+        supports (see ``_http_authenticate``)::
+
+            def _get_transports(self):
+                transports = super()._get_transports()
+                transports["http"]["auth_types"] += ("acme_hmac",)
+                return transports
+
         :edi-hook: framework
         :rtype: dict[str, dict]
         """
         return {
             "http": {
                 "schemes": ("http", "https"),
-                "auth_types": ("none", "basic", "api_key", "oauth2", "custom"),
+                "auth_types": ("none", "basic", "api_key", "oauth2"),
                 "client_certificate": True,
             },
         }
@@ -359,10 +397,12 @@ class EdiConnection(models.Model):
 
     @api.model
     def _get_auth_fields(self):
-        """Map each ``auth_type`` to the credential fields it uses.
+        """Map each ``auth_type`` to the credential fields it uses, shown in the form.
 
-        ``oauth2_<grant type>`` entries list the extra fields of each OAuth2 grant type.
+        ``oauth2_<grant type>`` entries list the extra fields of each OAuth2 grant type. Extended by
+        a module adding an authentication (see ``_http_authenticate``).
 
+        :edi-hook: client
         :rtype: dict[str, tuple[str]]
         """
         return {
@@ -381,7 +421,6 @@ class EdiConnection(models.Model):
             "oauth2_password": ("username", "password"),
             "oauth2_authorization_code": ("oauth2_authorize_url", "oauth2_redirect_uri", "oauth2_use_pkce"),
             "ssh_key": ("username", "ssh_private_key", "ssh_passphrase"),
-            "custom": ("auth_custom_code", "username", "password", "api_key"),
         }
 
     @api.constrains("transport", "auth_type")
@@ -444,10 +483,6 @@ class EdiConnection(models.Model):
         if auth_types and self.auth_type not in auth_types:
             self.auth_type = auth_types[0]
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        return super().create([self._normalize_vals(vals) for vals in vals_list])
-
     def write(self, vals):
         vals = self._normalize_vals(vals)
         if OAUTH2_TOKEN_FIELDS & vals.keys():
@@ -463,6 +498,10 @@ class EdiConnection(models.Model):
         if vals.get("url"):
             vals = {**vals, "url": vals["url"].strip()}
         return vals
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        return super().create([self._normalize_vals(vals) for vals in vals_list])
 
     def action_test(self):
         self.ensure_one()
@@ -593,7 +632,7 @@ class EdiConnection(models.Model):
         :raise EdiTransportError: if it is not
         """
         self.ensure_one()
-        if self.transport != "http" or self.auth_type in ("oauth2", "custom"):
+        if self.transport != "http" or self.auth_type == "oauth2":
             # opening the session already proved the credentials (token fetched, login done, ...)
             return
         response = self._http_send_request(session, "get", self._http_url(""))
@@ -620,7 +659,22 @@ class EdiConnection(models.Model):
         return session
 
     def _http_authenticate(self, session):
-        """Set the credentials of ``auth_type`` on ``session``."""
+        """Set the credentials of ``auth_type`` on ``session``, when it is opened.
+
+        A module adding an authentication specific to one remote system (request signing, login call
+        returning a session cookie, ...) adds it to the ``auth_type`` selection, to the ``auth_types``
+        of the transports (``_get_transports``) and to ``_get_auth_fields`` with its credential
+        fields, then implements it here, calling ``super()`` for the others::
+
+            def _http_authenticate(self, session):
+                if self.auth_type != "acme_hmac":
+                    return super()._http_authenticate(session)
+                session.auth = AcmeHmacAuth(self.sudo().acme_key)  # a requests.auth.AuthBase
+
+        :edi-hook: client
+        :param EdiHttpSession session: the session to authenticate, a ``requests.Session``
+        :raise EdiTransportError: if the remote system refuses the credentials
+        """
         connection = self.sudo()
         if connection.auth_type == "basic":
             session.auth = (connection.username or "", connection.password or "")
@@ -633,34 +687,8 @@ class EdiConnection(models.Model):
                 session.headers[connection.api_key_name] = value
         elif connection.auth_type == "oauth2":
             session.headers["Authorization"] = f"Bearer {connection._oauth2_get_token(session)}"
-        elif connection.auth_type == "custom":
-            connection._http_authenticate_custom(session)
-
-    def _http_authenticate_custom(self, session):
-        """Authenticate ``session`` for a connection with ``auth_type = custom``.
-
-        For authentications specific to one remote system: request signing, login call returning a
-        session cookie, provider specific token, ... Called with ``sudo()`` when the session is
-        opened, override it for your ``auth_custom_code`` and call ``super()`` for the others::
-
-            def _http_authenticate_custom(self, session):
-                if self.auth_custom_code != "acme_hmac":
-                    return super()._http_authenticate_custom(session)
-                session.auth = AcmeHmacAuth(self.api_key, self.password)  # a requests.auth.AuthBase
-
-        ``username``, ``password`` and ``api_key`` are available to store the credentials.
-
-        :edi-hook: client
-        :param EdiHttpSession session: the session to authenticate, a ``requests.Session``
-        :raise EdiTransportError: if the remote system refuses the credentials
-        """
-        raise EdiTransportError(
-            self.env._(
-                "No implementation of custom authentication %(code)s for connection %(name)s.",
-                code=self.auth_custom_code,
-                name=self.name,
-            )
-        )
+        elif connection.auth_type != "none":
+            raise EdiTransportError(self.env._("Authentication %s is not implemented for HTTP.", connection.auth_type))
 
     def _http_parse_headers(self):
         """Parse ``http_headers``, one ``Name: value`` per line.
@@ -796,9 +824,11 @@ class EdiConnection(models.Model):
         if success and self.file_processed_action == "delete":
             self._file_delete(session, message.ref)
             return
+        if self.file_processed_action != "move":
+            return  # left in place: once processed (keep), or to be retried (failed)
         folder = self.file_success_folder if success else self.file_failed_folder
-        if (success and self.file_processed_action == "keep") or not folder:
-            return  # left in place
+        if not folder:
+            return  # failed, without failed folder: left in place, to be retried
         path = self._file_path(self._file_processed_location(message, folder), message.name)
         if self._file_prepare_target(session, path):
             self._file_replace(session, message.ref, path)

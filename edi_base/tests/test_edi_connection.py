@@ -231,3 +231,21 @@ class TestEdiConnection(BaseCommon):
         mock, _sessions = self._patch_request(_response(status=401))
         with mock, self.assertRaises(UserError):
             self.connection.action_test()
+
+    def test_show_advanced(self):
+        self.assertFalse(self.connection.show_advanced)
+        self.connection.show_advanced = True  # can be shown on demand
+        self.connection.show_advanced = False
+        for vals in (
+            {"timeout": 60},
+            {"api_key_prefix": "Token"},
+            {"oauth2_scope": "orders"},
+            {"http_use_headers": True, "http_headers": "A: b"},
+        ):
+            with self.subTest(vals=vals):
+                connection = self.connection.copy()
+                self.assertFalse(connection.show_advanced)
+                connection.write(vals)  # never hidden once changed
+                self.assertTrue(connection.show_advanced)
+        connection = self.env["edi.connection"].create({"name": "B", "url": "https://b.example.com", "timeout": 5})
+        self.assertTrue(connection.show_advanced)  # also on creation
