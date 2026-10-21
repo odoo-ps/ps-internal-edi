@@ -31,6 +31,19 @@
                             <field name="transport"/>
                             <field name="url" placeholder="e.g. https://api.example.com/v1"/>
                             <field name="timeout"/>
+                            <field name="transport_file_based" invisible="1"/>
+                            <field name="file_on_conflict" invisible="not transport_file_based"/>
+                            <field name="file_processed_action" invisible="not transport_file_based"/>
+                            <field
+                                name="file_success_folder"
+                                invisible="not transport_file_based or file_processed_action != 'move'"
+                                required="transport_file_based and file_processed_action == 'move'"
+                            />
+                            <field
+                                name="file_failed_folder"
+                                invisible="not transport_file_based"
+                                placeholder="Leave in place, to retry"
+                            />
                             <field name="http_use_headers" invisible="transport != 'http'"/>
                             <field
                                 name="http_headers"

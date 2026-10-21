@@ -1,13 +1,15 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import base64
 import contextlib
+import fnmatch
 import hashlib
 import logging
 import os
+import posixpath
 import re
 import secrets
 import tempfile
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode, urlsplit
 
 import requests
@@ -101,9 +103,55 @@ class EdiConnection(models.Model):
         string="URL",
         required=True,
         tracking=True,
-        help="Base URL of the remote system, e.g. https://api.example.com/v1 or sftp://files.example.com:22",
+        help="Base URL of the remote system, e.g. https://api.example.com/v1 or sftp://files.example.com:22/acme. "
+        "For file transfers, without path (sftp://files.example.com) the folders are relative to the "
+        "login directory.",
     )
     timeout = fields.Integer(default=30, help="Seconds to wait for the remote system to answer.")
+    transport_file_based = fields.Boolean(compute="_compute_transport_file_based")
+    file_on_conflict = fields.Selection(
+        selection=[
+            ("fail", "Fail"),
+            ("rename", "Rename the existing file"),
+            ("replace", "Replace the existing file"),
+        ],
+        string="If File Exists",
+        default="fail",
+        required=True,
+        tracking=True,
+        help="What to do when a file is sent or moved where a file with the same name already exists. "
+        "Rename: the existing file gets a -<UTC date>.old suffix.",
+    )
+    file_processed_action = fields.Selection(
+        selection=[
+            ("move", "Move to the Success Folder"),
+            ("delete", "Delete"),
+            ("keep", "Leave in Place"),
+        ],
+        string="Processed Files",
+        default="move",
+        required=True,
+        tracking=True,
+        help="Incoming flows only: what to do with a received file once processed successfully. The files "
+        "sent by Odoo (outgoing flows) are not affected: once uploaded, they belong to the remote system.\n"
+        "When the files are moved or deleted, the most recent ones are received first. When they are left in "
+        "place, the oldest ones are received first, and only the files more recent than the last processed one.",
+    )
+    file_success_folder = fields.Char(
+        string="Success Folder",
+        default="done",
+        tracking=True,
+        help="Incoming flows only: where to move the received files processed successfully: relative to the "
+        "folder of the file (e.g. done for in/done), or to the path of the URL if it starts with /.",
+    )
+    file_failed_folder = fields.Char(
+        string="Failed Folder",
+        default="error",
+        tracking=True,
+        help="Incoming flows only: where to move the received files whose processing failed: relative to the "
+        "folder of the file (e.g. error for in/error), or to the path of the URL if it starts with /. Leave "
+        "empty to leave them in place: they are received again, to be retried, on the next run.",
+    )
     auth_type = fields.Selection(
         selection=[
             ("none", "None"),
@@ -254,10 +302,14 @@ class EdiConnection(models.Model):
             connection.oauth2_redirect_uri = urljoin(connection.get_base_url(), OAUTH2_REDIRECT_PATH)
 
     @api.depends("transport")
+    def _compute_transport_file_based(self):
+        for connection in self:
+            connection.transport_file_based = connection._get_transport_info().get("file_based", False)
+
+    @api.depends("transport")
     def _compute_tls_client_auth_supported(self):
         for connection in self:
-            transport = connection._get_transports().get(connection.transport, {})
-            connection.tls_client_auth_supported = transport.get("client_certificate", False)
+            connection.tls_client_auth_supported = connection._get_transport_info().get("client_certificate", False)
 
     @api.depends("tls_client_auth", "tls_client_certificate", "tls_client_key", "tls_client_password")
     def _compute_tls_client_certificate_expiry(self):
@@ -283,6 +335,7 @@ class EdiConnection(models.Model):
                         "schemes": ("ftp", "ftps"),
                         "auth_types": ("none", "basic"),
                         "client_certificate": True,  # optional, default False
+                        "file_based": True,  # optional, default False, see the _file_* methods
                     },
                 }
 
@@ -296,6 +349,13 @@ class EdiConnection(models.Model):
                 "client_certificate": True,
             },
         }
+
+    def _get_transport_info(self):
+        """Return the description of the transport of this connection (see ``_get_transports``).
+
+        :rtype: dict
+        """
+        return self._get_transports().get(self.transport, {}) if self.transport else {}
 
     @api.model
     def _get_auth_fields(self):
@@ -467,7 +527,7 @@ class EdiConnection(models.Model):
             raise NotImplementedError(f"Transport {self.transport} is not implemented")
         return self._http_connect()
 
-    def _edi_receive(self, session, location, *, params=None, method="get", limit=0):
+    def _edi_receive(self, session, location, *, params=None, method="get", pattern=None, limit=0, modified_after=None):
         """Fetch the data available at ``location``.
 
         :edi-hook: framework
@@ -475,10 +535,15 @@ class EdiConnection(models.Model):
         :param str location: endpoint path or remote folder, relative to the connection URL
         :param dict params: query parameters (request based transports)
         :param str method: request method (request based transports)
+        :param str pattern: file name pattern, e.g. ``*.csv`` (file based transports)
         :param int limit: max number of messages to return, 0 for no limit (file based transports)
+        :param datetime modified_after: only the files modified after this date, e.g. the date of
+            the last file processed, when they are left in place (file based transports)
         :rtype: list[EdiMessage]
         """
         self.ensure_one()
+        if self.transport_file_based:
+            return self._file_receive(session, location, pattern=pattern, limit=limit, modified_after=modified_after)
         if self.transport != "http":
             raise NotImplementedError(f"Transport {self.transport} is not implemented")
         return [self._http_request(session, method, location, params=params)]
@@ -498,23 +563,27 @@ class EdiConnection(models.Model):
         :rtype: EdiMessage | None
         """
         self.ensure_one()
+        if self.transport_file_based:
+            return self._file_send(session, location, content, name)
         if self.transport != "http":
             raise NotImplementedError(f"Transport {self.transport} is not implemented")
         headers = {"Content-Type": content_type} if content_type else None
         return self._http_request(session, method, location, params=params, data=content, headers=headers)
 
-    def _edi_acknowledge(self, session, message, success, *, location=None):
+    def _edi_acknowledge(self, session, message, success):
         """Tell the remote system that a received message has been handled.
 
-        File based transports typically move the file to ``location``. Default: nothing to do.
+        File based transports move or delete the file, according to ``file_processed_action`` and
+        ``file_failed_folder``. Default: nothing to do.
 
         :edi-hook: framework
         :param session: a session returned by ``_edi_connect``
         :param EdiMessage message: a message returned by ``_edi_receive``
         :param bool success: whether the message has been processed successfully
-        :param str location: where to move the message, if relevant
         """
         self.ensure_one()
+        if self.transport_file_based:
+            self._file_acknowledge(session, message, success)
 
     def _edi_test(self, session):
         """Check that the session is usable, beyond being opened.
@@ -643,6 +712,222 @@ class EdiConnection(models.Model):
             ref=url,
             meta={"status": response.status_code, "content_type": response.headers.get("Content-Type")},
         )
+
+    # ------------------------------------------------------------
+    # File based transports (FTP, SFTP, ...)
+    # ------------------------------------------------------------
+    # The transport modules implement the _file_* primitives below, the logic (sorting,
+    # filtering, temporary upload, conflicts, ...) is common to all of them.
+
+    def _file_root(self):
+        """Folder of the URL, all the locations are relative to it.
+
+        :return: the path of the URL (``sftp://host/acme``: ``/acme``, ``sftp://host/``: ``/``), or
+            ``.`` (the login directory of the user) if it has none (``sftp://host``)
+        """
+        path = urlsplit(self.url).path
+        return posixpath.normpath(path) if path else "."
+
+    def _file_path(self, location, name=None):
+        """Remote path of ``location`` (and ``name``), relative to the folder of the URL.
+
+        :return: an absolute path, or a path relative to the login directory if the URL has no path
+        :raise EdiTransportError: if the path is outside of the folder of the URL (e.g. with ``..``),
+            or if ``name`` is not a plain file name
+        """
+        root = self._file_root()
+        path = posixpath.normpath(posixpath.join(root, (location or "").lstrip("/")))
+        if name is not None:
+            if name in ("", ".", "..") or "/" in name or "\0" in name:
+                raise EdiTransportError(self.env._("%s is not a valid file name.", repr(name)))
+            path = posixpath.normpath(posixpath.join(path, name))
+        if root == ".":
+            inside = path != ".." and not path.startswith("../")
+        else:
+            inside = path == root or path.startswith(root.rstrip("/") + "/")
+        if not inside:
+            raise EdiTransportError(
+                self.env._(
+                    "%(path)s is outside of the folder %(root)s of connection %(name)s.",
+                    path=path,
+                    root=root,
+                    name=self.name,
+                )
+            )
+        return path
+
+    def _file_receive(self, session, location, *, pattern=None, limit=0, modified_after=None):
+        folder = self._file_path(location)
+        files = self._file_list(session, folder)
+        if pattern:
+            files = [(name, meta) for name, meta in files if fnmatch.fnmatch(name, pattern)]
+        if modified_after:
+            # files without date are kept: better received twice than never
+            files = [(name, meta) for name, meta in files if not meta.get("modify") or meta["modify"] > modified_after]
+        # the processed files leaving the folder, the most recent ones first; otherwise the oldest ones
+        # first, the caller asking for the ones after the last processed one (modified_after)
+        files = self._file_sort(files, newest_first=self.file_processed_action != "keep")
+        if limit:
+            files = files[:limit]
+        messages = []
+        for name, meta in files:
+            path = posixpath.normpath(posixpath.join(folder, name))
+            messages.append(EdiMessage(name=name, content=self._file_read(session, path), ref=path, meta=meta))
+        return messages
+
+    def _file_send(self, session, location, content, name):
+        if not name:
+            raise EdiTransportError(self.env._("A file name is required to send a file."))
+        path = self._file_path(location, name)
+        replace = self._file_prepare_target(session, path)
+        # upload under a temporary name, so that the remote system never picks up a partial file
+        uploading_path = f"{path}.{secrets.token_urlsafe(8)}.filepart"
+        try:
+            self._file_write(session, uploading_path, content)
+            if replace:
+                self._file_replace(session, uploading_path, path)
+            else:
+                self._file_rename(session, uploading_path, path)
+        except EdiTransportError:
+            self._file_delete_quietly(session, uploading_path)  # do not leave a partial upload behind
+            raise
+
+    def _file_acknowledge(self, session, message, success):
+        if success and self.file_processed_action == "delete":
+            self._file_delete(session, message.ref)
+            return
+        folder = self.file_success_folder if success else self.file_failed_folder
+        if (success and self.file_processed_action == "keep") or not folder:
+            return  # left in place
+        path = self._file_path(self._file_processed_location(message, folder), message.name)
+        if self._file_prepare_target(session, path):
+            self._file_replace(session, message.ref, path)
+        else:
+            self._file_rename(session, message.ref, path)
+
+    def _file_processed_location(self, message, folder):
+        """Location of ``folder`` (success or failed folder) for a received file.
+
+        :return: ``folder`` relative to the folder of the file, or as is if it starts with ``/``,
+            relative to the path of the URL (as expected by ``_file_path``)
+        """
+        if folder.startswith("/"):
+            return folder
+        file_folder = posixpath.dirname(message.ref) or "."
+        return posixpath.join(posixpath.relpath(file_folder, self._file_root()), folder)
+
+    def _file_prepare_target(self, session, path):
+        """Make room for a file at ``path``, according to ``file_on_conflict``.
+
+        :return: whether a file exists at ``path`` and must be replaced (with ``_file_replace``)
+        :rtype: bool
+        :raise EdiTransportError: if a file exists and ``file_on_conflict`` is ``fail``
+        """
+        if not self._file_exists(session, path):
+            return False
+        if self.file_on_conflict == "replace":
+            return True
+        if self.file_on_conflict == "rename":
+            self._file_rename(session, path, f"{path}-{datetime.now(UTC):%Y%m%d-%H%M%S}-utc.old")
+            return False
+        raise EdiTransportError(self.env._("File %s already exists on the remote system.", path))
+
+    def _file_sort(self, files, newest_first):
+        """Sort the listed files by date when the transport gives it, by name otherwise.
+
+        :param list[tuple[str, dict]] files: as returned by ``_file_list``
+        :param bool newest_first: most recent first, or oldest first
+        :rtype: list[tuple[str, dict]]
+        """
+        if all(meta.get("modify") for _name, meta in files):
+            return sorted(files, key=lambda file: (file[1]["modify"], file[0]), reverse=newest_first)
+        return sorted(files, reverse=newest_first)
+
+    def _file_delete_quietly(self, session, path):
+        """Delete ``path`` if possible, for a cleanup that must not hide the original error."""
+        try:
+            self._file_delete(session, path)
+        except EdiTransportError as e:
+            _logger.warning("EDI connection %s: could not delete %s: %s", self.id, path, e)
+
+    def _file_list(self, session, path):
+        """List the files (not the folders) of the remote folder ``path``, in any order.
+
+        The caller filters, sorts (most recent first) and limits them.
+
+        :edi-hook: framework
+        :return: the (file name, meta) tuples, meta being transport specific, with if possible
+            ``size`` (int) and ``modify`` (aware datetime of the last modification, to sort them)
+        :rtype: list[tuple[str, dict]]
+        :raise EdiTransportError: on any transport error
+        """
+        raise NotImplementedError(f"Transport {self.transport} is not file based")
+
+    def _file_exists(self, session, path):
+        """Return whether the remote file ``path`` exists.
+
+        :edi-hook: framework
+        :rtype: bool
+        :raise EdiTransportError: on any transport error
+        """
+        folder, name = posixpath.split(path)
+        return any(file_name == name for file_name, _meta in self._file_list(session, folder))
+
+    def _file_read(self, session, path):
+        """Return the content of the remote file ``path``.
+
+        :edi-hook: framework
+        :rtype: bytes
+        :raise EdiTransportError: on any transport error
+        """
+        raise NotImplementedError(f"Transport {self.transport} is not file based")
+
+    def _file_write(self, session, path, content):
+        """Write ``content`` to the remote file ``path``, replacing it if it exists.
+
+        :edi-hook: framework
+        :param bytes content: content of the file
+        :raise EdiTransportError: on any transport error
+        """
+        raise NotImplementedError(f"Transport {self.transport} is not file based")
+
+    def _file_rename(self, session, path, new_path):
+        """Rename (move) the remote file ``path`` to ``new_path``.
+
+        :edi-hook: framework
+        :raise EdiTransportError: on any transport error
+        """
+        raise NotImplementedError(f"Transport {self.transport} is not file based")
+
+    def _file_replace(self, session, path, target):
+        """Move the remote file ``path`` over the existing file ``target``.
+
+        Default: ``target`` is first renamed aside, and deleted once ``path`` took its place (or put
+        back if that fails), so that it is never lost; but ``target`` is missing for an instant.
+        Override it with an atomic rename when the transport has one (e.g. SFTP posix-rename).
+
+        :edi-hook: framework
+        :raise EdiTransportError: on any transport error
+        """
+        backup_path = f"{target}.{secrets.token_urlsafe(8)}.replaced"
+        self._file_rename(session, target, backup_path)
+        try:
+            self._file_rename(session, path, target)
+        except EdiTransportError:
+            try:
+                self._file_rename(session, backup_path, target)
+            except EdiTransportError as e:
+                _logger.error("EDI connection %s: could not restore %s from %s: %s", self.id, target, backup_path, e)
+            raise
+        self._file_delete_quietly(session, backup_path)
+
+    def _file_delete(self, session, path):
+        """Delete the remote file ``path``.
+
+        :edi-hook: framework
+        :raise EdiTransportError: on any transport error
+        """
+        raise NotImplementedError(f"Transport {self.transport} is not file based")
 
     # ------------------------------------------------------------
     # OAuth2
