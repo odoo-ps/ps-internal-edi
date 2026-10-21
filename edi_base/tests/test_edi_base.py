@@ -46,6 +46,40 @@ class TestEdiBase(TestEDICommonBase):
         )
         self.assertEqual(1, len(edi_parent_integration.sub_integration_ids))
 
+    def test_synchronization_and_execution_counts(self):
+        """Counts are batched, isolated per integration, and an execution is a distinct triggered_date"""
+        integrations = self.new_env["edi.integration"].create(
+            [
+                {
+                    "name": f"Test count integration {i}",
+                    "type": "api",
+                    "integration_flow": "out",
+                    "connection_id": self.mock_connection.id,
+                    "active": False,
+                }
+                for i in range(3)
+            ]
+        )
+        integration_1, integration_2 = integrations[:2]
+        Synchronization = self.new_env["edi.synchronization"]
+        # triggered_date is precomputed from the integration's last_execution_date
+        (integration_1 | integration_2).last_execution_date = "2026-01-01 10:00:00"
+        Synchronization.create(
+            [
+                {"name": "s1", "integration_id": integration_1.id},
+                {"name": "s2", "integration_id": integration_1.id},
+                {"name": "s4", "integration_id": integration_2.id},
+            ]
+        )
+        integration_1.last_execution_date = "2026-01-02 10:00:00"
+        Synchronization.create({"name": "s3", "integration_id": integration_1.id})
+        self.assertEqual(integrations.mapped("synchronization_count"), [3, 1, 0])
+        self.assertEqual(integrations.mapped("execution_count"), [2, 1, 0])
+
+        new_record = self.new_env["edi.integration"].new({"name": "New integration"})
+        self.assertEqual(new_record.synchronization_count, 0)
+        self.assertEqual(new_record.execution_count, 0)
+
 
 @tagged("post_install", "-at_install")
 class TestEdiCall(TestEDICommonBase):
