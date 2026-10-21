@@ -1,3 +1,2 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-from . import edi_integration
-from . import sftp_connection
+from . import edi_connection

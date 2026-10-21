@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="connection_form_view" model="ir.ui.view">
+        <field name="model">edi.connection</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_test" type="object" string="Test Connection" class="btn-primary"/>
+                    <button
+                        name="action_oauth2_authorize"
+                        type="object"
+                        string="Connect"
+                        class="btn-secondary"
+                        invisible="auth_type != 'oauth2' or oauth2_grant_type != 'authorization_code'"
+                    />
+                    <button
+                        name="action_reset_token"
+                        type="object"
+                        string="Reset Token"
+                        invisible="auth_type != 'oauth2' or not oauth2_access_token and not oauth2_refresh_token"
+                    />
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. ACME API"/></h1>
+                    </div>
+                    <group>
+                        <group name="transport" string="Transport">
+                            <field name="transport"/>
+                            <field name="url" placeholder="e.g. https://api.example.com/v1"/>
+                            <field name="timeout" invisible="not show_advanced"/>
+                            <field name="transport_file_based" invisible="1"/>
+                            <field name="tls_client_auth_supported" invisible="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active" invisible="1"/>
+                            <field name="show_advanced" widget="boolean_toggle"/>
+                        </group>
+                        <group name="auth" string="Authentication">
+                            <field name="auth_type" widget="radio"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="credentials" string="Credentials" invisible="not auth_field_names">
+                            <group name="credentials">
+                                <field name="auth_field_names" invisible="1"/>
+                                <field name="username" invisible="'username' not in auth_field_names"/>
+                                <field name="password" password="True" invisible="'password' not in auth_field_names"/>
+
+                                <field
+                                    name="api_key"
+                                    password="True"
+                                    required="auth_type == 'api_key'"
+                                    invisible="'api_key' not in auth_field_names"
+                                />
+                                <field
+                                    name="api_key_location"
+                                    required="auth_type == 'api_key'"
+                                    invisible="'api_key_location' not in auth_field_names or not show_advanced"
+                                />
+                                <field
+                                    name="api_key_name"
+                                    required="auth_type == 'api_key'"
+                                    invisible="'api_key_name' not in auth_field_names or not show_advanced"
+                                />
+                                <field
+                                    name="api_key_prefix"
+                                    invisible="'api_key_prefix' not in auth_field_names or not show_advanced"
+                                />
+
+                                <field
+                                    name="oauth2_grant_type"
+                                    required="auth_type == 'oauth2'"
+                                    invisible="'oauth2_grant_type' not in auth_field_names"
+                                />
+                                <field
+                                    name="oauth2_authorize_url"
+                                    required="auth_type == 'oauth2' and oauth2_grant_type == 'authorization_code'"
+                                    placeholder="e.g. https://auth.example.com/oauth/authorize"
+                                    invisible="'oauth2_authorize_url' not in auth_field_names"
+                                />
+                                <field
+                                    name="oauth2_redirect_uri"
+                                    widget="CopyClipboardChar"
+                                    invisible="'oauth2_redirect_uri' not in auth_field_names"
+                                />
+                                <field
+                                    name="oauth2_use_pkce"
+                                    invisible="'oauth2_use_pkce' not in auth_field_names or not show_advanced"
+                                />
+                                <field
+                                    name="oauth2_token_url"
+                                    required="auth_type == 'oauth2'"
+                                    placeholder="e.g. https://auth.example.com/oauth/token"
+                                    invisible="'oauth2_token_url' not in auth_field_names"
+                                />
+                                <field name="oauth2_client_id" invisible="'oauth2_client_id' not in auth_field_names"/>
+                                <field
+                                    name="oauth2_client_secret"
+                                    password="True"
+                                    invisible="'oauth2_client_secret' not in auth_field_names"
+                                />
+                                <field
+                                    name="oauth2_scope"
+                                    invisible="'oauth2_scope' not in auth_field_names or not show_advanced"
+                                />
+                                <field name="oauth2_access_token" invisible="1"/>
+                                <field name="oauth2_refresh_token" invisible="1"/>
+                                <field
+                                    name="oauth2_token_expiry"
+                                    invisible="'oauth2_token_expiry' not in auth_field_names or not oauth2_token_expiry"
+                                />
+
+                                <field
+                                    name="ssh_private_key"
+                                    required="auth_type == 'ssh_key'"
+                                    placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                                    invisible="'ssh_private_key' not in auth_field_names"
+                                />
+                                <field
+                                    name="ssh_passphrase"
+                                    password="True"
+                                    invisible="'ssh_passphrase' not in auth_field_names"
+                                />
+                            </group>
+                        </page>
+                        <page name="file_transfer" string="File Transfer" invisible="not transport_file_based">
+                            <group>
+                                <group name="file_received" string="Received Files">
+                                    <field name="file_processed_action" widget="radio"/>
+                                    <field
+                                        name="file_success_folder"
+                                        invisible="file_processed_action != 'move'"
+                                        required="transport_file_based and file_processed_action == 'move'"
+                                    />
+                                    <field
+                                        name="file_failed_folder"
+                                        invisible="file_processed_action != 'move'"
+                                        placeholder="Leave in place, to retry"
+                                    />
+                                </group>
+                                <group name="file_sent" string="Sent Files" invisible="not show_advanced">
+                                    <field name="file_on_conflict" widget="radio"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page
+                            name="http_headers"
+                            string="HTTP Headers"
+                            invisible="transport != 'http' or not show_advanced"
+                        >
+                            <group>
+                                <field name="http_use_headers"/>
+                                <field
+                                    name="http_headers"
+                                    invisible="not http_use_headers"
+                                    required="transport == 'http' and http_use_headers"
+                                    placeholder="Ocp-Apim-Subscription-Key: 1234abcd&#10;X-Api-Version: 2"
+                                />
+                            </group>
+                        </page>
+                        <page
+                            name="client_certificate"
+                            string="Client Certificate"
+                            invisible="not tls_client_auth_supported or not show_advanced"
+                        >
+                            <group>
+                                <group>
+                                    <field name="tls_client_auth"/>
+                                    <field
+                                        name="tls_client_certificate"
+                                        filename="tls_client_certificate_name"
+                                        invisible="not tls_client_auth"
+                                        required="tls_client_auth"
+                                    />
+                                    <field name="tls_client_certificate_name" invisible="1"/>
+                                    <field
+                                        name="tls_client_key"
+                                        filename="tls_client_key_name"
+                                        invisible="not tls_client_auth"
+                                    />
+                                    <field name="tls_client_key_name" invisible="1"/>
+                                    <field name="tls_client_password" password="True" invisible="not tls_client_auth"/>
+                                    <field
+                                        name="tls_client_certificate_expiry"
+                                        invisible="not tls_client_auth or not tls_client_certificate_expiry"
+                                    />
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="connection_list_view" model="ir.ui.view">
+        <field name="model">edi.connection</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="transport"/>
+                <field name="url"/>
+                <field name="auth_type"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="connection_search_view" model="ir.ui.view">
+        <field name="model">edi.connection</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="url"/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_by_transport" string="Transport" context="{'group_by': 'transport'}"/>
+                    <filter name="group_by_auth_type" string="Authentication" context="{'group_by': 'auth_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="connections_act_window" model="ir.actions.act_window">
+        <field name="name">Connections</field>
+        <field name="res_model">edi.connection</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a connection to a remote system</p>
+            <p>A connection holds where the remote system is and how to authenticate on it.</p>
+        </field>
+    </record>
+</odoo>

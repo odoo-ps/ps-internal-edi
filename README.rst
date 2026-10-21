@@ -8,6 +8,8 @@ This is the almost-perfect ecosystem to handle API/FTP/SFTP integrations.
 Documentation
 =============
 
+Developer documentation (nomenclature, developer guide, hooks): `doc <doc/index.rst>`_.
+
 This repository is organized into several modules:
 
 Base (including API connector)
