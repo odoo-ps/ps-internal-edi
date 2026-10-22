@@ -8,7 +8,7 @@ from io import BytesIO as StringIO
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import ustr
+from odoo.tools import SQL, ustr
 
 
 _logger = logging.getLogger(__name__)
@@ -347,24 +347,22 @@ class FTPConnection(models.Model):
 
         # if we have to let the processed files on the server (in folder),
         # then we have to excluded them from the next synchros
-        filenames_str = ", ".join(["('%s')" % filename for filename in filenames])
         cr = integration_id.env.cr
         cr.execute(
-            """
-            SELECT filename FROM (VALUES {filenames}) AS t (filename)
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM edi_synchronization as sync
+            SQL(
+                """
+                SELECT sync.filename
+                FROM edi_synchronization AS sync
                 WHERE sync.integration_id = %s
-                AND sync.state = 'done'
-                AND sync.filename = t.filename LIMIT 1
-            );
-            """.format(
-                filenames=filenames_str
-            ),
-            [integration_id.id],
+                  AND sync.state = 'done'
+                  AND sync.filename IN %s
+                """,
+                integration_id.id,
+                tuple(filenames),
+            )
         )
-        return [filename for (filename,) in cr.fetchall()]
+        processed_files = {filename for (filename,) in cr.fetchall()}
+        return [filename for filename in filenames if filename not in processed_files]
 
     def _clean_local_file(self, data, *args, **kwargs):
         """Delete the file locally and the directory if empty
