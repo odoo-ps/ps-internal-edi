@@ -13,6 +13,8 @@ class Synchronization(models.Model):
     active = fields.Boolean(default=True)
     error_ids = fields.One2many(context={"active_test": False})  # consider archived errors too
 
+    _integration_id_active_idx = models.Index("(integration_id) WHERE active IS TRUE")
+
     @api.model
     def _archive_states(self):
         return ["new", "fail", "done", "cancel"]
