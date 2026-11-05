@@ -2,7 +2,7 @@
 import json
 import logging
 
-from odoo import _, api, fields, models, tools
+from odoo import api, fields, models, tools
 from odoo.api import NewId
 from odoo.exceptions import UserError, ValidationError
 from odoo.modules.registry import Registry
@@ -255,7 +255,7 @@ class Integration(models.Model):
         elif self.integration_flow_type == "out":
             return out_method(*args, **kwargs)
         raise ValidationError(
-            _(
+            self.env._(
                 "Invalid integration flow type %s." "\nYou have to specify if this flow type is an 'in' or 'out' flow.",
                 self.integration_flow,
             )
@@ -322,7 +322,7 @@ class Integration(models.Model):
             )
             if not synchronizations:
                 _logger.warning(
-                    _(
+                    integration.env._(
                         "No synchronization related to the integration %s, impossible to set the status",
                         integration.type,
                     )
@@ -422,7 +422,7 @@ class Integration(models.Model):
 
         action_dict.update(
             {
-                "name": _("%s's synchronizations") % self.name,
+                "name": self.env._("%s's synchronizations", self.name),
                 "domain": [("integration_id", "in", [self.id] + self.sub_integration_ids.ids)],
                 "context": ctx,
             }
@@ -487,7 +487,7 @@ class Integration(models.Model):
             self.env.cr.sync._report_error(self.env.cr.activity, exception=exception, message=message)
             return
 
-        _logger.error(_("Cannot log error on sync object, sync object is not created yet"))
+        _logger.error(self.env._("Cannot log error on sync object, sync object is not created yet"))
 
     @api.model
     def _process(self, integration_id):
@@ -511,7 +511,7 @@ class Integration(models.Model):
             else:
                 if integration.integration_flow == "out_real":
                     _logger.warning(
-                        _("Do not call process_integration for real_time integration, call _process_realtime")
+                        integration.env._("Do not call process_integration for real_time integration, call _process_realtime")
                     )
                 else:
                     integration._process_in_out(raise_error=raise_error)
@@ -633,7 +633,7 @@ class Integration(models.Model):
                 data = self._exec_method_based_on_flow(self._get_in_data, self._get_out_data)
 
         if not data:
-            _logger.info(_("No data found to synchronize for %s [%s]", self.name, self.id))
+            _logger.info(self.env._("No data found to synchronize for %s [%s]", self.name, self.id))
         return data
 
     def _process_synchronizations(self, data, raise_error=False):
@@ -755,7 +755,7 @@ class Integration(models.Model):
         except Exception as exc_2:
             self.env.cr.sync._report_error(self.env.cr.activity, exc_2)
             raise ProcessIntegrationException(
-                _("Fail to handle the exception (%s) due to %s", str(exc), str(exc_2))
+                self.env._("Fail to handle the exception (%s) due to %s", str(exc), str(exc_2))
             ) from exc_2
 
     def _handle_success_execute_synchronization(self, data):
@@ -876,7 +876,7 @@ class Integration(models.Model):
 
                 # report an error on created synchronizations
                 syncs = env["edi.synchronization"].browse(sync_ids).exists()
-                error_message = _(
+                error_message = env._(
                     "An error occurred after the _process_realtime operation. The validity of the data is not guaranteed."
                 )
                 syncs._report_error("Post Integration", message=error_message)

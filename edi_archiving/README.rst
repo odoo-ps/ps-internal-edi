@@ -2,9 +2,9 @@
 EDI Archiving
 =============
 
-------------
+-------------
 Particularity
-------------
+-------------
 
 Adds an ``active`` field on ``edi.synchronization`` (and keeps its errors visible even once
 archived) plus an autovacuum job that archives, and optionally deletes, old synchronizations.

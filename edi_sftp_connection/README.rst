@@ -2,9 +2,9 @@
 SFTP Connector
 ==============
 
-------------
+-------------
 Particularity
-------------
+-------------
 
 Adds the ``type="sftp"`` connection to ``edi_base``. Same shape as ``edi_ftp_connection``
 (credentials & folders live in the ``configuration`` JSON field, no ``path``/``method`` on the

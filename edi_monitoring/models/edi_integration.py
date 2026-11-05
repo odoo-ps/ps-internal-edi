@@ -1,6 +1,6 @@
 import logging
 
-from odoo import _, fields, models
+from odoo import fields, models
 
 
 _logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class Integration(models.Model):
         self.ensure_one()
         levels = [False] + [level for level, _ in self._fields["logging_verbosity"].selection]
         if verbosity not in levels:
-            raise ValueError(_("The specified logging verbosity %s does not exist", verbosity))
+            raise ValueError(self.env._("The specified logging verbosity %s does not exist", verbosity))
         if levels.index(verbosity) <= levels.index(self.logging_verbosity):
             if prefix:
                 msg = "%s : %s" % (self.name, msg)

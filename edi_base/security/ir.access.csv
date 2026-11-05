@@ -1,0 +1,13 @@
+id,name,model_id,group_id/id,operation,domain
+access_edi_connection_user_all,access_edi_connection_user_all,edi.connection,base.group_user,r,
+access_edi_connection_erp_manager_all,access_edi_connection_erp_manager_all,edi.connection,base.group_system,crud,
+edi_connection_company_rule,Restricted edi connections: multi-company,edi.connection,,crud,"['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]"
+access_edi_integration_user_all,access_edi_integration_user_all,edi.integration,base.group_user,r,
+access_edi_integration_erp_manager_all,access_edi_integration_erp_manager_all,edi.integration,base.group_system,crud,
+edi_integration_company_rule,Restricted edi integrations: multi-company,edi.integration,,crud,"['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]"
+access_edi_synchronization_user_all,access_edi_synchronization_user_all,edi.synchronization,base.group_user,r,
+access_edi_synchronization_erp_manager_all,access_edi_synchronization_erp_manager_all,edi.synchronization,base.group_system,crud,
+edi_synchronization_company_rule,Restricted edi synchronization: multi-company,edi.synchronization,,crud,"['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]"
+access_edi_synchronization_error_user_all,access_edi_synchronization_error_user_all,edi.synchronization.error,base.group_user,r,
+access_edi_synchronization_error_erp_manager_all,access_edi_synchronization_error_erp_manager_all,edi.synchronization.error,base.group_system,crud,
+edi_synchronization_error_company_rule,Restricted edi synchronization error: multi-company,edi.synchronization.error,,crud,"['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]"
