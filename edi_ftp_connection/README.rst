@@ -2,9 +2,9 @@
 FTP Connector
 =============
 
-------------
+-------------
 Particularity
-------------
+-------------
 
 Adds the ``type="ftp"`` connection to ``edi_base``. Unlike the built-in ``type="api"``
 connection, credentials and paths are **not** exposed as dedicated fields: they live in the
